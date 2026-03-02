@@ -32,9 +32,15 @@ function App() {
           imageSize: imageDimensions ?? undefined,
           coordinateFix,
         });
-        if (debugCoords && result.debug_url) {
-          setDebugImage(result.debug_url);
-          setMask(null);
+        if (debugCoords) {
+          if (result.debug_url) {
+            setDebugImage(result.debug_url);
+            setMask(null);
+          } else {
+            setDebugImage(null);
+            console.warn('Debug requested but no debug_url in response:', result);
+            if (result.image?.url) setMask(result.image.url);
+          }
         } else {
           setDebugImage(null);
           if (result.image?.url) setMask(result.image.url);

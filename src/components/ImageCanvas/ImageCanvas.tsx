@@ -140,10 +140,18 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
   return (
     <div className="image-canvas" style={containerStyle}>
       {debugImageUrl && (
-        <div style={debugBannerStyle}>
-          Debug: Red marker shows where server received your click
-        </div>
+        <>
+          <div style={debugBannerStyle}>
+            Debug: Red marker shows where server received your click
+          </div>
+          <img
+            src={debugImageUrl}
+            alt="Debug: server received point location"
+            style={debugImgStyle}
+          />
+        </>
       )}
+      {!debugImageUrl && (
       <Stage
         ref={stageRef}
         width={canvasWidth}
@@ -236,6 +244,7 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
           )}
         </Layer>
       </Stage>
+      )}
     </div>
   );
 }
@@ -263,4 +272,10 @@ const debugBannerStyle: React.CSSProperties = {
   borderRadius: 6,
   marginBottom: 12,
   fontSize: 14,
+};
+const debugImgStyle: React.CSSProperties = {
+  maxWidth: '100%',
+  maxHeight: 600,
+  borderRadius: 8,
+  border: '3px solid #e94560',
 };
