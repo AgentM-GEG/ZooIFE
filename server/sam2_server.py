@@ -42,11 +42,11 @@ def get_predictor(model_id: str):
                 vit_type = model_id.replace("sam1-", "")
                 if vit_type not in ("vit_b", "vit_l", "vit_h"):
                     vit_type = "vit_h"
-                # SAM1 checkpoints on HuggingFace (ybelkada/segment-anything)
+                # SAM1 checkpoints on HuggingFace (ybelkada/segment-anything, in checkpoints/ subfolder)
                 ckpt_map = {
-                    "vit_b": ("ybelkada/segment-anything", "sam_vit_b_01ec64.pth"),
-                    "vit_l": ("ybelkada/segment-anything", "sam_vit_l_0b3195.pth"),
-                    "vit_h": ("ybelkada/segment-anything", "sam_vit_h_4b8939.pth"),
+                    "vit_b": ("ybelkada/segment-anything", "checkpoints/sam_vit_b_01ec64.pth"),
+                    "vit_l": ("ybelkada/segment-anything", "checkpoints/sam_vit_l_0b3195.pth"),
+                    "vit_h": ("ybelkada/segment-anything", "checkpoints/sam_vit_h_4b8939.pth"),
                 }
                 repo_id, filename = ckpt_map[vit_type]
                 ckpt_path = hf_hub_download(repo_id=repo_id, filename=filename)
