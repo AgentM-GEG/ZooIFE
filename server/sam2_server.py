@@ -72,23 +72,25 @@ class SegmentRequest(BaseModel):
 
 
 def load_image_from_request(image_url: str) -> np.ndarray:
-    """Load image from URL or data URI."""
-    from PIL import Image
+    """Load image from URL or data URI, applying EXIF orientation to match browser display."""
+    from PIL import Image, ImageOps
 
     if image_url.startswith("data:"):
-        # data:image/jpeg;base64,xxxx
         header, b64 = image_url.split(",", 1)
         data = base64.b64decode(b64)
         img = Image.open(io.BytesIO(data)).convert("RGB")
-        return np.array(img)
     else:
-        # HTTP URL - fetch synchronously for simplicity (or use aiohttp in async)
         import urllib.request
-
         with urllib.request.urlopen(image_url, timeout=30) as resp:
             data = resp.read()
         img = Image.open(io.BytesIO(data)).convert("RGB")
-        return np.array(img)
+
+    # Apply EXIF orientation so server image matches what the browser displays
+    try:
+        img = ImageOps.exif_transpose(img)
+    except Exception:
+        pass  # Keep original if transpose fails (e.g. corrupt EXIF)
+    return np.array(img)
 
 
 def mask_to_data_uri(mask: np.ndarray, alpha: float = 0.45) -> str:

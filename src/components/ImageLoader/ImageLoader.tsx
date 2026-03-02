@@ -1,6 +1,10 @@
 import { useRef } from 'react';
 import { useClassificationStore } from '../../stores/classificationStore';
-import { loadImageAsDataUrl, getImageDimensions } from '../../services/imageService';
+import {
+  loadImageAsDataUrl,
+  getImageDimensions,
+  normalizeImageForDisplay,
+} from '../../services/imageService';
 
 export function ImageLoader() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -11,8 +15,10 @@ export function ImageLoader() {
     if (!file) return;
     try {
       const dataUrl = await loadImageAsDataUrl(file);
-      const dims = await getImageDimensions(dataUrl);
-      setSubject(`local-${file.name}`, dataUrl, dims);
+      // Normalize so display and SAM2 see the same pixels (fixes EXIF coordinate mismatch)
+      const normalizedUrl = await normalizeImageForDisplay(dataUrl);
+      const dims = await getImageDimensions(normalizedUrl);
+      setSubject(`local-${file.name}`, normalizedUrl, dims);
     } catch (err) {
       console.error('Failed to load image:', err);
     }
