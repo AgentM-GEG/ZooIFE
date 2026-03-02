@@ -1,3 +1,4 @@
+import { useClassificationStore } from '../../stores/classificationStore';
 import type { AnnotationTool } from '../../types/annotations';
 
 interface ToolPaletteProps {
@@ -12,6 +13,9 @@ const tools: { id: AnnotationTool; label: string }[] = [
 ];
 
 export function ToolPalette({ tool, onToolChange }: ToolPaletteProps) {
+  const { annotations, clearAnnotations } = useClassificationStore();
+  const hasAnnotations = annotations.length > 0;
+
   return (
     <div className="tool-palette" style={style}>
       <span style={labelStyle}>Tools</span>
@@ -27,6 +31,14 @@ export function ToolPalette({ tool, onToolChange }: ToolPaletteProps) {
           {t.label}
         </button>
       ))}
+      {hasAnnotations && (
+        <button onClick={clearAnnotations} style={{ ...btnStyle, ...clearBtnStyle }}>
+          Clear all
+        </button>
+      )}
+      <span style={{ ...labelStyle, marginTop: 12, fontSize: 11 }}>
+        Right-click point to remove
+      </span>
     </div>
   );
 }
@@ -51,5 +63,10 @@ const btnStyle: React.CSSProperties = {
 };
 const btnActiveStyle: React.CSSProperties = {
   background: '#0f3460',
+  borderColor: '#e94560',
+};
+const clearBtnStyle: React.CSSProperties = {
+  marginTop: 4,
+  color: '#e94560',
   borderColor: '#e94560',
 };

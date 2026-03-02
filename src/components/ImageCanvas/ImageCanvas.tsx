@@ -10,7 +10,14 @@ interface ImageCanvasProps {
 }
 
 export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
-  const { imageUrl, annotations, addAnnotation, currentMaskUrl } = useClassificationStore();
+  const {
+    imageUrl,
+    annotations,
+    addAnnotation,
+    removeAnnotation,
+    clearAnnotations,
+    currentMaskUrl,
+  } = useClassificationStore();
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [maskImage, setMaskImage] = useState<HTMLImageElement | null>(null);
   const [drawingPoints, setDrawingPoints] = useState<Array<{ x: number; y: number }>>([]);
@@ -24,6 +31,9 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
 
   const handleStageClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      const target = e.target as { getClassName?: () => string };
+      if (target?.getClassName && ['Circle', 'Line'].includes(target.getClassName()))
+        return; // Clicked on annotation - don't add new point
       if (!stageRef.current || !image) return;
       const stage = stageRef.current;
       const pos = stage.getPointerPosition();
@@ -144,7 +154,6 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
               x={offsetX}
               y={offsetY}
               listening={false}
-              opacity={0.5}
             />
           )}
           {annotations.map((a, i) => {
@@ -154,10 +163,18 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
                   key={a.id ?? i}
                   x={offsetX + a.x * scale}
                   y={offsetY + a.y * scale}
-                  radius={6}
+                  radius={8}
                   fill="lime"
                   stroke="white"
                   strokeWidth={2}
+                  listening
+                  onClick={(e) => e.cancelBubble = true}
+                  onTap={(e) => e.cancelBubble = true}
+                  onContextMenu={(e) => {
+                    e.evt.preventDefault();
+                    if (a.id) removeAnnotation(a.id);
+                  }}
+                  hitStrokeWidth={10}
                 />
               );
             if (a.type === 'polyline' && a.points.length > 1)
@@ -169,6 +186,14 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
                   strokeWidth={3}
                   lineCap="round"
                   lineJoin="round"
+                  listening
+                  hitStrokeWidth={12}
+                  onClick={(e) => e.cancelBubble = true}
+                  onTap={(e) => e.cancelBubble = true}
+                  onContextMenu={(e) => {
+                    e.evt.preventDefault();
+                    if (a.id) removeAnnotation(a.id);
+                  }}
                 />
               );
             return null;

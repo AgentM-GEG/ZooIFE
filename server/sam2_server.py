@@ -91,19 +91,22 @@ def load_image_from_request(image_url: str) -> np.ndarray:
         return np.array(img)
 
 
-def mask_to_data_uri(mask: np.ndarray, alpha: float = 0.5) -> str:
-    """Convert binary mask to semi-transparent PNG data URI."""
+def mask_to_data_uri(mask: np.ndarray, alpha: float = 0.45) -> str:
+    """Convert binary mask to vivid semi-transparent overlay (green/cyan)."""
     from PIL import Image
 
     # mask: (C, H, W) or (H, W) - boolean or float
     if mask.ndim == 3:
         mask = mask[0]
-    mask_uint8 = (np.asarray(mask, dtype=float) * 255).astype(np.uint8)
-    img = Image.fromarray(mask_uint8, mode="L")
-    img_rgba = img.convert("RGBA")
-    data = np.array(img_rgba)
-    data[:, :, 3] = (data[:, :, 0] * alpha).astype(np.uint8)
-    out = Image.fromarray(data)
+    m = np.asarray(mask, dtype=float)
+    h, w = m.shape
+    # RGBA: segmented region = vivid cyan/green, rest = transparent
+    rgba = np.zeros((h, w, 4), dtype=np.uint8)
+    rgba[:, :, 0] = 0  # R
+    rgba[:, :, 1] = 255  # G (vivid green)
+    rgba[:, :, 2] = 200  # B (slight blue for cyan tint)
+    rgba[:, :, 3] = (m * 255 * alpha).astype(np.uint8)
+    out = Image.fromarray(rgba)
     buf = io.BytesIO()
     out.save(buf, format="PNG")
     b64 = base64.b64encode(buf.getvalue()).decode()

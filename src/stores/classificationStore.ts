@@ -25,6 +25,7 @@ interface ClassificationState {
   // Actions
   setSubject: (id: string, imageUrl: string, dimensions?: { width: number; height: number }) => void;
   addAnnotation: (annotation: DrawingAnnotation) => void;
+  removeAnnotation: (id: string) => void;
   clearAnnotations: () => void;
   setTaskAnswer: (taskId: string, value: string | string[]) => void;
   setMask: (url: string | null) => void;
@@ -54,6 +55,12 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
   addAnnotation: (annotation) =>
     set((state) => ({
       annotations: [...state.annotations, { ...annotation, id: crypto.randomUUID() }],
+    })),
+
+  removeAnnotation: (id) =>
+    set((state) => ({
+      annotations: state.annotations.filter((a) => (a.id ?? '') !== id),
+      currentMaskUrl: null,
     })),
 
   clearAnnotations: () => set({ annotations: [], currentMaskUrl: null }),
