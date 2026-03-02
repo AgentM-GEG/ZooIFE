@@ -1,0 +1,104 @@
+import { create } from 'zustand';
+import type { DrawingAnnotation } from '../types/annotations';
+import type { Annotation as PanoptesAnnotation } from '../types/panoptes';
+
+export interface TaskAnswer {
+  taskId: string;
+  value: string | string[];
+}
+
+interface ClassificationState {
+  // Subject & image
+  subjectId: string | null;
+  imageUrl: string | null;
+  imageDimensions: { width: number; height: number } | null;
+
+  // Annotations (drawing layer)
+  annotations: DrawingAnnotation[];
+
+  // Task answers (sidebar)
+  taskAnswers: Record<string, string | string[]>;
+
+  // SAM2 mask overlay
+  currentMaskUrl: string | null;
+
+  // Actions
+  setSubject: (id: string, imageUrl: string, dimensions?: { width: number; height: number }) => void;
+  addAnnotation: (annotation: DrawingAnnotation) => void;
+  clearAnnotations: () => void;
+  setTaskAnswer: (taskId: string, value: string | string[]) => void;
+  setMask: (url: string | null) => void;
+  buildPanoptesAnnotations: () => PanoptesAnnotation[];
+  reset: () => void;
+}
+
+const initialState = {
+  subjectId: null,
+  imageUrl: null,
+  imageDimensions: null,
+  annotations: [],
+  taskAnswers: {},
+  currentMaskUrl: null,
+};
+
+export const useClassificationStore = create<ClassificationState>((set, get) => ({
+  ...initialState,
+
+  setSubject: (id, imageUrl, dimensions) =>
+    set({
+      subjectId: id,
+      imageUrl,
+      imageDimensions: dimensions ?? null,
+    }),
+
+  addAnnotation: (annotation) =>
+    set((state) => ({
+      annotations: [...state.annotations, { ...annotation, id: crypto.randomUUID() }],
+    })),
+
+  clearAnnotations: () => set({ annotations: [], currentMaskUrl: null }),
+
+  setTaskAnswer: (taskId, value) =>
+    set((state) => ({
+      taskAnswers: { ...state.taskAnswers, [taskId]: value },
+    })),
+
+  setMask: (url) => set({ currentMaskUrl: url }),
+
+  buildPanoptesAnnotations: () => {
+    const { annotations, taskAnswers } = get();
+    const result: PanoptesAnnotation[] = [];
+
+    // Drawing annotations
+    annotations.forEach((a, i) => {
+      result.push({
+        task: `drawing-${i}`,
+        value: mapAnnotationToValue(a),
+      });
+    });
+
+    // Task answers
+    Object.entries(taskAnswers).forEach(([taskId, value]) => {
+      result.push({ task: taskId, value });
+    });
+
+    return result;
+  },
+
+  reset: () => set(initialState),
+}));
+
+function mapAnnotationToValue(a: DrawingAnnotation): unknown {
+  switch (a.type) {
+    case 'point':
+      return { type: 'point', x: a.x, y: a.y, label: a.label };
+    case 'polyline':
+      return { type: 'polyline', points: a.points };
+    case 'brush':
+      return { type: 'brush', strokes: a.strokes };
+    case 'sam2_mask':
+      return { type: 'sam2_mask', prompts: a.prompts, maskUrl: a.maskUrl };
+    default:
+      return a;
+  }
+}
