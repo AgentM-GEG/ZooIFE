@@ -164,13 +164,19 @@ async def segment(request: SegmentRequest) -> dict[str, Any]:
 
         result: dict[str, Any] = {"image": {"url": mask_url}}
         if request.debug:
-            # Draw red circle at received (x,y) to verify coordinate mapping
+            # Draw large visible marker at received (x,y) to verify coordinate mapping
             from PIL import Image, ImageDraw
             img_pil = Image.fromarray(image)
             draw = ImageDraw.Draw(img_pil)
+            h, w = image.shape[:2]
             for p in request.prompts:
-                r = max(10, min(image.shape[:2]) // 50)
-                draw.ellipse([p.x - r, p.y - r, p.x + r, p.y + r], outline="red", width=4)
+                r = max(40, min(h, w) // 15)  # Large radius: ~7% of smaller dimension
+                x0, y0 = max(0, p.x - r), max(0, p.y - r)
+                x1, y1 = min(w, p.x + r), min(h, p.y + r)
+                draw.ellipse([x0, y0, x1, y1], fill="red", outline="white", width=8)
+                draw.line([p.x - r, p.y, p.x + r, p.y], fill="white", width=4)
+                draw.line([p.x, p.y - r, p.x, p.y + r], fill="white", width=4)
+                log.info("Debug: drew marker at (%s, %s) for image %sx%s", p.x, p.y, w, h)
             buf = io.BytesIO()
             img_pil.save(buf, format="PNG")
             b64 = base64.b64encode(buf.getvalue()).decode()

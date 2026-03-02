@@ -139,6 +139,11 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
 
   return (
     <div className="image-canvas" style={containerStyle}>
+      {debugImageUrl && (
+        <div style={debugBannerStyle}>
+          Debug: Red marker shows where server received your click
+        </div>
+      )}
       <Stage
         ref={stageRef}
         width={canvasWidth}
@@ -175,11 +180,11 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
               x={offsetX}
               y={offsetY}
               listening={false}
-              opacity={0.85}
+              opacity={1}
             />
           )}
           {annotations.map((a, i) => {
-            if (a.type === 'point')
+            if (a.type === 'point' && !debugImageUrl)
               return (
                 <Circle
                   key={a.id ?? i}
@@ -250,4 +255,12 @@ const containerStyle: React.CSSProperties = {
   background: '#16213e',
   borderRadius: 8,
   padding: 16,
+};
+const debugBannerStyle: React.CSSProperties = {
+  background: '#e94560',
+  color: 'white',
+  padding: '6px 12px',
+  borderRadius: 6,
+  marginBottom: 12,
+  fontSize: 14,
 };
