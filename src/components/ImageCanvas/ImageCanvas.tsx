@@ -15,11 +15,12 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
     annotations,
     addAnnotation,
     removeAnnotation,
-    clearAnnotations,
     currentMaskUrl,
+    debugImageUrl,
   } = useClassificationStore();
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [maskImage, setMaskImage] = useState<HTMLImageElement | null>(null);
+  const [debugImage, setDebugImageEl] = useState<HTMLImageElement | null>(null);
   const [drawingPoints, setDrawingPoints] = useState<Array<{ x: number; y: number }>>([]);
   const stageRef = useRef<Konva.Stage>(null);
 
@@ -107,6 +108,16 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
     img.src = currentMaskUrl;
   }, [currentMaskUrl]);
 
+  useEffect(() => {
+    if (!debugImageUrl) {
+      setDebugImageEl(null);
+      return;
+    }
+    const img = new window.Image();
+    img.onload = () => setDebugImageEl(img);
+    img.src = debugImageUrl;
+  }, [debugImageUrl]);
+
   if (!imageUrl) {
     return (
       <div className="canvas-placeholder" style={placeholderStyle}>
@@ -154,6 +165,17 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
               x={offsetX}
               y={offsetY}
               listening={false}
+            />
+          )}
+          {debugImage && (
+            <Image
+              image={debugImage}
+              width={imgWidth}
+              height={imgHeight}
+              x={offsetX}
+              y={offsetY}
+              listening={false}
+              opacity={0.85}
             />
           )}
           {annotations.map((a, i) => {

@@ -4,6 +4,10 @@ import type { AnnotationTool } from '../../types/annotations';
 interface ToolPaletteProps {
   tool: AnnotationTool;
   onToolChange: (tool: AnnotationTool) => void;
+  coordinateFix: 'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY';
+  onCoordinateFixChange: (fix: 'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY') => void;
+  debugCoords: boolean;
+  onDebugCoordsChange: (v: boolean) => void;
 }
 
 const tools: { id: AnnotationTool; label: string }[] = [
@@ -12,7 +16,14 @@ const tools: { id: AnnotationTool; label: string }[] = [
   { id: 'brush', label: 'Brush' },
 ];
 
-export function ToolPalette({ tool, onToolChange }: ToolPaletteProps) {
+export function ToolPalette({
+  tool,
+  onToolChange,
+  coordinateFix,
+  onCoordinateFixChange,
+  debugCoords,
+  onDebugCoordsChange,
+}: ToolPaletteProps) {
   const { annotations, clearAnnotations } = useClassificationStore();
   const hasAnnotations = annotations.length > 0;
 
@@ -36,7 +47,27 @@ export function ToolPalette({ tool, onToolChange }: ToolPaletteProps) {
           Clear all
         </button>
       )}
-      <span style={{ ...labelStyle, marginTop: 12, fontSize: 11 }}>
+      <span style={{ ...labelStyle, marginTop: 12 }}>Coordinate fix</span>
+      <select
+        value={coordinateFix}
+        onChange={(e) => onCoordinateFixChange(e.target.value as typeof coordinateFix)}
+        style={selectStyle}
+      >
+        <option value="none">None</option>
+        <option value="flipX">Flip X</option>
+        <option value="flipY">Flip Y</option>
+        <option value="flipBoth">Flip both</option>
+        <option value="swapXY">Swap X/Y</option>
+      </select>
+      <label style={labelStyle}>
+        <input
+          type="checkbox"
+          checked={debugCoords}
+          onChange={(e) => onDebugCoordsChange(e.target.checked)}
+        />
+        {' '}Debug coords
+      </label>
+      <span style={{ ...labelStyle, marginTop: 4, fontSize: 11 }}>
         Right-click point to remove
       </span>
     </div>
@@ -69,4 +100,11 @@ const clearBtnStyle: React.CSSProperties = {
   marginTop: 4,
   color: '#e94560',
   borderColor: '#e94560',
+};
+const selectStyle: React.CSSProperties = {
+  padding: 6,
+  borderRadius: 6,
+  background: '#16213e',
+  color: '#eee',
+  border: '1px solid #333',
 };

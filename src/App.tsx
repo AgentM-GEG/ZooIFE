@@ -9,21 +9,41 @@ import type { AnnotationTool } from './types/annotations';
 
 function App() {
   const [tool, setTool] = useState<AnnotationTool>('point');
-  const { imageUrl, annotations, setMask } = useClassificationStore();
+  const [coordinateFix, setCoordinateFix] = useState<
+    'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY'
+  >('none');
+  const [debugCoords, setDebugCoords] = useState(false);
+  const { imageUrl, annotations, setMask, setDebugImage, imageDimensions } =
+    useClassificationStore();
 
   const handlePointClick = useCallback(
     async (x: number, y: number, label: 0 | 1) => {
       if (!imageUrl) return;
-      const points = [...annotations.filter((a) => a.type === 'point').map((a) => ({ x: a.x, y: a.y, label: (a as { label: 0 | 1 }).label })), { x, y, label }];
+      const points = [
+        ...annotations
+          .filter((a) => a.type === 'point')
+          .map((a) => ({ x: a.x, y: a.y, label: (a as { label: 0 | 1 }).label })),
+        { x, y, label },
+      ];
       if (points.length === 0) return;
       try {
-        const result = await segmentWithPoints(imageUrl, points);
-        if (result.image?.url) setMask(result.image.url);
+        const result = await segmentWithPoints(imageUrl, points, '', {
+          debug: debugCoords,
+          imageSize: imageDimensions ?? undefined,
+          coordinateFix,
+        });
+        if (debugCoords && result.debug_url) {
+          setDebugImage(result.debug_url);
+          setMask(null);
+        } else {
+          setDebugImage(null);
+          if (result.image?.url) setMask(result.image.url);
+        }
       } catch (err) {
-        console.warn('SAM2 not available (need backend proxy):', err);
+        console.warn('SAM2 not available:', err);
       }
     },
-    [imageUrl, annotations, setMask]
+    [imageUrl, annotations, setMask, setDebugImage, imageDimensions, coordinateFix, debugCoords]
   );
 
   return (
@@ -35,7 +55,14 @@ function App() {
       </header>
       <main style={mainStyle}>
         <aside style={leftAsideStyle}>
-          <ToolPalette tool={tool} onToolChange={setTool} />
+          <ToolPalette
+            tool={tool}
+            onToolChange={setTool}
+            coordinateFix={coordinateFix}
+            onCoordinateFixChange={setCoordinateFix}
+            debugCoords={debugCoords}
+            onDebugCoordsChange={setDebugCoords}
+          />
         </aside>
         <section style={canvasSectionStyle}>
           <ImageCanvas tool={tool} onPointClick={handlePointClick} />

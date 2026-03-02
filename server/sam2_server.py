@@ -69,6 +69,7 @@ class PointPrompt(BaseModel):
 class SegmentRequest(BaseModel):
     image_url: str  # URL or data:image/...;base64,...
     prompts: list[PointPrompt]
+    debug: bool = False  # If True, also return debug image with point drawn
 
 
 def load_image_from_request(image_url: str) -> np.ndarray:
@@ -161,7 +162,20 @@ async def segment(request: SegmentRequest) -> dict[str, Any]:
             best_mask = best_mask.cpu().numpy()
         mask_url = mask_to_data_uri(best_mask)
 
-        return {"image": {"url": mask_url}}
+        result: dict[str, Any] = {"image": {"url": mask_url}}
+        if request.debug:
+            # Draw red circle at received (x,y) to verify coordinate mapping
+            from PIL import Image, ImageDraw
+            img_pil = Image.fromarray(image)
+            draw = ImageDraw.Draw(img_pil)
+            for p in request.prompts:
+                r = max(10, min(image.shape[:2]) // 50)
+                draw.ellipse([p.x - r, p.y - r, p.x + r, p.y + r], outline="red", width=4)
+            buf = io.BytesIO()
+            img_pil.save(buf, format="PNG")
+            b64 = base64.b64encode(buf.getvalue()).decode()
+            result["debug_url"] = f"data:image/png;base64,{b64}"
+        return result
 
     except RuntimeError as e:
         log.exception("SAM2 inference error")

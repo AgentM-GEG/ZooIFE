@@ -21,6 +21,7 @@ interface ClassificationState {
 
   // SAM2 mask overlay
   currentMaskUrl: string | null;
+  debugImageUrl: string | null; // When set, shows where server received the point
 
   // Actions
   setSubject: (id: string, imageUrl: string, dimensions?: { width: number; height: number }) => void;
@@ -29,6 +30,7 @@ interface ClassificationState {
   clearAnnotations: () => void;
   setTaskAnswer: (taskId: string, value: string | string[]) => void;
   setMask: (url: string | null) => void;
+  setDebugImage: (url: string | null) => void;
   buildPanoptesAnnotations: () => PanoptesAnnotation[];
   reset: () => void;
 }
@@ -40,6 +42,7 @@ const initialState = {
   annotations: [],
   taskAnswers: {},
   currentMaskUrl: null,
+  debugImageUrl: null,
 };
 
 export const useClassificationStore = create<ClassificationState>((set, get) => ({
@@ -63,14 +66,16 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
       currentMaskUrl: null,
     })),
 
-  clearAnnotations: () => set({ annotations: [], currentMaskUrl: null }),
+  clearAnnotations: () =>
+    set({ annotations: [], currentMaskUrl: null, debugImageUrl: null }),
 
   setTaskAnswer: (taskId, value) =>
     set((state) => ({
       taskAnswers: { ...state.taskAnswers, [taskId]: value },
     })),
 
-  setMask: (url) => set({ currentMaskUrl: url }),
+  setMask: (url) => set({ currentMaskUrl: url, debugImageUrl: null }),
+  setDebugImage: (url: string | null) => set({ debugImageUrl: url }),
 
   buildPanoptesAnnotations: () => {
     const { annotations, taskAnswers } = get();

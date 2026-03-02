@@ -11,6 +11,7 @@ export interface PointPrompt {
 
 export interface Sam2Output {
   image?: { url: string; width?: number; height?: number };
+  debug_url?: string;
 }
 
 /**
@@ -18,18 +19,59 @@ export interface Sam2Output {
  * Sends request to local SAM2 server (POST /api/sam2/segment).
  * Accepts image as URL or data URI (data:image/...;base64,...).
  */
+export type CoordinateFix = 'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY';
+
+export interface Sam2Options {
+  debug?: boolean;
+  imageSize?: { width: number; height: number };
+  coordinateFix?: CoordinateFix;
+}
+
 export async function segmentWithPoints(
   imageUrl: string,
   prompts: PointPrompt[],
-  baseUrl = '' // Use '' for same-origin proxy to local server
+  baseUrl = '', // Use '' for same-origin proxy to local server
+  options: Sam2Options = {}
 ): Promise<Sam2Output> {
+  const { debug = false, imageSize, coordinateFix = 'none' } = options;
+
+  const applyFix = (x: number, y: number): { x: number; y: number } => {
+    let out = { x, y };
+    if (imageSize && coordinateFix !== 'none') {
+      const { width, height } = imageSize;
+      switch (coordinateFix) {
+        case 'flipX':
+          out = { x: width - 1 - x, y };
+          break;
+        case 'flipY':
+          out = { x, y: height - 1 - y };
+          break;
+        case 'flipBoth':
+          out = { x: width - 1 - x, y: height - 1 - y };
+          break;
+        case 'swapXY':
+          out = { x: y, y: x };
+          break;
+        default:
+          break;
+      }
+    }
+    return out;
+  };
+
+  const resolvedPrompts = prompts.map((p) => {
+    const { x, y } = applyFix(p.x, p.y);
+    return { x: Math.round(x), y: Math.round(y), label: p.label };
+  });
+
   const url = baseUrl ? `${baseUrl}/api/sam2/segment` : '/api/sam2/segment';
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       image_url: imageUrl,
-      prompts: prompts.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y), label: p.label })),
+      prompts: resolvedPrompts,
+      debug,
     }),
   });
   if (!res.ok) {
