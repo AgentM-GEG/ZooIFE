@@ -9,7 +9,7 @@ Setup:
   3. pip install -r server/requirements.txt
   4. Run: python server/sam2_server.py
 
-Model is downloaded from HuggingFace on first run (facebook/sam2-hiera-small).
+Model is downloaded from HuggingFace on first run (facebook/sam2-hiera-large).
 """
 
 import base64
@@ -37,7 +37,7 @@ def get_predictor():
             from sam2.sam2_image_predictor import SAM2ImagePredictor
 
             # Supported: tiny, small, base-plus, large (no "base" - use small or base-plus)
-            _predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-small")
+            _predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-large")
         except ImportError as e:
             if "huggingface_hub" in str(e) or "No module named 'huggingface_hub'" in str(e):
                 raise RuntimeError(
