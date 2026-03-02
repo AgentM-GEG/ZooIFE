@@ -24,6 +24,9 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
   const [drawingPoints, setDrawingPoints] = useState<Array<{ x: number; y: number }>>([]);
   const stageRef = useRef<Konva.Stage>(null);
 
+  const BRUSH_RADIUS = 10; // in image coordinates
+  const toolCursor = tool === 'point' || tool === 'freehand' || tool === 'brush' ? 'crosshair' : 'default';
+
   const handleImageLoad = useCallback((img: HTMLImageElement) => {
     useClassificationStore.setState({
       imageDimensions: { width: img.naturalWidth, height: img.naturalHeight },
@@ -50,7 +53,7 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
       if (tool === 'point') {
         addAnnotation({ type: 'point', x, y, label: 1 });
         onPointClick?.(x, y, 1);
-      } else if (tool === 'freehand') {
+      } else if (tool === 'freehand' || tool === 'brush') {
         setDrawingPoints((prev) => [...prev, { x, y }]);
       }
     },
@@ -59,7 +62,7 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
 
   const handleStageMouseMove = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
-      if (tool !== 'freehand') return;
+      if (tool !== 'freehand' && tool !== 'brush') return;
       const isDrawing = e.evt.buttons === 1;
       if (!isDrawing || !stageRef.current || !image) return;
       const stage = stageRef.current;
@@ -80,6 +83,11 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
   const handleStageMouseUp = useCallback(() => {
     if (tool === 'freehand' && drawingPoints.length > 1) {
       addAnnotation({ type: 'polyline', points: [...drawingPoints] });
+      setDrawingPoints([]);
+    } else if (tool === 'brush' && drawingPoints.length > 1) {
+      addAnnotation({ type: 'brush', strokes: [{ points: [...drawingPoints], radius: BRUSH_RADIUS }] });
+      setDrawingPoints([]);
+    } else if ((tool === 'freehand' || tool === 'brush') && drawingPoints.length <= 1) {
       setDrawingPoints([]);
     }
   }, [tool, drawingPoints, addAnnotation]);
@@ -138,7 +146,7 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
   const offsetY = (canvasHeight - imgHeight) / 2;
 
   return (
-    <div className="image-canvas" style={containerStyle}>
+    <div className="image-canvas" style={{ ...containerStyle, cursor: !debugImageUrl ? toolCursor : 'default' }}>
       {debugImageUrl && (
         <>
           <div style={debugBannerStyle}>
@@ -231,13 +239,36 @@ export function ImageCanvas({ tool, onPointClick }: ImageCanvasProps) {
                   }}
                 />
               );
+            if (a.type === 'brush')
+              return (
+                <React.Fragment key={a.id ?? i}>
+                  {a.strokes.map((stroke, si) => (
+                    <Line
+                      key={si}
+                      points={stroke.points.flatMap((p) => [offsetX + p.x * scale, offsetY + p.y * scale])}
+                      stroke="lime"
+                      strokeWidth={stroke.radius * 2 * scale}
+                      lineCap="round"
+                      lineJoin="round"
+                      listening
+                      hitStrokeWidth={Math.max(12, stroke.radius * 2 * scale)}
+                      onClick={(e) => e.cancelBubble = true}
+                      onTap={(e) => e.cancelBubble = true}
+                      onContextMenu={(e) => {
+                        e.evt.preventDefault();
+                        if (a.id) removeAnnotation(a.id);
+                      }}
+                    />
+                  ))}
+                </React.Fragment>
+              );
             return null;
           })}
           {drawingPoints.length > 1 && (
             <Line
               points={drawingPoints.flatMap((p) => [offsetX + p.x * scale, offsetY + p.y * scale])}
-              stroke="cyan"
-              strokeWidth={3}
+              stroke={tool === 'brush' ? 'lime' : 'cyan'}
+              strokeWidth={tool === 'brush' ? BRUSH_RADIUS * 2 * scale : 3}
               lineCap="round"
               lineJoin="round"
             />
