@@ -12,7 +12,7 @@ function App() {
   const [modelId, setModelId] = useState('sam2-hiera-large');
   const [coordinateFix, setCoordinateFix] = useState<
     'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY'
-  >('flipY');
+  >('none');
   const [debugCoords, setDebugCoords] = useState(false);
   const { imageUrl, annotations, setMask, setDebugImage, imageDimensions } =
     useClassificationStore();
