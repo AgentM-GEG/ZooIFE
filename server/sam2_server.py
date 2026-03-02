@@ -14,9 +14,14 @@ Model is downloaded from HuggingFace on first run (facebook/sam2-hiera-base or -
 
 import base64
 import io
+import logging
+import traceback
 from typing import Any
 
 import numpy as np
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 import torch
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -137,16 +142,23 @@ async def segment(request: SegmentRequest) -> dict[str, Any]:
                 )
 
         # Pick best mask by IoU (masks: CxHxW, iou_preds: C or 1xC)
+        # Handle both torch tensors and numpy
+        if hasattr(iou_preds, "cpu"):
+            iou_preds = iou_preds.cpu().numpy()
         iou_flat = np.asarray(iou_preds).ravel()
         best_idx = int(np.argmax(iou_flat))
         best_mask = masks[best_idx]
+        if hasattr(best_mask, "cpu"):
+            best_mask = best_mask.cpu().numpy()
         mask_url = mask_to_data_uri(best_mask)
 
         return {"image": {"url": mask_url}}
 
     except RuntimeError as e:
+        log.exception("SAM2 inference error")
         raise HTTPException(500, str(e)) from e
     except Exception as e:
+        log.exception("SAM2 inference error")
         raise HTTPException(500, f"Inference failed: {e}") from e
 
 
