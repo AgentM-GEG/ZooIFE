@@ -25,7 +25,18 @@ export interface Sam2Options {
   debug?: boolean;
   imageSize?: { width: number; height: number };
   coordinateFix?: CoordinateFix;
+  modelId?: string;
 }
+
+export const SEGMENT_MODELS = [
+  { id: 'sam2-hiera-tiny', label: 'SAM2 Tiny (fastest)' },
+  { id: 'sam2-hiera-small', label: 'SAM2 Small' },
+  { id: 'sam2-hiera-base-plus', label: 'SAM2 Base+' },
+  { id: 'sam2-hiera-large', label: 'SAM2 Large (best)' },
+  { id: 'sam1-vit_b', label: 'SAM1 ViT-B' },
+  { id: 'sam1-vit_l', label: 'SAM1 ViT-L' },
+  { id: 'sam1-vit_h', label: 'SAM1 ViT-H (largest)' },
+] as const;
 
 export async function segmentWithPoints(
   imageUrl: string,
@@ -33,7 +44,7 @@ export async function segmentWithPoints(
   baseUrl = '', // Use '' for same-origin proxy to local server
   options: Sam2Options = {}
 ): Promise<Sam2Output> {
-  const { debug = false, imageSize, coordinateFix = 'none' } = options;
+  const { debug = false, imageSize, coordinateFix = 'none', modelId = 'sam2-hiera-large' } = options;
 
   const applyFix = (x: number, y: number): { x: number; y: number } => {
     let out = { x, y };
@@ -72,6 +83,7 @@ export async function segmentWithPoints(
       image_url: imageUrl,
       prompts: resolvedPrompts,
       debug,
+      model_id: modelId,
     }),
   });
   if (!res.ok) {

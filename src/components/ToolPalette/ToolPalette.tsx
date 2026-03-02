@@ -1,9 +1,12 @@
 import { useClassificationStore } from '../../stores/classificationStore';
+import { SEGMENT_MODELS } from '../../services/sam2Service';
 import type { AnnotationTool } from '../../types/annotations';
 
 interface ToolPaletteProps {
   tool: AnnotationTool;
   onToolChange: (tool: AnnotationTool) => void;
+  modelId: string;
+  onModelChange: (id: string) => void;
   coordinateFix: 'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY';
   onCoordinateFixChange: (fix: 'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY') => void;
   debugCoords: boolean;
@@ -19,6 +22,8 @@ const tools: { id: AnnotationTool; label: string }[] = [
 export function ToolPalette({
   tool,
   onToolChange,
+  modelId,
+  onModelChange,
   coordinateFix,
   onCoordinateFixChange,
   debugCoords,
@@ -47,6 +52,18 @@ export function ToolPalette({
           Clear all
         </button>
       )}
+      <span style={{ ...labelStyle, marginTop: 12 }}>Model</span>
+      <select
+        value={modelId}
+        onChange={(e) => onModelChange(e.target.value)}
+        style={selectStyle}
+      >
+        {SEGMENT_MODELS.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.label}
+          </option>
+        ))}
+      </select>
       <span style={{ ...labelStyle, marginTop: 12 }}>Coordinate fix</span>
       <select
         value={coordinateFix}

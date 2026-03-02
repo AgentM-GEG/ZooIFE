@@ -27,27 +27,52 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-_predictor = None
+_predictors: dict[str, Any] = {}  # model_id -> predictor
 
 
-def get_predictor():
-    global _predictor
-    if _predictor is None:
-        try:
-            from sam2.sam2_image_predictor import SAM2ImagePredictor
+def get_predictor(model_id: str):
+    global _predictors
+    if model_id not in _predictors:
+        if model_id.startswith("sam1-"):
+            # SAM1 (Segment Anything 1) - vit_b, vit_l, vit_h
+            try:
+                from segment_anything import SamPredictor, sam_model_registry
+                from huggingface_hub import hf_hub_download
 
-            # Supported: tiny, small, base-plus, large (no "base" - use small or base-plus)
-            _predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-large")
-        except ImportError as e:
-            if "huggingface_hub" in str(e) or "No module named 'huggingface_hub'" in str(e):
+                vit_type = model_id.replace("sam1-", "")
+                if vit_type not in ("vit_b", "vit_l", "vit_h"):
+                    vit_type = "vit_h"
+                # SAM1 checkpoints on HuggingFace (ybelkada/segment-anything)
+                ckpt_map = {
+                    "vit_b": ("ybelkada/segment-anything", "sam_vit_b_01ec64.pth"),
+                    "vit_l": ("ybelkada/segment-anything", "sam_vit_l_0b3195.pth"),
+                    "vit_h": ("ybelkada/segment-anything", "sam_vit_h_4b8939.pth"),
+                }
+                repo_id, filename = ckpt_map[vit_type]
+                ckpt_path = hf_hub_download(repo_id=repo_id, filename=filename)
+                sam = sam_model_registry[vit_type](checkpoint=ckpt_path)
+                sam.to(device="cuda" if torch.cuda.is_available() else "cpu")
+                _predictors[model_id] = ("sam1", SamPredictor(sam))
+            except ImportError as e:
                 raise RuntimeError(
-                    "huggingface_hub not installed. Run: pip install huggingface_hub"
+                    "SAM1 requires: pip install segment-anything "
+                    "(or: pip install git+https://github.com/facebookresearch/segment-anything.git)"
                 ) from e
-            raise RuntimeError(
-                "SAM2 not installed. Clone https://github.com/facebookresearch/sam2 "
-                "and run: pip install -e ./sam2"
-            ) from e
-    return _predictor
+        else:
+            # SAM2 - sam2-hiera-{tiny,small,base-plus,large}
+            try:
+                from sam2.sam2_image_predictor import SAM2ImagePredictor
+
+                hf_id = f"facebook/{model_id}"
+                _predictors[model_id] = ("sam2", SAM2ImagePredictor.from_pretrained(hf_id))
+            except ImportError as e:
+                if "huggingface_hub" in str(e):
+                    raise RuntimeError("huggingface_hub not installed. Run: pip install huggingface_hub") from e
+                raise RuntimeError(
+                    "SAM2 not installed. Clone https://github.com/facebookresearch/sam2 "
+                    "and run: pip install -e ./sam2"
+                ) from e
+    return _predictors[model_id]
 
 
 app = FastAPI(title="SAM2 Inference")
@@ -70,6 +95,7 @@ class SegmentRequest(BaseModel):
     image_url: str  # URL or data:image/...;base64,...
     prompts: list[PointPrompt]
     debug: bool = False  # If True, also return debug image with point drawn
+    model_id: str = "sam2-hiera-large"  # Model to use for inference
 
 
 def load_image_from_request(image_url: str) -> np.ndarray:
@@ -130,26 +156,34 @@ async def segment(request: SegmentRequest) -> dict[str, Any]:
     point_labels = np.array([p.label for p in request.prompts], dtype=np.int64)
 
     try:
-        predictor = get_predictor()
+        backend, predictor = get_predictor(request.model_id)
 
-        if torch.cuda.is_available():
-            with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
-                predictor.set_image(image)
-                masks, iou_preds, _ = predictor.predict(
-                    point_coords=point_coords,
-                    point_labels=point_labels,
-                    multimask_output=True,
-                    normalize_coords=False,
-                )
+        if backend == "sam1":
+            predictor.set_image(image)
+            masks, iou_preds, _ = predictor.predict(
+                point_coords=point_coords,
+                point_labels=point_labels,
+                multimask_output=True,
+            )
         else:
-            with torch.inference_mode():
-                predictor.set_image(image)
-                masks, iou_preds, _ = predictor.predict(
-                    point_coords=point_coords,
-                    point_labels=point_labels,
-                    multimask_output=True,
-                    normalize_coords=False,
-                )
+            if torch.cuda.is_available():
+                with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+                    predictor.set_image(image)
+                    masks, iou_preds, _ = predictor.predict(
+                        point_coords=point_coords,
+                        point_labels=point_labels,
+                        multimask_output=True,
+                        normalize_coords=False,
+                    )
+            else:
+                with torch.inference_mode():
+                    predictor.set_image(image)
+                    masks, iou_preds, _ = predictor.predict(
+                        point_coords=point_coords,
+                        point_labels=point_labels,
+                        multimask_output=True,
+                        normalize_coords=False,
+                    )
 
         # Pick best mask by IoU (masks: CxHxW, iou_preds: C or 1xC)
         # Handle both torch tensors and numpy

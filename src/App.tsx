@@ -9,9 +9,10 @@ import type { AnnotationTool } from './types/annotations';
 
 function App() {
   const [tool, setTool] = useState<AnnotationTool>('point');
+  const [modelId, setModelId] = useState('sam2-hiera-large');
   const [coordinateFix, setCoordinateFix] = useState<
     'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY'
-  >('none');
+  >('flipY');
   const [debugCoords, setDebugCoords] = useState(false);
   const { imageUrl, annotations, setMask, setDebugImage, imageDimensions } =
     useClassificationStore();
@@ -31,6 +32,7 @@ function App() {
           debug: debugCoords,
           imageSize: imageDimensions ?? undefined,
           coordinateFix,
+          modelId,
         });
         if (debugCoords) {
           if (result.debug_url) {
@@ -49,7 +51,7 @@ function App() {
         console.warn('SAM2 not available:', err);
       }
     },
-    [imageUrl, annotations, setMask, setDebugImage, imageDimensions, coordinateFix, debugCoords]
+    [imageUrl, annotations, setMask, setDebugImage, imageDimensions, coordinateFix, debugCoords, modelId]
   );
 
   return (
@@ -64,6 +66,8 @@ function App() {
           <ToolPalette
             tool={tool}
             onToolChange={setTool}
+            modelId={modelId}
+            onModelChange={setModelId}
             coordinateFix={coordinateFix}
             onCoordinateFixChange={setCoordinateFix}
             debugCoords={debugCoords}
