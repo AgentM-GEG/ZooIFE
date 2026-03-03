@@ -19,7 +19,6 @@ const tools: { id: AnnotationTool; label: string }[] = [
   { id: 'point', label: 'Point (SAM)' },
   { id: 'freehand', label: 'Freehand' },
   { id: 'brush', label: 'Brush' },
-  { id: 'pan', label: 'Pan' },
 ];
 
 export function ToolPalette({

@@ -28,11 +28,12 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
 
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanMode, setIsPanMode] = useState(false);
 
   const STAGE_WIDTH = 1200;
   const STAGE_HEIGHT = 800;
   const BRUSH_RADIUS = 10;
-  const toolCursor = tool === 'point' || tool === 'freehand' || tool === 'brush' ? 'crosshair' : tool === 'pan' ? 'grab' : 'default';
+  const toolCursor = isPanMode ? 'grab' : tool === 'point' || tool === 'freehand' || tool === 'brush' ? 'crosshair' : 'default';
 
   const baseScale = image
     ? Math.min(STAGE_WIDTH / image.naturalWidth, STAGE_HEIGHT / image.naturalHeight)
@@ -141,12 +142,14 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
     [zoom, baseScale, contentScale, groupX, groupY, image]
   );
 
-  const handleContentDragEnd = useCallback(
+  const handleContentDragMove = useCallback(
     (e: Konva.KonvaEventObject<DragEvent>) => {
       const node = e.target;
-      setPan({ x: node.x() - centerX, y: node.y() - centerY });
+      const newCenterX = (STAGE_WIDTH - (image?.naturalWidth ?? 0) * contentScale) / 2;
+      const newCenterY = (STAGE_HEIGHT - (image?.naturalHeight ?? 0) * contentScale) / 2;
+      setPan({ x: node.x() - newCenterX, y: node.y() - newCenterY });
     },
-    [centerX, centerY]
+    [contentScale, image]
   );
 
   useEffect(() => {
@@ -205,6 +208,14 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
           <button type="button" onClick={zoomIn} style={toolbarBtnStyle} title="Zoom in">+</button>
           <button type="button" onClick={zoomFit} style={toolbarBtnStyle} title="Fit to view">Fit</button>
           <button type="button" onClick={zoom100} style={toolbarBtnStyle} title="100% (1:1 pixels)">100%</button>
+          <button
+            type="button"
+            onClick={() => setIsPanMode((p) => !p)}
+            style={{ ...toolbarBtnStyle, ...(isPanMode ? toolbarBtnActiveStyle : {}) }}
+            title="Pan mode: drag to move image"
+          >
+            Pan
+          </button>
         </div>
       )}
       {debugImageUrl && (
@@ -237,8 +248,8 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
             y={groupY}
             scaleX={contentScale}
             scaleY={contentScale}
-            draggable={tool === 'pan'}
-            onDragEnd={handleContentDragEnd}
+            draggable={isPanMode}
+            onDragMove={handleContentDragMove}
           >
             <Image
               image={image}
@@ -365,6 +376,10 @@ const toolbarLabelStyle: React.CSSProperties = {
   color: '#888',
   minWidth: 48,
   textAlign: 'center' as const,
+};
+const toolbarBtnActiveStyle: React.CSSProperties = {
+  background: '#0f3460',
+  borderColor: '#e94560',
 };
 const placeholderStyle: React.CSSProperties = {
   width: 1200,
