@@ -7,6 +7,8 @@ interface ToolPaletteProps {
   onToolChange: (tool: AnnotationTool) => void;
   modelId: string;
   onModelChange: (id: string) => void;
+  showPoints: boolean;
+  onShowPointsChange: (v: boolean) => void;
   coordinateFix: 'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY';
   onCoordinateFixChange: (fix: 'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY') => void;
   debugCoords: boolean;
@@ -14,9 +16,10 @@ interface ToolPaletteProps {
 }
 
 const tools: { id: AnnotationTool; label: string }[] = [
-  { id: 'point', label: 'Point (SAM2)' },
+  { id: 'point', label: 'Point (SAM)' },
   { id: 'freehand', label: 'Freehand' },
   { id: 'brush', label: 'Brush' },
+  { id: 'pan', label: 'Pan' },
 ];
 
 export function ToolPalette({
@@ -24,6 +27,8 @@ export function ToolPalette({
   onToolChange,
   modelId,
   onModelChange,
+  showPoints,
+  onShowPointsChange,
   coordinateFix,
   onCoordinateFixChange,
   debugCoords,
@@ -64,6 +69,14 @@ export function ToolPalette({
           </option>
         ))}
       </select>
+      <label style={labelStyle}>
+        <input
+          type="checkbox"
+          checked={showPoints}
+          onChange={(e) => onShowPointsChange(e.target.checked)}
+        />
+        {' '}Show points
+      </label>
       <span style={{ ...labelStyle, marginTop: 12 }}>Coordinate fix</span>
       <select
         value={coordinateFix}

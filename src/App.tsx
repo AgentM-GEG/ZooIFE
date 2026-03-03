@@ -14,6 +14,7 @@ function App() {
     'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY'
   >('none');
   const [debugCoords, setDebugCoords] = useState(false);
+  const [showPoints, setShowPoints] = useState(true);
   const { imageUrl, annotations, setMask, setDebugImage, imageDimensions } =
     useClassificationStore();
 
@@ -68,6 +69,8 @@ function App() {
             onToolChange={setTool}
             modelId={modelId}
             onModelChange={setModelId}
+            showPoints={showPoints}
+            onShowPointsChange={setShowPoints}
             coordinateFix={coordinateFix}
             onCoordinateFixChange={setCoordinateFix}
             debugCoords={debugCoords}
@@ -75,7 +78,7 @@ function App() {
           />
         </aside>
         <section style={canvasSectionStyle}>
-          <ImageCanvas tool={tool} onPointClick={handlePointClick} />
+          <ImageCanvas tool={tool} onPointClick={handlePointClick} showPoints={showPoints} />
         </section>
         <aside style={rightAsideStyle}>
           <TaskSidebar />
@@ -104,7 +107,12 @@ const mainStyle: React.CSSProperties = {
   alignItems: 'flex-start',
 };
 const leftAsideStyle: React.CSSProperties = { flexShrink: 0 };
-const canvasSectionStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
+const canvasSectionStyle: React.CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  overflow: 'auto',
+  maxHeight: 'calc(100vh - 120px)',
+};
 const rightAsideStyle: React.CSSProperties = { flexShrink: 0 };
 
 export default App;

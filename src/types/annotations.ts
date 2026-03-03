@@ -2,7 +2,7 @@
  * Annotation types for drawing tools
  */
 
-export type AnnotationTool = 'point' | 'freehand' | 'brush' | 'sam2';
+export type AnnotationTool = 'point' | 'freehand' | 'brush' | 'pan' | 'sam2';
 
 export interface PointAnnotation {
   type: 'point';
