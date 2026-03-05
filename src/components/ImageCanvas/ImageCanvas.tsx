@@ -60,6 +60,7 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
 
   const handleStageClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (isPanMode) return;
       const target = e.target as { getClassName?: () => string };
       if (target?.getClassName && ['Circle', 'Line'].includes(target.getClassName()))
         return;
@@ -75,11 +76,12 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
         setDrawingPoints((prev) => [...prev, { x, y }]);
       }
     },
-    [tool, image, addAnnotation, onPointClick, pointerToImage]
+    [tool, image, addAnnotation, onPointClick, pointerToImage, isPanMode]
   );
 
   const handleStageMouseMove = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (isPanMode) return;
       if (tool !== 'freehand' && tool !== 'brush') return;
       const isDrawing = e.evt.buttons === 1;
       if (!isDrawing || !stageRef.current || !image) return;
@@ -88,10 +90,11 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
       const { x, y } = pointerToImage(pos);
       setDrawingPoints((prev) => [...prev, { x, y }]);
     },
-    [tool, image, pointerToImage]
+    [tool, image, pointerToImage, isPanMode]
   );
 
   const handleStageMouseUp = useCallback(() => {
+    if (isPanMode) return;
     if (tool === 'freehand' && drawingPoints.length > 1) {
       addAnnotation({ type: 'polyline', points: [...drawingPoints] });
       setDrawingPoints([]);
@@ -101,7 +104,7 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
     } else if ((tool === 'freehand' || tool === 'brush') && drawingPoints.length <= 1) {
       setDrawingPoints([]);
     }
-  }, [tool, drawingPoints, addAnnotation]);
+  }, [tool, drawingPoints, addAnnotation, isPanMode]);
 
   const ZOOM_MIN = 0.25;
   const ZOOM_MAX = 4;
