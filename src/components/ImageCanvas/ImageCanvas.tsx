@@ -258,7 +258,7 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
               image={image}
               width={natW}
               height={natH}
-              listening={false}
+              listening={isPanMode}
             />
             {maskImage && (
               <Image
