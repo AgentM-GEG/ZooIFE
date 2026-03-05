@@ -63,6 +63,8 @@ ZooIFE is a React-based Incubator Front End (IFE) for interactive image classifi
 - ✅ Point, freehand, and brush tools implemented in canvas.
 - ✅ Local image-to-model loop for segmentation is wired.
 - ✅ Panoptes-aligned data structures and API helpers are present.
+- ✅ SAM positive/negative point prompts: left-click = foreground (green), right-click = background (red).
+- ✅ Undo last annotation via toolbar button or Ctrl+Z/⌘Z, with automatic SAM re-inference on remaining points.
 - ⚠️ Full OAuth-based Panoptes login and live subject queue navigation are not yet fully wired into the UI.
 - ⚠️ Current “Submit Classification” path logs payload to console rather than posting to backend.
 - ✅ Debug options (point visibility, coordinate fixes, debug overlays) aid segmentation alignment and troubleshooting.

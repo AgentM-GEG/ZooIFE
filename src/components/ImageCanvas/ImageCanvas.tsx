@@ -7,15 +7,15 @@ import type { AnnotationTool } from '../../types/annotations';
 interface ImageCanvasProps {
   tool: AnnotationTool;
   onPointClick?: (x: number, y: number, label: 0 | 1) => void;
+  onUndo?: () => void;
   showPoints?: boolean;
 }
 
-export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanvasProps) {
+export function ImageCanvas({ tool, onPointClick, onUndo, showPoints = true }: ImageCanvasProps) {
   const {
     imageUrl,
     annotations,
     addAnnotation,
-    removeAnnotation,
     currentMaskUrl,
     debugImageUrl,
   } = useClassificationStore();
@@ -61,6 +61,7 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
   const handleStageClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (isPanMode) return;
+      if (e.evt.button !== 0) return;
       const target = e.target as { getClassName?: () => string };
       if (target?.getClassName && ['Circle', 'Line'].includes(target.getClassName()))
         return;
@@ -75,6 +76,20 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
       } else if (tool === 'freehand' || tool === 'brush') {
         setDrawingPoints((prev) => [...prev, { x, y }]);
       }
+    },
+    [tool, image, addAnnotation, onPointClick, pointerToImage, isPanMode]
+  );
+
+  const handleContextMenu = useCallback(
+    (e: Konva.KonvaEventObject<MouseEvent>) => {
+      e.evt.preventDefault();
+      if (isPanMode) return;
+      if (tool !== 'point' || !stageRef.current || !image) return;
+      const pos = stageRef.current.getPointerPosition();
+      if (!pos) return;
+      const { x, y } = pointerToImage(pos);
+      addAnnotation({ type: 'point', x, y, label: 0 });
+      onPointClick?.(x, y, 0);
     },
     [tool, image, addAnnotation, onPointClick, pointerToImage, isPanMode]
   );
@@ -156,6 +171,17 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
   );
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        onUndo?.();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onUndo]);
+
+  useEffect(() => {
     if (!imageUrl) {
       setImage(null);
       return;
@@ -219,6 +245,16 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
           >
             Pan
           </button>
+          {annotations.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onUndo?.()}
+              style={{ ...toolbarBtnStyle, ...undoBtnStyle }}
+              title="Undo last point (Ctrl+Z / ⌘Z)"
+            >
+              Undo
+            </button>
+          )}
         </div>
       )}
       {debugImageUrl && (
@@ -239,6 +275,7 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
         width={STAGE_WIDTH}
         height={STAGE_HEIGHT}
         onClick={handleStageClick}
+        onContextMenu={handleContextMenu}
         onMouseMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}
         onMouseLeave={handleStageMouseUp}
@@ -285,17 +322,10 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
                     x={a.x}
                     y={a.y}
                     radius={4}
-                    fill="lime"
+                    fill={a.label === 0 ? '#e94560' : 'lime'}
                     stroke="white"
                     strokeWidth={1}
-                    listening
-                    onClick={(e) => e.cancelBubble = true}
-                    onTap={(e) => e.cancelBubble = true}
-                    onContextMenu={(e) => {
-                      e.evt.preventDefault();
-                      if (a.id) removeAnnotation(a.id);
-                    }}
-                    hitStrokeWidth={8}
+                    listening={false}
                   />
                 );
               if (a.type === 'polyline' && a.points.length > 1)
@@ -307,14 +337,7 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
                     strokeWidth={3}
                     lineCap="round"
                     lineJoin="round"
-                    listening
-                    hitStrokeWidth={12}
-                    onClick={(e) => e.cancelBubble = true}
-                    onTap={(e) => e.cancelBubble = true}
-                    onContextMenu={(e) => {
-                      e.evt.preventDefault();
-                      if (a.id) removeAnnotation(a.id);
-                    }}
+                    listening={false}
                   />
                 );
               if (a.type === 'brush')
@@ -328,14 +351,7 @@ export function ImageCanvas({ tool, onPointClick, showPoints = true }: ImageCanv
                         strokeWidth={stroke.radius * 2}
                         lineCap="round"
                         lineJoin="round"
-                        listening
-                        hitStrokeWidth={Math.max(12, stroke.radius * 2)}
-                        onClick={(e) => e.cancelBubble = true}
-                        onTap={(e) => e.cancelBubble = true}
-                        onContextMenu={(e) => {
-                          e.evt.preventDefault();
-                          if (a.id) removeAnnotation(a.id);
-                        }}
+                        listening={false}
                       />
                     ))}
                   </React.Fragment>
@@ -383,6 +399,11 @@ const toolbarLabelStyle: React.CSSProperties = {
 const toolbarBtnActiveStyle: React.CSSProperties = {
   background: '#0f3460',
   borderColor: '#e94560',
+};
+const undoBtnStyle: React.CSSProperties = {
+  marginLeft: 8,
+  color: '#ffa726',
+  borderColor: '#ffa726',
 };
 const placeholderStyle: React.CSSProperties = {
   width: 1200,

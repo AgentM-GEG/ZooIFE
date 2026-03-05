@@ -15,8 +15,41 @@ function App() {
   >('none');
   const [debugCoords, setDebugCoords] = useState(false);
   const [showPoints, setShowPoints] = useState(true);
-  const { imageUrl, annotations, setMask, setDebugImage, imageDimensions } =
+  const { imageUrl, annotations, undoLastAnnotation, setMask, setDebugImage, imageDimensions } =
     useClassificationStore();
+
+  const handleUndo = useCallback(async () => {
+    const removed = undoLastAnnotation();
+    if (!removed) return;
+    const remaining = useClassificationStore.getState().annotations;
+    const points = remaining
+      .filter((a) => a.type === 'point')
+      .map((a) => ({ x: a.x, y: a.y, label: (a as { label: 0 | 1 }).label }));
+
+    if (points.length === 0) {
+      setMask(null);
+      setDebugImage(null);
+      return;
+    }
+    if (!imageUrl) return;
+    try {
+      const result = await segmentWithPoints(imageUrl, points, '', {
+        debug: debugCoords,
+        imageSize: imageDimensions ?? undefined,
+        coordinateFix,
+        modelId,
+      });
+      if (debugCoords && result.debug_url) {
+        setDebugImage(result.debug_url);
+        setMask(null);
+      } else {
+        setDebugImage(null);
+        if (result.image?.url) setMask(result.image.url);
+      }
+    } catch (err) {
+      console.warn('SAM2 not available:', err);
+    }
+  }, [imageUrl, undoLastAnnotation, setMask, setDebugImage, imageDimensions, coordinateFix, debugCoords, modelId]);
 
   const handlePointClick = useCallback(
     async (x: number, y: number, label: 0 | 1) => {
@@ -78,7 +111,7 @@ function App() {
           />
         </aside>
         <section style={canvasSectionStyle}>
-          <ImageCanvas tool={tool} onPointClick={handlePointClick} showPoints={showPoints} />
+          <ImageCanvas tool={tool} onPointClick={handlePointClick} onUndo={handleUndo} showPoints={showPoints} />
         </section>
         <aside style={rightAsideStyle}>
           <TaskSidebar />

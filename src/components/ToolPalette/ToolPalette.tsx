@@ -96,8 +96,10 @@ export function ToolPalette({
         />
         {' '}Debug coords
       </label>
-      <span style={{ ...labelStyle, marginTop: 4, fontSize: 11 }}>
-        Right-click point to remove
+      <span style={{ ...labelStyle, marginTop: 4, fontSize: 11, lineHeight: '1.5' }}>
+        Left-click: positive point (green)<br />
+        Right-click: negative point (red)<br />
+        Undo: Ctrl+Z / ⌘Z
       </span>
     </div>
   );
