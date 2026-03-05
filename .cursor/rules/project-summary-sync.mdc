@@ -1,0 +1,16 @@
+---
+description: Keep PROJECT_SUMMARY.md synchronized with project changes
+alwaysApply: true
+---
+
+# PROJECT_SUMMARY.md synchronization
+
+For any task where repository files are changed, update `PROJECT_SUMMARY.md` so it reflects the new state of the project before completing.
+
+- Keep a top-level section describing the current project state and architecture.
+- Add a concise list of changed/added/removed files.
+- Record new dependencies, scripts, and configuration updates.
+- Record outstanding work, risks, and known issues introduced by changes.
+- If `PROJECT_SUMMARY.md` is missing, create it and include the above details.
+- If the summary already exists, update it in place and note why each changed area now differs.
+- If the change introduces multiple independent updates, include a short “Current status” section that mentions the combined effect.
