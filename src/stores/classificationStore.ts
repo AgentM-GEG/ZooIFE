@@ -21,6 +21,8 @@ interface ClassificationState {
 
   // SAM2 mask overlay
   currentMaskUrl: string | null;
+  maskHistory: ImageData[] | [];
+  maskHistoryIndex: number;
   debugImageUrl: string | null; // When set, shows where server received the point
 
   // Actions
@@ -32,6 +34,11 @@ interface ClassificationState {
   setTaskAnswer: (taskId: string, value: string | string[]) => void;
   setMask: (url: string | null) => void;
   setDebugImage: (url: string | null) => void;
+
+  pushMaskHistory: (imgData: ImageData) => void;
+  undoMask: () => ImageData | null;
+  redoMask: () => ImageData | null
+
   buildPanoptesAnnotations: () => PanoptesAnnotation[];
   reset: () => void;
 }
@@ -43,6 +50,8 @@ const initialState = {
   annotations: [],
   taskAnswers: {},
   currentMaskUrl: null,
+  maskHistory: [],
+  maskHistoryIndex: 0,
   debugImageUrl: null,
 };
 
@@ -54,6 +63,8 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
       subjectId: id,
       imageUrl,
       imageDimensions: dimensions ?? null,
+      maskHistory: [],
+      maskHistoryIndex: 0
     }),
 
   addAnnotation: (annotation) =>
@@ -85,6 +96,28 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
 
   setMask: (url) => set({ currentMaskUrl: url, debugImageUrl: null }),
   setDebugImage: (url: string | null) => set({ debugImageUrl: url }),
+
+  // UNDO / REDO FOR MASK HISTORY (used by Konva brush) 
+  pushMaskHistory: (imgData: ImageData) => set((state) => {
+    const truncated = state.maskHistory.slice(0, state.maskHistoryIndex + 1);
+    return { maskHistory: [...truncated, imgData], maskHistoryIndex: truncated.length, };
+  }),
+
+  undoMask: () => {
+    const { maskHistory, maskHistoryIndex } = get();
+    if (maskHistoryIndex <= 0) return null;
+    const newIndex = Math.max(maskHistoryIndex - 2, 0);
+    set({ maskHistoryIndex: newIndex });
+    return maskHistory[newIndex];
+  },
+
+  redoMask: () => {
+    const { maskHistory, maskHistoryIndex } = get();
+    if (maskHistoryIndex >= maskHistory.length - 1) return null;
+    const newIndex = Math.min(maskHistoryIndex + 2, maskHistory.length - 1);
+    set({ maskHistoryIndex: newIndex });
+    return maskHistory[newIndex];
+  },
 
   buildPanoptesAnnotations: () => {
     const { annotations, taskAnswers } = get();

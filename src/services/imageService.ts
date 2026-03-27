@@ -4,13 +4,27 @@
  * Phase 2: Zooniverse /subjects/queued locations
  */
 
-export async function loadImageAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+export async function loadImageAsDataUrl(file: File | string): Promise<string> {
+  if (file instanceof File) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+  else {
+    return new Promise((resolve, reject) => {
+      fetch(file).then(response => response.blob())
+        .then(blob => {
+          let imgURL = URL.createObjectURL(blob);
+          resolve(imgURL);
+        }).catch(error => {
+          console.error(`Error fetching image: ${error}`)
+          reject();
+        });
+    });
+  }
 }
 
 /**

@@ -1,14 +1,32 @@
-import { useState, useCallback } from 'react';
-import { ImageLoader } from './components/ImageLoader/ImageLoader';
+import { useState, useCallback, useRef } from 'react';
+import { Login } from './components/Login/Login';
+import { ZooniverseImageLoader } from './components/ImageLoader/ZooniverseImageLoader';
 import { ImageCanvas } from './components/ImageCanvas/ImageCanvas';
 import { ToolPalette } from './components/ToolPalette/ToolPalette';
 import { TaskSidebar } from './components/TaskSidebar/TaskSidebar';
 import { segmentWithPoints } from './services/sam2Service';
 import { useClassificationStore } from './stores/classificationStore';
 import type { AnnotationTool } from './types/annotations';
+import { BrushEditableImageHandle } from "./components/ImageMask/BrushEditableImage";
+import type { BrushProps } from './types/tools';
+
+// TODO: Move to another file
+function makeSvgCursorUri(size: number) : string {
+  const prefix = "data:image/svg+xml";
+  const viewBoxSize = 2*size + 25;
+  const circleCentre = viewBoxSize/2
+  const circle_svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${viewBoxSize}" height="${viewBoxSize}" viewBox="0 0 ${viewBoxSize} ${viewBoxSize}"><circle cx="${circleCentre}" cy="${circleCentre}" r="${2*size}" fill="none" stroke="purple" stroke-width="1"/></svg>`;
+  const encoded_circle_svg = encodeURIComponent(circle_svg);
+  const circle_uri = `url(${prefix},${encoded_circle_svg}) ${circleCentre} ${circleCentre}, auto`;
+  return circle_uri;
+}
 
 function App() {
   const [tool, setTool] = useState<AnnotationTool>('point');
+  const [brushUri, setBrushUri] = useState<string>(makeSvgCursorUri(5));
+  const [brushSize, setBrushSize] = useState<number>(5);
+  const [predModBrushSize, setPredModBrushSize] = useState<number>(5);
+  const [predModBrushUri, setPredModBrushUri] = useState<string>(makeSvgCursorUri(5));
   const [modelId, setModelId] = useState('sam2-hiera-large');
   const [coordinateFix, setCoordinateFix] = useState<
     'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY'
@@ -88,22 +106,39 @@ function App() {
     [imageUrl, annotations, setMask, setDebugImage, imageDimensions, coordinateFix, debugCoords, modelId]
   );
 
+  const [brushMode, setBrushMode] = useState("add");
+
+  const brushRef = useRef<BrushEditableImageHandle>(null);
+
+  const brushProps : BrushProps = {
+    brushSize:brushSize, 
+    brushUri:brushUri, 
+    predModBrushSize:predModBrushSize,
+    predModBrushUri:predModBrushUri,
+    predModBrushMode:brushMode,
+    predModBrushRef:brushRef
+  };
+
   return (
     <div style={appStyle}>
       <header style={headerStyle}>
         <h1 style={titleStyle}>ZooIFE</h1>
         <p style={subtitleStyle}>Interactive Image Classification for Zooniverse</p>
-        <ImageLoader />
+        <ZooniverseImageLoader /> <Login />
       </header>
       <main style={mainStyle}>
         <aside style={leftAsideStyle}>
           <ToolPalette
             tool={tool}
             onToolChange={setTool}
+            brushProps={brushProps} 
+            onBrushSizeChange={(brushSize:number) => {setBrushSize(brushSize); setBrushUri(makeSvgCursorUri(brushSize))}}
+            onPredModBrushModeChange={(predModBrushMode : string) => {setBrushMode(predModBrushMode)}}
             modelId={modelId}
             onModelChange={setModelId}
             showPoints={showPoints}
             onShowPointsChange={setShowPoints}
+            onPredModBrushSizeChange={(brushSize:number) => {setPredModBrushSize(brushSize); setPredModBrushUri(makeSvgCursorUri(brushSize))}}
             coordinateFix={coordinateFix}
             onCoordinateFixChange={setCoordinateFix}
             debugCoords={debugCoords}
@@ -111,7 +146,7 @@ function App() {
           />
         </aside>
         <section style={canvasSectionStyle}>
-          <ImageCanvas tool={tool} onPointClick={handlePointClick} onUndo={handleUndo} showPoints={showPoints} />
+          <ImageCanvas tool={tool} brushProps={brushProps} onPointClick={handlePointClick} onUndo={handleUndo} showPoints={showPoints} />
         </section>
         <aside style={rightAsideStyle}>
           <TaskSidebar />
@@ -139,7 +174,7 @@ const mainStyle: React.CSSProperties = {
   padding: 24,
   alignItems: 'flex-start',
 };
-const leftAsideStyle: React.CSSProperties = { flexShrink: 0 };
+const leftAsideStyle: React.CSSProperties = { flexShrink: 0 , width: '15%'};
 const canvasSectionStyle: React.CSSProperties = {
   flex: 1,
   minWidth: 0,

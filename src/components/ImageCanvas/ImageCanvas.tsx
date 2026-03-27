@@ -1,17 +1,22 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Stage, Layer, Group, Image, Line, Circle } from 'react-konva';
 import Konva from 'konva';
+import type { KonvaEventObject } from "konva/lib/Node"
 import { useClassificationStore } from '../../stores/classificationStore';
+import { BrushEditableImage, BrushEditableImageHandle } from '../ImageMask/BrushEditableImage';
 import type { AnnotationTool } from '../../types/annotations';
+import type { BrushProps } from '../../types/tools';
+
 
 interface ImageCanvasProps {
   tool: AnnotationTool;
+  brushProps: BrushProps; 
   onPointClick?: (x: number, y: number, label: 0 | 1) => void;
   onUndo?: () => void;
   showPoints?: boolean;
 }
 
-export function ImageCanvas({ tool, onPointClick, onUndo, showPoints = true }: ImageCanvasProps) {
+export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints = true }: ImageCanvasProps) {
   const {
     imageUrl,
     annotations,
@@ -32,8 +37,7 @@ export function ImageCanvas({ tool, onPointClick, onUndo, showPoints = true }: I
 
   const STAGE_WIDTH = 1200;
   const STAGE_HEIGHT = 800;
-  const BRUSH_RADIUS = 10;
-  const toolCursor = isPanMode ? 'grab' : tool === 'point' || tool === 'freehand' || tool === 'brush' ? 'crosshair' : 'default';
+  const toolCursor = isPanMode ? 'grab' : tool === "brush" ? brushProps.brushUri : tool === "modifier_brush" ? brushProps.predModBrushUri:  tool === 'point' || tool === 'freehand' ? 'crosshair' : 'default';
 
   const baseScale = image
     ? Math.min(STAGE_WIDTH / image.naturalWidth, STAGE_HEIGHT / image.naturalHeight)
@@ -114,7 +118,7 @@ export function ImageCanvas({ tool, onPointClick, onUndo, showPoints = true }: I
       addAnnotation({ type: 'polyline', points: [...drawingPoints] });
       setDrawingPoints([]);
     } else if (tool === 'brush' && drawingPoints.length > 1) {
-      addAnnotation({ type: 'brush', strokes: [{ points: [...drawingPoints], radius: BRUSH_RADIUS }] });
+      addAnnotation({ type: 'brush', strokes: [{ points: [...drawingPoints], radius: 2 * brushProps.brushSize }] });
       setDrawingPoints([]);
     } else if ((tool === 'freehand' || tool === 'brush') && drawingPoints.length <= 1) {
       setDrawingPoints([]);
@@ -217,6 +221,8 @@ export function ImageCanvas({ tool, onPointClick, onUndo, showPoints = true }: I
     img.src = debugImageUrl;
   }, [debugImageUrl]);
 
+  
+
   if (!imageUrl) {
     return (
       <div className="canvas-placeholder" style={placeholderStyle}>
@@ -228,11 +234,15 @@ export function ImageCanvas({ tool, onPointClick, onUndo, showPoints = true }: I
   const natW = image?.naturalWidth ?? 0;
   const natH = image?.naturalHeight ?? 0;
 
+  const handleDown = (e: KonvaEventObject<PointerEvent>) => brushProps.predModBrushRef?.current?.pointerDown(e);  
+  const handleMove = (e: KonvaEventObject<PointerEvent>) => brushProps.predModBrushRef?.current?.pointerMove(e); 
+  const handleUp = () => brushProps.predModBrushRef?.current?.pointerUp();
+
   return (
     <div className="image-canvas" style={{ ...containerStyle, cursor: !debugImageUrl ? toolCursor : 'default' }}>
       {!debugImageUrl && (
         <div style={toolbarStyle}>
-          <button type="button" onClick={zoomOut} style={toolbarBtnStyle} title="Zoom out">−</button>
+          <button type="button" onClick={zoomOut} style={toolbarBtnStyle} title="Zoom out">-</button>
           <span style={toolbarLabelStyle}>{Math.round(zoom * 100)}%</span>
           <button type="button" onClick={zoomIn} style={toolbarBtnStyle} title="Zoom in">+</button>
           <button type="button" onClick={zoomFit} style={toolbarBtnStyle} title="Fit to view">Fit</button>
@@ -280,6 +290,9 @@ export function ImageCanvas({ tool, onPointClick, onUndo, showPoints = true }: I
         onMouseUp={handleStageMouseUp}
         onMouseLeave={handleStageMouseUp}
         onWheel={handleWheel}
+        onPointerDown={handleDown}
+        onPointerMove={handleMove}
+        onPointerUp={handleUp}
       >
         <Layer>
           <Group
@@ -289,24 +302,28 @@ export function ImageCanvas({ tool, onPointClick, onUndo, showPoints = true }: I
             scaleX={contentScale}
             scaleY={contentScale}
             draggable={isPanMode}
-            onDragMove={handleContentDragMove}
-          >
-            <Image
-              image={image}
-              width={natW}
-              height={natH}
-              listening={isPanMode}
-            />
-            {maskImage && (
+              onDragMove={handleContentDragMove}
+            >
               <Image
-                image={maskImage}
+                image={image}
                 width={natW}
                 height={natH}
-                listening={false}
+                listening={isPanMode}
               />
-            )}
-            {debugImage && (
-              <Image
+              {maskImage && (
+                <BrushEditableImage
+                  image={maskImage}
+                  enableBrush={true}
+                  brushRadius={brushProps.predModBrushSize}
+                  brushMode={brushProps.predModBrushMode}
+                  width={natW}
+                  height={natH}
+                  ref={brushProps.predModBrushRef}
+                  contentScale={contentScale}
+                />
+              )}
+              {debugImage && (
+                <Image
                 image={debugImage}
                 width={natW}
                 height={natH}
@@ -362,7 +379,7 @@ export function ImageCanvas({ tool, onPointClick, onUndo, showPoints = true }: I
               <Line
                 points={drawingPoints.flatMap((p) => [p.x, p.y])}
                 stroke={tool === 'brush' ? 'lime' : 'cyan'}
-                strokeWidth={tool === 'brush' ? BRUSH_RADIUS * 2 : 3}
+                strokeWidth={tool === 'brush' ? brushProps.brushSize * 4 : 3}
                 lineCap="round"
                 lineJoin="round"
               />
@@ -383,7 +400,8 @@ const toolbarStyle: React.CSSProperties = {
 };
 const toolbarBtnStyle: React.CSSProperties = {
   padding: '6px 12px',
-  border: '1px solid #333',
+  border: '1px solid',
+  borderColor: '#333',
   borderRadius: 6,
   background: '#16213e',
   color: '#eee',
@@ -434,5 +452,6 @@ const debugImgStyle: React.CSSProperties = {
   maxWidth: '100%',
   maxHeight: 600,
   borderRadius: 8,
-  border: '3px solid #e94560',
+  border: '3px solid',
+  borderColor: '#e94560'
 };
