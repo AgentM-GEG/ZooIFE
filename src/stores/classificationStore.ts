@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type { DrawingAnnotation } from '../types/annotations';
 import type { Annotation as PanoptesAnnotation } from '../types/panoptes';
+import { compressSegmentationMask } from "../utils/image/compressImageMask";
+
 
 export interface TaskAnswer {
   taskId: string;
@@ -39,7 +41,7 @@ interface ClassificationState {
   undoMask: () => ImageData | null;
   redoMask: () => ImageData | null
 
-  buildPanoptesAnnotations: () => PanoptesAnnotation[];
+  buildPanoptesAnnotations: () => Promise<PanoptesAnnotation[]>;
   reset: () => void;
 }
 
@@ -119,9 +121,18 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
     return maskHistory[newIndex];
   },
 
-  buildPanoptesAnnotations: () => {
-    const { annotations, taskAnswers } = get();
+   buildPanoptesAnnotations: async () => {
+    const { annotations, taskAnswers, maskHistory, maskHistoryIndex } = get();
+
+    const currentMask = maskHistory[maskHistoryIndex];
+    const compressedMask = await compressSegmentationMask(currentMask);
+
     const result: PanoptesAnnotation[] = [];
+
+    result.push({
+      task: 'segmentation-mask',
+      value: compressedMask,
+    });
 
     // Drawing annotations
     annotations.forEach((a, i) => {
@@ -136,13 +147,15 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
       result.push({ task: taskId, value });
     });
 
+    console.log(JSON.stringify(result, null, 2));
+
     return result;
   },
 
   reset: () => set(initialState),
 }));
 
-function mapAnnotationToValue(a: DrawingAnnotation): unknown {
+function mapAnnotationToValue(a: DrawingAnnotation): PanoptesAnnotation['value'] {
   switch (a.type) {
     case 'point':
       return { type: 'point', x: a.x, y: a.y, label: a.label };

@@ -15,7 +15,7 @@ const WORKFLOW = "29070";//"29620";
 export function ZooniverseImageLoader() {
     const { token } = useAuth();
     const [subjects, setSubjects] = useState<Subject[] | null>(null);
-    const { setSubject } = useClassificationStore();
+    const setSubject = useClassificationStore(s => s.setSubject);
 
     const processSubject = async (subject : Subject) => {
         try {

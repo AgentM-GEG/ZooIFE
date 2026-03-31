@@ -3,6 +3,8 @@
  * Aligned with CSSI IFE Interoperability and Panoptes API
  */
 
+import { CompressedMask } from "@/utils/image/compressImageMask";
+
 export interface SubjectLocation {
   [mimeType: string]: string; // e.g. { "image/jpeg": "https://..." }
 }
@@ -36,7 +38,7 @@ export interface Workflow {
 
 export interface Annotation {
   task: string;
-  value: string | string[] | number[] | Record<string, unknown> | unknown[];
+  value: string | string[] | number[] | Record<string, unknown> | CompressedMask | unknown[];
 }
 
 export interface ClassificationMetadata {

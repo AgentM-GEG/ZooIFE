@@ -2,7 +2,6 @@ import { useClassificationStore } from '../../stores/classificationStore';
 import { SEGMENT_MODELS } from '../../services/sam2Service';
 import type { AnnotationTool } from '../../types/annotations';
 import { BrushProps } from '@/types/tools';
-import { shallow } from 'zustand/shallow';
 
 interface ToolPaletteProps {
   tool: AnnotationTool;
