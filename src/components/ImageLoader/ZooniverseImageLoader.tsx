@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useClassificationStore } from '../../stores/classificationStore';
 import {
     loadImageAsDataUrl,
@@ -10,7 +10,10 @@ import { useAuth } from '../../auth/AuthContext';
 // import type { TokenSet } from '../../auth/tokenStore'
 import type { Subject } from '../../types/panoptes'
 
-const WORKFLOW = "29070";//"29620";
+/** Override via `.env`: `VITE_ZOONIVERSE_WORKFLOW_ID`, optional `VITE_ZOONIVERSE_SUBJECT_SET_ID`. */
+const WORKFLOW_ID = import.meta.env.VITE_ZOONIVERSE_WORKFLOW_ID ?? '29070';
+const SUBJECT_SET_ID = import.meta.env.VITE_ZOONIVERSE_SUBJECT_SET_ID?.trim() || undefined;
+const QUEUE_OPTS = SUBJECT_SET_ID ? { subjectSetId: SUBJECT_SET_ID } : undefined;
 
 export function ZooniverseImageLoader() {
     const { token } = useAuth();
@@ -34,7 +37,7 @@ export function ZooniverseImageLoader() {
 
         // If no subjects loaded yet, fetch them FIRST and use them immediately
         if (!subjects || subjects.length === 0) {
-            const newSubjects = await getQueuedSubjects(WORKFLOW, token.access_token);
+            const newSubjects = await getQueuedSubjects(WORKFLOW_ID, token.access_token, QUEUE_OPTS);
 
             // Save to React state
             setSubjects(newSubjects);

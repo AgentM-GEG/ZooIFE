@@ -17,13 +17,24 @@ function headers(token?: string): HeadersInit {
   return h;
 }
 
+export type QueuedSubjectsOptions = {
+  staging?: boolean;
+  /** When set, appended as `subject_set_id` (required for grouped workflows; optional otherwise). */
+  subjectSetId?: string;
+};
+
 export async function getQueuedSubjects(
   workflowId: string,
   token?: string,
-  staging = false
+  opts?: boolean | QueuedSubjectsOptions
 ): Promise<Subject[]> {
+  const options: QueuedSubjectsOptions =
+    typeof opts === 'boolean' ? { staging: opts } : (opts ?? {});
+  const { staging = false, subjectSetId } = options;
   const base = staging ? STAGING_BASE : API_BASE;
-  const url = `${base}/subjects/queued?workflow_id=${workflowId}`;
+  const params = new URLSearchParams({ workflow_id: workflowId });
+  if (subjectSetId) params.set('subject_set_id', subjectSetId);
+  const url = `${base}/subjects/queued?${params.toString()}`;
   const res = await fetch(url, { headers: headers(token) });
   if (!res.ok) throw new Error(`Subjects error: ${res.status}`);
   const json = await res.json();
