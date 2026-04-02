@@ -9,3 +9,10 @@ export interface BrushProps {
     predModBrushMode: string;
     predModBrushRef: RefObject<BrushEditableImageHandle> | null;
 }
+
+export interface TooltipState {
+  visible: boolean;
+  x: number;    // screen-space X (pixels)
+  y: number;    // screen-space Y (pixels)
+  text: string;
+}

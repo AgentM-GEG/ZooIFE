@@ -51,7 +51,7 @@ export function ToolPalette({
 
   const hasAnnotations = annotations.length > 0;
 
-  console.log([maskHistoryIndex, maskHistory]);
+  // console.log([maskHistoryIndex, maskHistory]);
 
   const undoMaskPossible = maskHistoryIndex >= 0;
   const redoMaskPossible = maskHistoryIndex < maskHistory.length - 1;
@@ -103,7 +103,7 @@ export function ToolPalette({
         />
         {' '}Show points
       </label>
-      {currentMaskUrl && (
+      {(
         <div
           style={{
             display: "flex",

@@ -101,6 +101,8 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
 
   // UNDO / REDO FOR MASK HISTORY (used by Konva brush) 
   pushMaskHistory: (imgData: ImageData) => set((state) => {
+    console.log("pushMaskHistory");
+    
     const truncated = state.maskHistory.slice(0, state.maskHistoryIndex + 1);
     return { maskHistory: [...truncated, imgData], maskHistoryIndex: truncated.length, };
   }),

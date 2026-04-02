@@ -9,6 +9,8 @@ import { useClassificationStore } from './stores/classificationStore';
 import type { AnnotationTool } from './types/annotations';
 import { BrushEditableImageHandle } from "./components/ImageMask/BrushEditableImage";
 import type { BrushProps } from './types/tools';
+import { GraphQLClient } from 'graphql-request'
+
 
 // TODO: Move to another file
 function makeSvgCursorUri(size: number) : string {
@@ -35,6 +37,8 @@ function App() {
   const [showPoints, setShowPoints] = useState(true);
   const { imageUrl, annotations, undoLastAnnotation, setMask, setDebugImage, imageDimensions } =
     useClassificationStore();
+
+  // const { caesarClient, setCaesarClient } = useState(new GraphQLClient(API_BASE));
 
   const handleUndo = useCallback(async () => {
     const removed = undoLastAnnotation();

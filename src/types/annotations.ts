@@ -41,3 +41,23 @@ export type DrawingAnnotation =
   | PolylineAnnotation
   | BrushAnnotation
   | Sam2MaskAnnotation;
+
+
+export type CaesarAnnotation = {
+      toolType: "rectangle";
+      x_center: number;
+      y_center: number;
+      width: number;
+      height: number;
+      markId: string;
+      [key: string]: unknown;
+    }
+  | {
+      toolType: "custom";
+      data: unknown; // fallback for unknown reducer shapes
+    };
+
+
+export type CaesarAnnotations = {
+  data : CaesarAnnotation[];
+}

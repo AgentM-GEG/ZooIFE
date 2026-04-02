@@ -5,28 +5,84 @@ import {
     getImageDimensions,
     normalizeImageForDisplay,
 } from '../../services/imageService';
-import { getQueuedSubjects } from '../../services/panoptesService';
+import { getQueuedSubjects, getWorkflow, QueuedSubjectsOptions } from '../../services/panoptesService';
 import { useAuth } from '../../auth/AuthContext';
 // import type { TokenSet } from '../../auth/tokenStore'
-import type { Subject } from '../../types/panoptes'
+import type { Subject } from '../../types/panoptes';
+import type { CaesarAnnotation } from '../../types/annotations';
+import { useCaesarClient, fetchCaesarReductions, CaesarReductionOptions, SubjectReduction } from '../../services/caesarService';
+
+import { useCaesarAnnotationStore } from '../../stores/caesarReductionStore'
 
 /** Override via `.env`: `VITE_ZOONIVERSE_WORKFLOW_ID`, optional `VITE_ZOONIVERSE_SUBJECT_SET_ID`. */
-const WORKFLOW_ID = import.meta.env.VITE_ZOONIVERSE_WORKFLOW_ID ?? '29070';
+const USE_STAGING_APIS = import.meta.env.VITE_ZOONIVERSE_USE_STAGING_APIS === 'true';
+const WORKFLOW_ID = import.meta.env.VITE_ZOONIVERSE_WORKFLOW_ID?.trim() ?? '29070';
 const SUBJECT_SET_ID = import.meta.env.VITE_ZOONIVERSE_SUBJECT_SET_ID?.trim() || undefined;
-const QUEUE_OPTS = SUBJECT_SET_ID ? { subjectSetId: SUBJECT_SET_ID } : undefined;
+const CEASAR_DEFAULT_TOOL_TYPE = import.meta.env.VITE_CEASAR_DEFAULT_TOOL_TYPE?.trim() || "default";
 
-export function ZooniverseImageLoader() {
+const QUEUE_OPTS: QueuedSubjectsOptions = { staging: USE_STAGING_APIS };
+
+const CAESAR_REDUCTION_OPTS: CaesarReductionOptions = { staging: USE_STAGING_APIS, defaultToolType : CEASAR_DEFAULT_TOOL_TYPE };
+
+if (SUBJECT_SET_ID) {
+    QUEUE_OPTS.subjectSetId = SUBJECT_SET_ID;
+}
+
+export function ZooniverseImageLoader() {    
     const { token } = useAuth();
+    const caesarClient = useCaesarClient(token?.access_token!, CAESAR_REDUCTION_OPTS);
     const [subjects, setSubjects] = useState<Subject[] | null>(null);
     const setSubject = useClassificationStore(s => s.setSubject);
 
-    const processSubject = async (subject : Subject) => {
+    const processCaesarReductions = async (subject: Subject) => {
+            const reductions: SubjectReduction[] = await fetchCaesarReductions(caesarClient, "machineLearnt", subject.id, WORKFLOW_ID)
+            
+            // TODO: This should be elsewhere!!
+            const workflow = await getWorkflow(WORKFLOW_ID, token?.access_token!, CAESAR_REDUCTION_OPTS.staging);            
+
+            const parsed: CaesarAnnotation[] = reductions.flatMap(r => {
+                const outer = Array.isArray(r.data) ? r.data : [r.data];
+
+                return outer.flatMap(d => {
+                    const inner = Array.isArray(d?.data) ? d.data : [];
+
+                    return inner.map(b => {
+                        const taskIndex : number = b.taskIndex ?? 0;
+                        const toolIndex : number = b.toolIndex ?? 0;
+                        const markTool = workflow.tasks[`T${taskIndex}`].tools[toolIndex];                        
+                        
+                        const toolType = b.toolType ?? CAESAR_REDUCTION_OPTS.defaultToolType;
+                        if (markTool.type === "rectangle") {
+                            return {
+                                toolType: "rectangle",
+                                x_center: b.x_center,
+                                y_center: b.y_center,
+                                width: b.width,
+                                height: b.height,
+                                markId: b.markId ?? crypto.randomUUID(),
+                                markColour: markTool.color,
+                                markLabel: markTool.label
+                            };
+                        }
+                        return { toolType: "custom", data: undefined };
+                    });
+                });
+            });
+
+            console.log(parsed);
+
+            useCaesarAnnotationStore.getState().setAnnotations(parsed);
+    }
+
+    const processSubject = async (subject: Subject) => {
         try {
             const dataUrl = await loadImageAsDataUrl(subject.locations[0]["image/jpeg"]);
             // Normalize so display and SAM2 see the same pixels (fixes EXIF coordinate mismatch)
             const normalizedUrl = await normalizeImageForDisplay(dataUrl);
             const dims = await getImageDimensions(normalizedUrl);
             setSubject(subject.id, normalizedUrl, dims);
+            processCaesarReductions(subject);
+
         } catch (err) {
             console.error('Failed to load image:', err);
         }

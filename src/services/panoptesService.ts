@@ -8,10 +8,10 @@ import type { Subject, Classification, Workflow } from '../types/panoptes';
 const API_BASE = 'https://www.zooniverse.org/api';
 const STAGING_BASE = 'https://panoptes-staging.zooniverse.org/api';
 
-function headers(token?: string): HeadersInit {
+export function headers(token?: string, content_type :string = 'application/vnd.api+json; version=1'): HeadersInit {
   const h: HeadersInit = {
     Accept: 'application/vnd.api+json; version=1',
-    'Content-Type': 'application/vnd.api+json; version=1',
+    'Content-Type': content_type,
   };
   if (token) (h as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   return h;
@@ -34,9 +34,9 @@ export async function getQueuedSubjects(
   const base = staging ? STAGING_BASE : API_BASE;
   const params = new URLSearchParams({ workflow_id: workflowId });
   if (subjectSetId) params.set('subject_set_id', subjectSetId);
-  const url = `${base}/subjects/queued?${params.toString()}`;
-  const res = await fetch(url, { headers: headers(token) });
-  if (!res.ok) throw new Error(`Subjects error: ${res.status}`);
+  const url = `${base}/subjects/queued?${params.toString()}`;  
+  const res = await fetch(url, { headers: headers(token) });  
+  if (!res.ok) throw new Error(`Subjects error: ${res.status}, ${JSON.stringify(response.errors)}`);
   const json = await res.json();
   return json.subjects ?? [];
 }

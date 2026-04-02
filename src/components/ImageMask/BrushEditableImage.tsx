@@ -14,7 +14,11 @@ export interface BrushEditableImageHandle {
   redo: () => void;
 }
 
-interface BrushEditableImageProps extends Konva.ImageConfig {
+interface BrushEditableImageProps
+  extends Omit<Konva.ImageConfig, "image"> {
+
+  image?: HTMLImageElement | null;
+  externalMask?: ImageData | HTMLImageElement | null;
   enableBrush?: boolean;
   brushRadius?: number;
   brushMode?: BrushMode;
@@ -31,13 +35,16 @@ export const BrushEditableImage = forwardRef<
   brushMode = "add",
   addColor = "rgba(0,255,200,0.45)",
   image,
+  externalMask,
   contentScale,
   ...rest
 }, ref) => {
 
+
   const imageRef = useRef<Konva.Image>(null);
   const isDrawingRef = useRef(false);
   const lastPosRef = useRef<{ x: number; y: number } | null>(null);
+  
 
   const [canvasImage] = useState(() => document.createElement("canvas"));
 
@@ -47,33 +54,128 @@ export const BrushEditableImage = forwardRef<
   const maskHistory = useClassificationStore(s => s.maskHistory);
   const maskHistoryIndex = useClassificationStore(s => s.maskHistoryIndex);
 
+
+  const parseRGBA = (rgba: string): [number, number, number, number] => {
+    const m = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+),?\s*([\d\.]+)?\)/);
+    if (!m) return [0, 255, 0, 0.45]; // fallback
+
+    return [
+      Number(m[1]),
+      Number(m[2]),
+      Number(m[3]),
+      Math.floor((Number(m[4] ?? 1)) * 255)
+    ];
+  }
+
+  const ensureMaskExists = () => {
+    if (brushMode !== "add") return;
+
+    const store = useClassificationStore.getState();
+    const hasMask = store.maskHistory.length > 0;
+
+    if (hasMask) return;
+
+    // Create a fully transparent mask with the correct size
+    const ctx = canvasImage.getContext("2d")!;
+    ctx.clearRect(0, 0, canvasImage.width, canvasImage.height);
+
+    // const emptyMask = ctx.getImageData(0, 0, canvasImage.width, canvasImage.height);
+    // pushMaskHistory(emptyMask);
+  };
+
+  useEffect(() => {
+    if (!externalMask) return;
+
+    const ctx = canvasImage.getContext("2d")!;
+
+    //
+    // ✅ Extract existing mask BEFORE resizing
+    //
+    let currentMask: ImageData | null = null;
+    if (canvasImage.width > 0 && canvasImage.height > 0) {
+      currentMask = ctx.getImageData(0, 0, canvasImage.width, canvasImage.height);
+      pushMaskHistory(currentMask);
+    }
+
+    //
+    // ✅ Convert externalMask (ImageData | HTMLImageElement) into ImageData
+    //
+    let extData: ImageData;
+    let w: number;
+    let h: number;
+
+    if (externalMask instanceof ImageData) {
+      extData = externalMask;
+      w = externalMask.width;
+      h = externalMask.height;
+    } else {
+      w = externalMask.width || externalMask.naturalWidth;
+      h = externalMask.height || externalMask.naturalHeight;
+
+      const temp = document.createElement("canvas");
+      temp.width = w;
+      temp.height = h;
+      const tctx = temp.getContext("2d")!;
+      tctx.drawImage(externalMask, 0, 0);
+      extData = tctx.getImageData(0, 0, w, h);
+    }
+
+    //
+    // ✅ Resize canvas AFTER extracting existing mask
+    //
+    canvasImage.width = w;
+    canvasImage.height = h;
+
+    // If sizes mismatch, treat existing mask as empty
+    if (!currentMask || currentMask.width !== w || currentMask.height !== h) {
+      currentMask = ctx.createImageData(w, h);
+    }
+
+    //
+    // ✅ Apply addColor to external mask
+    //
+    const [r, g, b, a0] = parseRGBA(addColor);
+
+    const merged = ctx.createImageData(w, h);
+
+    for (let i = 0; i < merged.data.length; i += 4) {
+      const alpha = extData.data[i + 3] || currentMask.data[i + 3];
+
+      merged.data[i] = r;
+      merged.data[i + 1] = g;
+      merged.data[i + 2] = b;
+      merged.data[i + 3] = alpha;
+    }
+
+    ctx.putImageData(merged, 0, 0);
+    
+    pushMaskHistory(merged);
+
+    imageRef.current?.getLayer()?.batchDraw();
+  }, [externalMask]);
+
+
+
   //
   // 1️⃣ Load initial image ONCE into persistent canvas
   //
   useEffect(() => {
     if (!image) return;
 
-    const loadSource = (source: any) => {
-      canvasImage.width = source.width || source.naturalWidth;
-      canvasImage.height = source.height || source.naturalHeight;
+    const w = image.width || image.naturalWidth;
+    const h = image.height || image.naturalHeight;
 
-      const ctx = canvasImage.getContext("2d")!;
-      ctx.clearRect(0, 0, canvasImage.width, canvasImage.height);
-      ctx.drawImage(source, 0, 0);
-      const snapshot = ctx.getImageData(0, 0, canvasImage.width, canvasImage.height);
-      pushMaskHistory(snapshot);
+    if (!w || !h) return;
 
-      imageRef.current?.getLayer()?.batchDraw();
-    };
+    canvasImage.width = w;
+    canvasImage.height = h;
 
-    if (image instanceof HTMLImageElement) {
-      if (image.complete) loadSource(image);
-      else image.onload = () => loadSource(image);
-    } else {
-      loadSource(image);
-    }
+    // ⚠️ DO NOT draw base image into canvasImage.
+    const ctx = canvasImage.getContext("2d")!;
+    ctx.clearRect(0, 0, w, h);
 
-  }, [image, canvasImage]);
+    imageRef.current?.getLayer()?.batchDraw();
+  }, [image]);
 
 
   //
@@ -146,6 +248,7 @@ export const BrushEditableImage = forwardRef<
 
       // must be a real left-button PRESS, not synthetic or hover
       if (e.evt.buttons === 1 && !isDrawingRef.current) {
+        ensureMaskExists();
         isDrawingRef.current = true;
 
         const ctx = canvasImage.getContext("2d")!;

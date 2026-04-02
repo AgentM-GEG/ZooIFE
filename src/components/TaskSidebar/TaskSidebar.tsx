@@ -30,8 +30,8 @@ const SAMPLE_TASKS: TaskConfig[] = [
 export function TaskSidebar() {
   const { taskAnswers, setTaskAnswer, buildPanoptesAnnotations } = useClassificationStore();
 
-  const handleSubmit = () => {
-    const annotations = buildPanoptesAnnotations();
+  const handleSubmit = async () => {
+    const annotations = await buildPanoptesAnnotations();
     console.log('Classifications (Panoptes format):', annotations);
   };
 

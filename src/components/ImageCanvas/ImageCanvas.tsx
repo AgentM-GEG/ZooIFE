@@ -3,14 +3,16 @@ import { Stage, Layer, Group, Image, Line, Circle } from 'react-konva';
 import Konva from 'konva';
 import type { KonvaEventObject } from "konva/lib/Node"
 import { useClassificationStore } from '../../stores/classificationStore';
-import { BrushEditableImage, BrushEditableImageHandle } from '../ImageMask/BrushEditableImage';
+import { BrushEditableImage } from '../ImageMask/BrushEditableImage';
+import { CaesarAnnotationOverlay } from '../CaesarAnnotationOverlay/CaesarAnnotationOverlay';
 import type { AnnotationTool } from '../../types/annotations';
 import type { BrushProps } from '../../types/tools';
+import { useCaesarAnnotationStore } from '../../stores/caesarReductionStore';
 
 
 interface ImageCanvasProps {
   tool: AnnotationTool;
-  brushProps: BrushProps; 
+  brushProps: BrushProps;
   onPointClick?: (x: number, y: number, label: 0 | 1) => void;
   onUndo?: () => void;
   showPoints?: boolean;
@@ -24,6 +26,10 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
     currentMaskUrl,
     debugImageUrl,
   } = useClassificationStore();
+
+  const caesarReducedAnnotations = useCaesarAnnotationStore(s => s.annotations);
+  const [selectedCaesarAnnotation, setSelectedCaesarAnnotation] = useState<string | null>(null);
+
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [maskImage, setMaskImage] = useState<HTMLImageElement | null>(null);
   const [debugImage, setDebugImageEl] = useState<HTMLImageElement | null>(null);
@@ -35,9 +41,24 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanMode, setIsPanMode] = useState(false);
 
+  const [tooltip, setTooltip] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    text: "",
+  });
+
   const STAGE_WIDTH = 1200;
   const STAGE_HEIGHT = 800;
-  const toolCursor = isPanMode ? 'grab' : tool === "brush" ? brushProps.brushUri : tool === "modifier_brush" ? brushProps.predModBrushUri:  tool === 'point' || tool === 'freehand' ? 'crosshair' : 'default';
+  const toolCursor: string = isPanMode
+    ? 'grab'
+    : tool === "brush"
+      ? brushProps.brushUri ?? 'crosshair'
+      : tool === "modifier_brush"
+        ? brushProps.predModBrushUri ?? 'crosshair'
+        : tool === 'point' || tool === 'freehand'
+          ? 'crosshair'
+          : 'default';
 
   const baseScale = image
     ? Math.min(STAGE_WIDTH / image.naturalWidth, STAGE_HEIGHT / image.naturalHeight)
@@ -47,6 +68,28 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   const centerY = (STAGE_HEIGHT - (image?.naturalHeight ?? 0) * contentScale) / 2;
   const groupX = centerX + pan.x;
   const groupY = centerY + pan.y;
+
+  function animateTo(targetZoom: number, targetPan: { x: number; y: number }) {
+    const duration = 0.25; // seconds
+    const startZoom = zoom;
+    const startPan = pan;
+    const startTime = performance.now();
+
+    function step(now: number) {
+      const t = Math.min((now - startTime) / (duration * 1000), 1);
+      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // EaseInOutQuad
+
+      setZoom(startZoom + (targetZoom - startZoom) * ease);
+      setPan({
+        x: startPan.x + (targetPan.x - startPan.x) * ease,
+        y: startPan.y + (targetPan.y - startPan.y) * ease,
+      });
+
+      if (t < 1) requestAnimationFrame(step);
+    }
+
+    requestAnimationFrame(step);
+  }
 
   const pointerToImage = useCallback(
     (pos: { x: number; y: number }) => ({
@@ -140,7 +183,33 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
     const fitScale = Math.min(STAGE_WIDTH / image.naturalWidth, STAGE_HEIGHT / image.naturalHeight);
     setZoom(1 / fitScale);
     setPan({ x: 0, y: 0 });
+
   }, [image]);
+
+  const zoomFitAnimated = useCallback(() => {
+    if (!image) return;
+
+    // Zoom that produces fit-to-screen
+    const targetZoom = 1;
+    const targetContentScale = baseScale;
+
+    const imageW = image.naturalWidth;
+    const imageH = image.naturalHeight;
+
+    // Compute where the image would be centered at that zoom
+    const targetCenterX = (STAGE_WIDTH - imageW * targetContentScale) / 2;
+    const targetCenterY = (STAGE_HEIGHT - imageH * targetContentScale) / 2;
+
+    // We want groupX === targetCenterX, but:
+    // groupX = centerX + pan.x
+    // and centerX recomputes automatically from zoom
+    //
+    // Therefore: to center, pan.x must be 0.
+    const targetPan = { x: 0, y: 0 };
+
+    animateTo(targetZoom, targetPan);
+
+  }, [image, baseScale, animateTo]);
 
   const handleWheel = useCallback(
     (e: Konva.KonvaEventObject<WheelEvent>) => {
@@ -221,7 +290,50 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
     img.src = debugImageUrl;
   }, [debugImageUrl]);
 
-  
+
+  const zoomToAnnotation = useCallback(({ x, y, width, height }) => {
+    if (!image) return;
+
+    const padding = 40;
+
+    // Calculate required scale in stage coordinates
+    const scaleX = (STAGE_WIDTH - 2 * padding) / width;
+    const scaleY = (STAGE_HEIGHT - 2 * padding) / height;
+    const newContentScale = Math.min(scaleX, scaleY);
+
+    // Convert to your zoom model
+    const targetZoom = newContentScale / baseScale;
+
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+
+    const targetGroupX = STAGE_WIDTH / 2 - cx * newContentScale;
+    const targetGroupY = STAGE_HEIGHT / 2 - cy * newContentScale;
+
+    const newCenterX =
+      (STAGE_WIDTH - image.naturalWidth * newContentScale) / 2;
+    const newCenterY =
+      (STAGE_HEIGHT - image.naturalHeight * newContentScale) / 2;
+
+    const targetPan = {
+      x: targetGroupX - newCenterX,
+      y: targetGroupY - newCenterY,
+    };
+
+    animateTo(targetZoom, targetPan);
+  }, [image, baseScale, zoom, pan]);
+
+
+  const handleCaesarAnnotationClick = (annotation, annotationId) => {
+    if (selectedCaesarAnnotation === annotationId) {
+      zoomFitAnimated();
+      setSelectedCaesarAnnotation(null);
+      return;
+    }
+
+    setSelectedCaesarAnnotation(annotationId);
+    zoomToAnnotation(annotation);
+  }
 
   if (!imageUrl) {
     return (
@@ -234,8 +346,8 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   const natW = image?.naturalWidth ?? 0;
   const natH = image?.naturalHeight ?? 0;
 
-  const handleDown = (e: KonvaEventObject<PointerEvent>) => brushProps.predModBrushRef?.current?.pointerDown(e);  
-  const handleMove = (e: KonvaEventObject<PointerEvent>) => brushProps.predModBrushRef?.current?.pointerMove(e); 
+  const handleDown = (e: KonvaEventObject<PointerEvent>) => brushProps.predModBrushRef?.current?.pointerDown(e);
+  const handleMove = (e: KonvaEventObject<PointerEvent>) => brushProps.predModBrushRef?.current?.pointerMove(e);
   const handleUp = () => brushProps.predModBrushRef?.current?.pointerUp();
 
   return (
@@ -280,28 +392,28 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
         </>
       )}
       {!debugImageUrl && (
-      <Stage
-        ref={stageRef}
-        width={STAGE_WIDTH}
-        height={STAGE_HEIGHT}
-        onClick={handleStageClick}
-        onContextMenu={handleContextMenu}
-        onMouseMove={handleStageMouseMove}
-        onMouseUp={handleStageMouseUp}
-        onMouseLeave={handleStageMouseUp}
-        onWheel={handleWheel}
-        onPointerDown={handleDown}
-        onPointerMove={handleMove}
-        onPointerUp={handleUp}
-      >
-        <Layer>
-          <Group
-            ref={contentRef}
-            x={groupX}
-            y={groupY}
-            scaleX={contentScale}
-            scaleY={contentScale}
-            draggable={isPanMode}
+        <Stage
+          ref={stageRef}
+          width={STAGE_WIDTH}
+          height={STAGE_HEIGHT}
+          onClick={handleStageClick}
+          onContextMenu={handleContextMenu}
+          onMouseMove={handleStageMouseMove}
+          onMouseUp={handleStageMouseUp}
+          onMouseLeave={handleStageMouseUp}
+          onWheel={handleWheel}
+          onPointerDown={tool === "modifier_brush" ? handleDown : undefined}
+          onPointerMove={tool === "modifier_brush" ? handleMove : undefined}
+          onPointerUp={tool === "modifier_brush" ? handleUp : undefined}
+        >
+          <Layer>
+            <Group
+              ref={contentRef}
+              x={groupX}
+              y={groupY}
+              scaleX={contentScale}
+              scaleY={contentScale}
+              draggable={isPanMode}
               onDragMove={handleContentDragMove}
             >
               <Image
@@ -310,10 +422,11 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
                 height={natH}
                 listening={isPanMode}
               />
-              {maskImage && (
+              {(
                 <BrushEditableImage
-                  image={maskImage}
-                  enableBrush={true}
+                  image={image}
+                  externalMask={maskImage}
+                  enableBrush={tool === "modifier_brush"}
                   brushRadius={brushProps.predModBrushSize}
                   brushMode={brushProps.predModBrushMode}
                   width={natW}
@@ -322,71 +435,95 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
                   contentScale={contentScale}
                 />
               )}
+              {caesarReducedAnnotations && (<CaesarAnnotationOverlay
+                annotations={caesarReducedAnnotations}
+                toolCursor={toolCursor}
+                strokeWidth={2 / contentScale}
+                setToolTip={setTooltip}
+                onAnnotationClick={(caesarAnnotation, annotationId) => handleCaesarAnnotationClick(caesarAnnotation, annotationId)}
+              />)}
               {debugImage && (
                 <Image
-                image={debugImage}
-                width={natW}
-                height={natH}
-                listening={false}
-                opacity={1}
-              />
-            )}
-            {annotations.map((a, i) => {
-              if (a.type === 'point' && !debugImageUrl && showPoints)
-                return (
-                  <Circle
-                    key={a.id ?? i}
-                    x={a.x}
-                    y={a.y}
-                    radius={4}
-                    fill={a.label === 0 ? '#e94560' : 'lime'}
-                    stroke="white"
-                    strokeWidth={1}
-                    listening={false}
-                  />
-                );
-              if (a.type === 'polyline' && a.points.length > 1)
-                return (
-                  <Line
-                    key={a.id ?? i}
-                    points={a.points.flatMap((p) => [p.x, p.y])}
-                    stroke="lime"
-                    strokeWidth={3}
-                    lineCap="round"
-                    lineJoin="round"
-                    listening={false}
-                  />
-                );
-              if (a.type === 'brush')
-                return (
-                  <React.Fragment key={a.id ?? i}>
-                    {a.strokes.map((stroke, si) => (
-                      <Line
-                        key={si}
-                        points={stroke.points.flatMap((p) => [p.x, p.y])}
-                        stroke="lime"
-                        strokeWidth={stroke.radius * 2}
-                        lineCap="round"
-                        lineJoin="round"
-                        listening={false}
-                      />
-                    ))}
-                  </React.Fragment>
-                );
-              return null;
-            })}
-            {drawingPoints.length > 1 && (
-              <Line
-                points={drawingPoints.flatMap((p) => [p.x, p.y])}
-                stroke={tool === 'brush' ? 'lime' : 'cyan'}
-                strokeWidth={tool === 'brush' ? brushProps.brushSize * 4 : 3}
-                lineCap="round"
-                lineJoin="round"
-              />
-            )}
-          </Group>
-        </Layer>
-      </Stage>
+                  image={debugImage}
+                  width={natW}
+                  height={natH}
+                  listening={false}
+                  opacity={1}
+                />
+              )}
+              {annotations.map((a, i) => {
+                if (a.type === 'point' && !debugImageUrl && showPoints)
+                  return (
+                    <Circle
+                      key={a.id ?? i}
+                      x={a.x}
+                      y={a.y}
+                      radius={4}
+                      fill={a.label === 0 ? '#e94560' : 'lime'}
+                      stroke="white"
+                      strokeWidth={1}
+                      listening={false}
+                    />
+                  );
+                if (a.type === 'polyline' && a.points.length > 1)
+                  return (
+                    <Line
+                      key={a.id ?? i}
+                      points={a.points.flatMap((p) => [p.x, p.y])}
+                      stroke="lime"
+                      strokeWidth={3}
+                      lineCap="round"
+                      lineJoin="round"
+                      listening={false}
+                    />
+                  );
+                if (a.type === 'brush')
+                  return (
+                    <React.Fragment key={a.id ?? i}>
+                      {a.strokes.map((stroke, si) => (
+                        <Line
+                          key={si}
+                          points={stroke.points.flatMap((p) => [p.x, p.y])}
+                          stroke="lime"
+                          strokeWidth={stroke.radius * 2}
+                          lineCap="round"
+                          lineJoin="round"
+                          listening={false}
+                        />
+                      ))}
+                    </React.Fragment>
+                  );
+                return null;
+              })}
+              {drawingPoints.length > 1 && (
+                <Line
+                  points={drawingPoints.flatMap((p) => [p.x, p.y])}
+                  stroke={tool === 'brush' ? 'lime' : 'cyan'}
+                  strokeWidth={tool === 'brush' ? brushProps.brushSize * 4 : 3}
+                  lineCap="round"
+                  lineJoin="round"
+                />
+              )}
+            </Group>
+          </Layer>
+        </Stage>
+      )}
+      {tooltip.visible && (
+        <div
+          style={{
+            position: "absolute",
+            top: tooltip.y,
+            left: tooltip.x,
+            background: "rgba(0,0,0,0.75)",
+            color: "white",
+            padding: "4px 8px",
+            borderRadius: "4px",
+            pointerEvents: "none",      // important
+            transform: "translate(-50%, -100%)"
+          }}
+        >
+          {tooltip.text}
+        </div>
       )}
     </div>
   );
