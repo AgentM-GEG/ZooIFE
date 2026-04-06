@@ -1,4 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
+import styled from 'styled-components';
+import { theme } from '../../theme/zooniverseTheme';
 import { Stage, Layer, Group, Image, Line, Circle } from 'react-konva';
 import Konva from 'konva';
 import type { KonvaEventObject } from "konva/lib/Node"
@@ -8,6 +10,85 @@ import { CaesarAnnotationOverlay } from '../CaesarAnnotationOverlay/CaesarAnnota
 import type { AnnotationTool } from '../../types/annotations';
 import type { BrushProps } from '../../types/tools';
 import { useCaesarAnnotationStore } from '../../stores/caesarReductionStore';
+
+// Styled Components
+const Container = styled.div`
+  background: ${theme.colors.secondary};
+  border-radius: ${theme.borders.radius.lg};
+  padding: ${theme.spacing.lg};
+  display: inline-block;
+`;
+
+const Toolbar = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+  margin-bottom: ${theme.spacing.md};
+`;
+
+const ToolbarButton = styled.button<{ $active?: boolean }>`
+  padding: 6px 12px;
+  border: 1px solid ${(props) => props.$active ? theme.colors.primary : theme.colors.border};
+  border-radius: ${theme.borders.radius.base};
+  background: ${(props) => props.$active ? theme.colors.primary : theme.colors.secondary};
+  color: ${(props) => props.$active ? theme.colors.secondary : theme.colors.text.inverse};
+  cursor: pointer;
+  font-family: ${theme.typography.fontFamily};
+  font-size: ${theme.typography.size.sm};
+  transition: all ${theme.transitions.base};
+
+  &:hover {
+    background: ${theme.colors.primary};
+    color: ${theme.colors.secondary};
+    border-color: ${theme.colors.primary};
+  }
+`;
+
+const UndoButton = styled(ToolbarButton)`
+  margin-left: ${theme.spacing.sm};
+  color: ${theme.colors.warning};
+  border-color: ${theme.colors.warning};
+
+  &:hover {
+    background: ${theme.colors.warning};
+    color: ${theme.colors.text.inverse};
+  }
+`;
+
+const ToolbarLabel = styled.span`
+  font-size: ${theme.typography.size.sm};
+  color: ${theme.colors.text.secondary};
+  min-width: 48px;
+  text-align: center;
+`;
+
+const Placeholder = styled.div`
+  width: 1200px;
+  height: 800px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: ${theme.colors.background.surface};
+  border-radius: ${theme.borders.radius.lg};
+  color: ${theme.colors.text.secondary};
+  font-size: ${theme.typography.size.base};
+`;
+
+const DebugBanner = styled.div`
+  background: ${theme.colors.error};
+  color: ${theme.colors.text.inverse};
+  padding: 6px 12px;
+  border-radius: ${theme.borders.radius.base};
+  margin-bottom: ${theme.spacing.md};
+  font-size: ${theme.typography.size.sm};
+`;
+
+const DebugImage = styled.img`
+  max-width: 100%;
+  max-height: 600px;
+  border-radius: ${theme.borders.radius.lg};
+  border: 3px solid ${theme.colors.error};
+`;
 
 
 interface ImageCanvasProps {
@@ -367,9 +448,9 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
 
   if (!imageUrl) {
     return (
-      <div className="canvas-placeholder" style={placeholderStyle}>
+      <Placeholder>
         Load an image to get started
-      </div>
+      </Placeholder>
     );
   }
 
@@ -381,43 +462,41 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   const handleUp = () => brushProps.predModBrushRef?.current?.pointerUp();
 
   return (
-    <div className="image-canvas"> {/*style={{ ...containerStyle, cursor: !debugImageUrl ? toolCursor : 'default' }}>*/}
+    <Container>
       {!debugImageUrl && (
-        <div style={toolbarStyle}>
-          <button type="button" onClick={zoomOut} style={toolbarBtnStyle} title="Zoom out">-</button>
-          <span style={toolbarLabelStyle}>{Math.round(zoom * 100)}%</span>
-          <button type="button" onClick={zoomIn} style={toolbarBtnStyle} title="Zoom in">+</button>
-          <button type="button" onClick={zoomFit} style={toolbarBtnStyle} title="Fit to view">Fit</button>
-          <button type="button" onClick={zoom100} style={toolbarBtnStyle} title="100% (1:1 pixels)">100%</button>
-          <button
+        <Toolbar>
+          <ToolbarButton type="button" onClick={zoomOut} title="Zoom out">-</ToolbarButton>
+          <ToolbarLabel>{Math.round(zoom * 100)}%</ToolbarLabel>
+          <ToolbarButton type="button" onClick={zoomIn} title="Zoom in">+</ToolbarButton>
+          <ToolbarButton type="button" onClick={zoomFit} title="Fit to view">Fit</ToolbarButton>
+          <ToolbarButton type="button" onClick={zoom100} title="100% (1:1 pixels)">100%</ToolbarButton>
+          <ToolbarButton
             type="button"
+            $active={isPanMode}
             onClick={() => setIsPanMode((p) => !p)}
-            style={{ ...toolbarBtnStyle, ...(isPanMode ? toolbarBtnActiveStyle : {}) }}
             title="Pan mode: drag to move image"
           >
             Pan
-          </button>
+          </ToolbarButton>
           {annotations.length > 0 && (
-            <button
+            <UndoButton
               type="button"
               onClick={() => onUndo?.()}
-              style={{ ...toolbarBtnStyle, ...undoBtnStyle }}
               title="Undo last point (Ctrl+Z / ⌘Z)"
             >
               Undo
-            </button>
+            </UndoButton>
           )}
-        </div>
+        </Toolbar>
       )}
       {debugImageUrl && (
         <>
-          <div style={debugBannerStyle}>
+          <DebugBanner>
             Debug: Red marker shows where server received your click
-          </div>
-          <img
+          </DebugBanner>
+          <DebugImage
             src={debugImageUrl}
             alt="Debug: server received point location"
-            style={debugImgStyle}
           />
         </>
       )}
@@ -555,70 +634,6 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
           {tooltip.text}
         </div>
       )}
-    </div>
+    </Container>
   );
 }
-
-const toolbarStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  marginBottom: 12,
-};
-const toolbarBtnStyle: React.CSSProperties = {
-  padding: '6px 12px',
-  border: '1px solid',
-  borderColor: '#333',
-  borderRadius: 6,
-  background: '#16213e',
-  color: '#eee',
-  cursor: 'pointer',
-  fontSize: 14,
-};
-const toolbarLabelStyle: React.CSSProperties = {
-  fontSize: 13,
-  color: '#888',
-  minWidth: 48,
-  textAlign: 'center' as const,
-};
-const toolbarBtnActiveStyle: React.CSSProperties = {
-  background: '#0f3460',
-  borderColor: '#e94560',
-};
-const undoBtnStyle: React.CSSProperties = {
-  marginLeft: 8,
-  color: '#ffa726',
-  borderColor: '#ffa726',
-};
-const placeholderStyle: React.CSSProperties = {
-  width: 1200,
-  height: 800,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: '#1a1a2e',
-  color: '#888',
-  borderRadius: 8,
-};
-
-const containerStyle: React.CSSProperties = {
-  background: '#16213e',
-  borderRadius: 8,
-  padding: 16,
-  display: 'inline-block',
-};
-const debugBannerStyle: React.CSSProperties = {
-  background: '#e94560',
-  color: 'white',
-  padding: '6px 12px',
-  borderRadius: 6,
-  marginBottom: 12,
-  fontSize: 14,
-};
-const debugImgStyle: React.CSSProperties = {
-  maxWidth: '100%',
-  maxHeight: 600,
-  borderRadius: 8,
-  border: '3px solid',
-  borderColor: '#e94560'
-};

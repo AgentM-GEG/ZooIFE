@@ -1,4 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
+import styled from 'styled-components';
+import { theme } from './theme/zooniverseTheme';
 import { Login } from './components/Login/Login';
 import { ZooniverseImageLoader } from './components/ImageLoader/ZooniverseImageLoader';
 import { ImageCanvas } from './components/ImageCanvas/ImageCanvas';
@@ -9,8 +11,71 @@ import { useClassificationStore } from './stores/classificationStore';
 import type { AnnotationTool } from './types/annotations';
 import { BrushEditableImageHandle } from "./components/ImageMask/BrushEditableImage";
 import type { BrushProps } from './types/tools';
-import { GraphQLClient } from 'graphql-request'
 
+// Styled components
+const AppContainer = styled.div`
+  min-height: 100vh;
+  background-color: ${theme.colors.background.default};
+  color: ${theme.colors.text.primary};
+  font-family: ${theme.typography.fontFamily};
+  display: flex;
+  flex-direction: column;
+`;
+
+const Header = styled.header`
+  padding: ${theme.spacing.lg};
+  border-bottom: ${theme.borders.width.thin} solid ${theme.colors.border};
+  background-color: ${theme.colors.secondary};
+  color: ${theme.colors.text.inverse};
+`;
+
+const HeaderTitle = styled.h1`
+  margin: 0;
+  font-size: ${theme.typography.heading.h2.fontSize};
+  font-weight: ${theme.typography.fontWeight.medium};
+`;
+
+const HeaderSubtitle = styled.p`
+  margin: ${theme.spacing.xs} 0 ${theme.spacing.md};
+  color: ${theme.colors.neutral.light};
+  font-size: ${theme.typography.size.sm};
+`;
+
+const HeaderContent = styled.div`
+  display: flex;
+  gap: ${theme.spacing.md};
+  align-items: center;
+`;
+
+const Main = styled.main`
+  display: flex;
+  gap: ${theme.spacing.xl};
+  padding: ${theme.spacing.xl};
+  align-items: flex-start;
+  flex: 1;
+  overflow: hidden;
+`;
+
+const LeftAside = styled.aside`
+  flex-shrink: 0;
+  width: 15%;
+  min-width: 280px;
+`;
+
+const CanvasSection = styled.section`
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  max-height: calc(100vh - 120px);
+  background-color: ${theme.colors.background.surface};
+  border-radius: ${theme.borders.radius.lg};
+  box-shadow: ${theme.shadows.sm};
+`;
+
+const RightAside = styled.aside`
+  flex-shrink: 0;
+  width: 320px;
+`;
 
 // TODO: Move to another file
 function makeSvgCursorUri(size: number) : string {
@@ -124,18 +189,21 @@ function App() {
   };
 
   return (
-    <div style={appStyle}>
-      <header style={headerStyle}>
-        <h1 style={titleStyle}>ZooIFE</h1>
-        <p style={subtitleStyle}>Interactive Image Classification for Zooniverse</p>
-        <ZooniverseImageLoader /> <Login />
-      </header>
-      <main style={mainStyle}>
-        <aside style={leftAsideStyle}>
+    <AppContainer>
+      <Header>
+        <HeaderTitle>ZooIFE</HeaderTitle>
+        <HeaderSubtitle>Interactive Image Classification for Zooniverse</HeaderSubtitle>
+        <HeaderContent>
+          <ZooniverseImageLoader />
+          <Login />
+        </HeaderContent>
+      </Header>
+      <Main>
+        <LeftAside>
           <ToolPalette
             tool={tool}
             onToolChange={setTool}
-            brushProps={brushProps} 
+            brushProps={brushProps}
             onBrushSizeChange={(brushSize:number) => {setBrushSize(brushSize); setBrushUri(makeSvgCursorUri(brushSize))}}
             onPredModBrushModeChange={(predModBrushMode : string) => {setBrushMode(predModBrushMode)}}
             modelId={modelId}
@@ -148,43 +216,16 @@ function App() {
             debugCoords={debugCoords}
             onDebugCoordsChange={setDebugCoords}
           />
-        </aside>
-        <section style={canvasSectionStyle}>
+        </LeftAside>
+        <CanvasSection>
           <ImageCanvas tool={tool} brushProps={brushProps} onPointClick={handlePointClick} onUndo={handleUndo} showPoints={showPoints} />
-        </section>
-        <aside style={rightAsideStyle}>
+        </CanvasSection>
+        <RightAside>
           <TaskSidebar />
-        </aside>
-      </main>
-    </div>
+        </RightAside>
+      </Main>
+    </AppContainer>
   );
 }
-
-const appStyle: React.CSSProperties = {
-  minHeight: '100vh',
-  background: '#0f0f23',
-  color: '#eee',
-  fontFamily: 'system-ui, sans-serif',
-};
-const headerStyle: React.CSSProperties = {
-  padding: '20px 24px',
-  borderBottom: '1px solid #1a1a2e',
-};
-const titleStyle: React.CSSProperties = { margin: 0, fontSize: 24 };
-const subtitleStyle: React.CSSProperties = { margin: '4px 0 16px', color: '#888', fontSize: 14 };
-const mainStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 24,
-  padding: 24,
-  alignItems: 'flex-start',
-};
-const leftAsideStyle: React.CSSProperties = { flexShrink: 0 , width: '15%'};
-const canvasSectionStyle: React.CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  overflow: 'auto',
-  maxHeight: 'calc(100vh - 120px)',
-};
-const rightAsideStyle: React.CSSProperties = { flexShrink: 0 };
 
 export default App;

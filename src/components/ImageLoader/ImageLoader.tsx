@@ -1,10 +1,42 @@
 import { useRef } from 'react';
+import styled from 'styled-components';
+import { theme } from '../../theme/zooniverseTheme';
 import { useClassificationStore } from '../../stores/classificationStore';
 import {
   loadImageAsDataUrl,
   getImageDimensions,
   normalizeImageForDisplay,
 } from '../../services/imageService';
+
+const Container = styled.div`
+  display: inline-block;
+`;
+
+const Button = styled.button`
+  padding: ${theme.spacing.sm} ${theme.spacing.lg};
+  background: ${theme.colors.secondary};
+  border: 1px solid ${theme.colors.primary};
+  border-radius: ${theme.borders.radius.base};
+  color: ${theme.colors.text.inverse};
+  cursor: pointer;
+  font-family: ${theme.typography.fontFamily};
+  font-size: ${theme.typography.size.sm};
+  font-weight: ${theme.typography.fontWeight.medium};
+  transition: all ${theme.transitions.base};
+
+  &:hover {
+    background: ${theme.colors.primary};
+    color: ${theme.colors.secondary};
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
+const HiddenInput = styled.input`
+  display: none;
+`;
 
 export function ImageLoader() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -25,27 +57,16 @@ export function ImageLoader() {
   };
 
   return (
-    <div style={containerStyle}>
-      <input
+    <Container>
+      <HiddenInput
         ref={inputRef}
         type="file"
         accept="image/*"
         onChange={handleFileChange}
-        style={{ display: 'none' }}
       />
-      <button onClick={() => inputRef.current?.click()} style={btnStyle}>
+      <Button onClick={() => inputRef.current?.click()}>
         Load Image
-      </button>
-    </div>
+      </Button>
+    </Container>
   );
 }
-
-const containerStyle: React.CSSProperties = { display: 'inline-block' };
-const btnStyle: React.CSSProperties = {
-  padding: '8px 16px',
-  background: '#0f3460',
-  border: '1px solid #e94560',
-  borderRadius: 6,
-  color: '#eee',
-  cursor: 'pointer',
-};

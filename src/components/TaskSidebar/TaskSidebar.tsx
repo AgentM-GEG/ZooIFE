@@ -1,3 +1,5 @@
+import styled from 'styled-components';
+import { theme } from '../../theme/zooniverseTheme';
 import { useClassificationStore } from '../../stores/classificationStore';
 
 interface TaskConfig {
@@ -27,6 +29,107 @@ const SAMPLE_TASKS: TaskConfig[] = [
   },
 ];
 
+// Styled Components
+const Sidebar = styled.div`
+  width: 320px;
+  padding: ${theme.spacing.lg};
+  background: ${theme.colors.background.surface};
+  border: ${theme.borders.width.thin} solid ${theme.colors.border};
+  border-radius: ${theme.borders.radius.lg};
+  display: flex;
+  flex-direction: column;
+  gap: ${theme.spacing.lg};
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+`;
+
+const Title = styled.h3`
+  margin: 0;
+  color: ${theme.colors.text.primary};
+  font-size: ${theme.typography.heading.h4.fontSize};
+  font-weight: ${theme.typography.fontWeight.medium};
+`;
+
+const TaskBlock = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${theme.spacing.sm};
+`;
+
+const Question = styled.label`
+  color: ${theme.colors.text.primary};
+  font-size: ${theme.typography.size.sm};
+  font-weight: ${theme.typography.fontWeight.medium};
+  cursor: default;
+`;
+
+const OptionsContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${theme.spacing.xs};
+`;
+
+const OptionLabel = styled.label`
+  color: ${theme.colors.text.secondary};
+  font-size: ${theme.typography.size.sm};
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+
+  input {
+    cursor: pointer;
+  }
+
+  &:hover {
+    color: ${theme.colors.text.primary};
+  }
+`;
+
+const TextArea = styled.textarea`
+  padding: ${theme.spacing.md};
+  border-radius: ${theme.borders.radius.base};
+  border: ${theme.borders.width.thin} solid ${theme.colors.border};
+  background: ${theme.colors.secondary};
+  color: ${theme.colors.text.inverse};
+  font-family: ${theme.typography.fontFamily};
+  font-size: ${theme.typography.size.sm};
+  resize: vertical;
+  transition: all ${theme.transitions.base};
+
+  &:focus {
+    outline: none;
+    border-color: ${theme.colors.primary};
+    box-shadow: 0 0 0 3px ${theme.colors.primaryLight}40;
+  }
+
+  &::placeholder {
+    color: ${theme.colors.neutral.dark};
+  }
+`;
+
+const SubmitButton = styled.button`
+  padding: ${theme.spacing.md} ${theme.spacing.lg};
+  background: ${theme.colors.primary};
+  border: none;
+  border-radius: ${theme.borders.radius.base};
+  color: ${theme.colors.secondary};
+  font-family: ${theme.typography.fontFamily};
+  font-size: ${theme.typography.size.sm};
+  font-weight: ${theme.typography.fontWeight.medium};
+  cursor: pointer;
+  margin-top: auto;
+  transition: all ${theme.transitions.base};
+
+  &:hover {
+    opacity: 0.9;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
 export function TaskSidebar() {
   const { taskAnswers, setTaskAnswer, buildPanoptesAnnotations } = useClassificationStore();
 
@@ -36,15 +139,15 @@ export function TaskSidebar() {
   };
 
   return (
-    <div className="task-sidebar" style={sidebarStyle}>
-      <h3 style={titleStyle}>Tasks</h3>
+    <Sidebar>
+      <Title>Tasks</Title>
       {SAMPLE_TASKS.map((task) => (
-        <div key={task.id} style={taskBlockStyle}>
-          <label style={questionStyle}>{task.question}</label>
+        <TaskBlock key={task.id}>
+          <Question>{task.question}</Question>
           {task.type === 'single' && (
-            <div style={optionsStyle}>
+            <OptionsContainer>
               {task.options?.map((opt) => (
-                <label key={opt} style={labelStyle}>
+                <OptionLabel key={opt}>
                   <input
                     type="radio"
                     name={task.id}
@@ -53,14 +156,14 @@ export function TaskSidebar() {
                     onChange={() => setTaskAnswer(task.id, opt)}
                   />
                   {opt}
-                </label>
+                </OptionLabel>
               ))}
-            </div>
+            </OptionsContainer>
           )}
           {task.type === 'multiple' && (
-            <div style={optionsStyle}>
+            <OptionsContainer>
               {task.options?.map((opt) => (
-                <label key={opt} style={labelStyle}>
+                <OptionLabel key={opt}>
                   <input
                     type="checkbox"
                     value={opt}
@@ -74,56 +177,23 @@ export function TaskSidebar() {
                     }}
                   />
                   {opt}
-                </label>
+                </OptionLabel>
               ))}
-            </div>
+            </OptionsContainer>
           )}
           {task.type === 'text' && (
-            <textarea
+            <TextArea
               placeholder="Free-form text..."
               value={(taskAnswers[task.id] as string) ?? ''}
               onChange={(e) => setTaskAnswer(task.id, e.target.value)}
-              style={textareaStyle}
               rows={3}
             />
           )}
-        </div>
+        </TaskBlock>
       ))}
-      <button onClick={handleSubmit} style={submitStyle}>
+      <SubmitButton onClick={handleSubmit}>
         Submit Classification
-      </button>
-    </div>
+      </SubmitButton>
+    </Sidebar>
   );
 }
-
-const sidebarStyle: React.CSSProperties = {
-  width: 280,
-  padding: 16,
-  background: '#1a1a2e',
-  borderRadius: 8,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 16,
-};
-const titleStyle: React.CSSProperties = { margin: 0, color: '#eee', fontSize: 16 };
-const taskBlockStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };
-const questionStyle: React.CSSProperties = { color: '#bbb', fontSize: 14 };
-const optionsStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 };
-const labelStyle: React.CSSProperties = { color: '#ddd', fontSize: 13, cursor: 'pointer' };
-const textareaStyle: React.CSSProperties = {
-  padding: 8,
-  borderRadius: 6,
-  border: '1px solid #333',
-  background: '#16213e',
-  color: '#eee',
-  resize: 'vertical',
-};
-const submitStyle: React.CSSProperties = {
-  padding: '10px 16px',
-  background: '#e94560',
-  border: 'none',
-  borderRadius: 6,
-  color: 'white',
-  cursor: 'pointer',
-  marginTop: 'auto',
-};

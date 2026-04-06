@@ -1,3 +1,5 @@
+import styled from 'styled-components';
+import { theme } from '../../theme/zooniverseTheme';
 import { useClassificationStore } from '../../stores/classificationStore';
 import { SEGMENT_MODELS } from '../../services/sam2Service';
 import type { AnnotationTool } from '../../types/annotations';
@@ -26,6 +28,159 @@ const tools: { id: AnnotationTool; label: string }[] = [
   { id: 'brush', label: 'Brush' },
 ];
 
+// Styled Components
+const Container = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${theme.spacing.sm};
+  padding: ${theme.spacing.md};
+  background: ${theme.colors.background.surface};
+  border: ${theme.borders.width.thin} solid ${theme.colors.border};
+  border-radius: ${theme.borders.radius.lg};
+  width: 100%;
+`;
+
+const Label = styled.span`
+  font-size: ${theme.typography.size.xs};
+  color: ${theme.colors.text.secondary};
+  margin-bottom: ${theme.spacing.xs};
+  display: block;
+  font-weight: ${theme.typography.fontWeight.medium};
+`;
+
+const Button = styled.button<{ $active?: boolean }>`
+  padding: ${theme.spacing.sm} ${theme.spacing.lg};
+  border: 1px solid ${(props) => props.$active ? theme.colors.primary : theme.colors.border};
+  border-radius: ${theme.borders.radius.base};
+  background: ${(props) => props.$active ? theme.colors.primary : theme.colors.secondary};
+  color: ${(props) => props.$active ? theme.colors.secondary : theme.colors.text.inverse};
+  cursor: pointer;
+  font-family: ${theme.typography.fontFamily};
+  font-size: ${theme.typography.size.sm};
+  font-weight: ${theme.typography.fontWeight.medium};
+  transition: all ${theme.transitions.base};
+  text-align: left;
+  width: 100%;
+
+  &:hover:not(:disabled) {
+    background: ${theme.colors.primary};
+    color: ${theme.colors.secondary};
+    border-color: ${theme.colors.primary};
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: ${theme.colors.secondary};
+    color: ${theme.colors.neutral.dark};
+    border-color: ${theme.colors.border};
+  }
+`;
+
+const ClearButton = styled(Button)`
+  color: ${theme.colors.error};
+  border-color: ${theme.colors.error};
+  background: ${theme.colors.secondary};
+  margin-top: ${theme.spacing.xs};
+
+  &:hover {
+    background: ${theme.colors.error};
+    color: ${theme.colors.text.inverse};
+  }
+`;
+
+const Select = styled.select`
+  padding: ${theme.spacing.xs} ${theme.spacing.md};
+  border-radius: ${theme.borders.radius.base};
+  background: ${theme.colors.secondary};
+  color: ${theme.colors.text.inverse};
+  border: 1px solid ${theme.colors.border};
+  font-family: ${theme.typography.fontFamily};
+  font-size: ${theme.typography.size.sm};
+  cursor: pointer;
+  transition: all ${theme.transitions.base};
+
+  &:hover {
+    border-color: ${theme.colors.primary};
+  }
+
+  &:focus {
+    outline: none;
+    border-color: ${theme.colors.primary};
+    box-shadow: 0 0 0 3px ${theme.colors.primaryLight}40;
+  }
+`;
+
+const CheckboxLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.md};
+  font-size: ${theme.typography.size.sm};
+  color: ${theme.colors.text.primary};
+  cursor: pointer;
+
+  input {
+    cursor: pointer;
+  }
+`;
+
+const FlexContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+`;
+
+const RangeSlider = styled.input`
+  cursor: pointer;
+  flex: 1;
+`;
+
+const PredModContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${theme.spacing.sm};
+  align-items: flex-start;
+  margin-top: ${theme.spacing.md};
+`;
+
+const ModifierToggle = styled.input`
+  width: 40px;
+  cursor: pointer;
+  background: linear-gradient(
+    to right,
+    ${theme.colors.success} 0%,
+    ${theme.colors.success} 50%,
+    ${theme.colors.error} 50%,
+    ${theme.colors.error} 100%
+  );
+  border-radius: ${theme.borders.radius.base};
+  border: 1px solid ${theme.colors.text.inverse};
+  height: 11px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+`;
+
+const HelpText = styled.span`
+  font-size: 11px;
+  line-height: 1.5;
+  color: ${theme.colors.text.secondary};
+  margin-top: ${theme.spacing.md};
+  display: block;
+  white-space: pre-line;
+`;
+
+const ButtonGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${theme.spacing.sm};
+  width: 100%;
+`;
+
 export function ToolPalette({
   tool,
   onToolChange,
@@ -45,124 +200,112 @@ export function ToolPalette({
 
   const annotations = useClassificationStore(s => s.annotations);
   const clearAnnotations = useClassificationStore(s => s.clearAnnotations);
-  // const currentMaskUrl = useClassificationStore(s => s.currentMaskUrl);
   const maskHistory = useClassificationStore(s => s.maskHistory);
   const maskHistoryIndex = useClassificationStore(s => s.maskHistoryIndex);
 
   const hasAnnotations = annotations.length > 0;
 
-  // console.log([maskHistoryIndex, maskHistory]);
-
   const undoMaskPossible = maskHistoryIndex >= 0;
   const redoMaskPossible = maskHistoryIndex < maskHistory.length - 1;
 
   return (
-    <div className="tool-palette" style={style}>
-      <span style={labelStyle}>Tools</span>
-      {tools.map((t) => (
-        <button
-          key={t.id}
-          onClick={() => onToolChange(t.id)}
-          style={{
-            ...btnStyle,
-            ...(tool === t.id ? btnActiveStyle : {}),
+    <Container>
+      <Label>Tools</Label>
+      <ButtonGroup>
+        {tools.map((t) => (
+          <Button
+            key={t.id}
+            $active={tool === t.id}
+            onClick={() => onToolChange(t.id)}
+          >
+            {t.label}
+          </Button>
+        ))}
+      </ButtonGroup>
+
+      <FlexContainer>
+        <Label style={{ margin: 0 }}>Brush size</Label>
+        <RangeSlider
+          type="range"
+          min="1"
+          max="10"
+          defaultValue="5"
+          id="brush_size_slider"
+          onChange={(event) => {
+            onBrushSizeChange(parseFloat(event.target.value))
           }}
-        >
-          {t.label}
-        </button>
-      ))}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span style={labelStyle}>Brush size</span>
-      {(
-        <input type="range" min="1" max="10" defaultValue="5" id="brush_size_slider" onChange={(event) => {
-          onBrushSizeChange(parseFloat(event.target.value))
-        }
-        } />
-      )}
-      </div>
+        />
+      </FlexContainer>
+
       {hasAnnotations && (
-        <button onClick={clearAnnotations} style={{ ...btnStyle, ...clearBtnStyle }}>
+        <ClearButton onClick={clearAnnotations}>
           Clear all
-        </button>
+        </ClearButton>
       )}
-      <span style={{ ...labelStyle, marginTop: 12 }}>Model</span>
-      <select
+
+      <Label style={{ marginTop: theme.spacing.md }}>Model</Label>
+      <Select
         value={modelId}
         onChange={(e) => onModelChange(e.target.value)}
-        style={selectStyle}
       >
         {SEGMENT_MODELS.map((m) => (
           <option key={m.id} value={m.id}>
             {m.label}
           </option>
         ))}
-      </select>
-      <label style={labelStyle}>
+      </Select>
+
+      <CheckboxLabel>
         <input
           type="checkbox"
           checked={showPoints}
           onChange={(e) => onShowPointsChange(e.target.checked)}
         />
-        {' '}Show points
-      </label>
-      {(
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "8px",          // spacing between items
-            alignItems: "flex-start", // optional: left-align contents
-            marginTop: "12px"
-          }}
-        >
-          <div><button
+        Show points
+      </CheckboxLabel>
+
+      <PredModContainer>
+        <ButtonGroup>
+          <Button
+            $active={tool === "modifier_brush"}
             onClick={() => onToolChange("modifier_brush")}
-            style={{ ...btnStyle, ...(tool === "modifier_brush" ? btnActiveStyle : {}) }}
           >
             Modify prediction
-          </button>
-            {undoMaskPossible &&
-              <button
-                onClick={() => brushProps.predModBrushRef?.current?.undo()}
-                style={btnStyle}
-              >
-                Undo
-              </button>
-            }
-            {redoMaskPossible &&
-              <button
-                onClick={() => brushProps.predModBrushRef?.current?.redo()}
-                style={btnStyle}
-              >
-                Redo
-              </button>
-            }
-          </div>
-          <label style={{ display: "flex", alignItems: "left", gap: "10px" }}>
-            <span style={labelStyle}>
-              Modifier mode:
-            </span>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="1"
-              value={brushProps.predModBrushMode === "subtract" ? 0 : 1}
-              onChange={(e) =>
-                onPredModBrushModeChange(e.target.value === "0" ? "subtract" : "add")
-              }
-              // onClick={() => onPredModBrushModeChange(brushProps.predModBrushMode === "subtract" ? "add" : "subtract")}
-              style={predModBrushToggleStyle}
-            />
-            <span style={labelStyle}>
-              {brushProps.predModBrushMode === "add" ? "Add" : "Subtract"}
-            </span>
+          </Button>
+          <Button
+            disabled={!undoMaskPossible}
+            onClick={() => brushProps.predModBrushRef?.current?.undo()}
+          >
+            Undo
+          </Button>
+          <Button
+            disabled={!redoMaskPossible}
+            onClick={() => brushProps.predModBrushRef?.current?.redo()}
+          >
+            Redo
+          </Button>
+        </ButtonGroup>
 
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={labelStyle}>Modifier brush size</span>
+        <FlexContainer>
+          <Label style={{ margin: 0 }}>Modifier mode:</Label>
+          <ModifierToggle
+            type="range"
+            min="0"
+            max="1"
+            step="1"
+            value={brushProps.predModBrushMode === "subtract" ? 0 : 1}
+            onChange={(e) =>
+              onPredModBrushModeChange(e.target.value === "0" ? "subtract" : "add")
+            }
+          />
+          <Label style={{ margin: 0 }}>
+            {brushProps.predModBrushMode === "add" ? "Add" : "Subtract"}
+          </Label>
+        </FlexContainer>
 
-          <input
+        <FlexContainer>
+          <Label style={{ margin: 0 }}>Modifier brush size</Label>
+          <RangeSlider
             type="range"
             min="1"
             max="10"
@@ -172,88 +315,14 @@ export function ToolPalette({
               onPredModBrushSizeChange(parseFloat(event.target.value))
             }
           />
-          </div>
-        </div>
-      )}
-      {/* <span style={{ ...labelStyle, marginTop: 12 }}>Coordinate fix</span>
-      <select
-        value={coordinateFix}
-        onChange={(e) => onCoordinateFixChange(e.target.value as typeof coordinateFix)}
-        style={selectStyle}
-      >
-        <option value="none">None</option>
-        <option value="flipX">Flip X</option>
-        <option value="flipY">Flip Y</option>
-        <option value="flipBoth">Flip both</option>
-        <option value="swapXY">Swap X/Y</option>
-      </select>
-      <label style={labelStyle}>
-        <input
-          type="checkbox"
-          checked={debugCoords}
-          onChange={(e) => onDebugCoordsChange(e.target.checked)}
-        />
-        {' '}Debug coords
-      </label> */}
-      <span style={{ ...labelStyle, marginTop: 4, fontSize: 11, lineHeight: '1.5' }}>
-        Left-click: positive point (green)<br />
-        Right-click: negative point (red)<br />
+        </FlexContainer>
+      </PredModContainer>
+
+      <HelpText>
+        Left-click: positive point (green){'\n'}
+        Right-click: negative point (red){'\n'}
         Undo: Ctrl+Z / ⌘Z
-      </span>
-    </div>
+      </HelpText>
+    </Container>
   );
 }
-
-const style: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 8,
-  padding: 12,
-  background: '#1a1a2e',
-  borderRadius: 8,
-  width: '100%'
-};
-const labelStyle: React.CSSProperties = { fontSize: 12, color: '#888', marginBottom: 4 };
-const btnStyle: React.CSSProperties = {
-  padding: '8px 16px',
-  border: '1px solid',
-  borderColor: '#333',
-  borderRadius: 6,
-  background: '#16213e',
-  color: '#eee',
-  cursor: 'pointer',
-  textAlign: 'left',
-};
-const btnActiveStyle: React.CSSProperties = {
-  background: '#0f3460',
-  borderColor: '#e94560',
-};
-const clearBtnStyle: React.CSSProperties = {
-  marginTop: 4,
-  color: '#e94560',
-  borderColor: '#e94560',
-};
-const selectStyle: React.CSSProperties = {
-  padding: 6,
-  borderRadius: 6,
-  background: '#16213e',
-  color: '#eee',
-  border: '1px solid #333',
-};
-const predModBrushToggleStyle: React.CSSProperties = {
-  width: '40px',
-  cursor: "pointer",
-  background: `linear-gradient(
-      to right,
-      #5cb85c 0%,
-      #5cb85c 50%,
-      #d9534f 50%,
-      #d9534f 100%
-    )`,
-  borderRadius: "6px",
-  border: '1px solid white',
-  height: "11px",
-  appearance: "none",
-};
-
-

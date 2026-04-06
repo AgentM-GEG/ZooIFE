@@ -1,27 +1,45 @@
+import styled from 'styled-components';
+import { theme } from '../../theme/zooniverseTheme';
 import { useAuth } from "../../auth/AuthContext";
+
+const Container = styled.div`
+  display: inline-block;
+`;
+
+const Button = styled.button`
+  padding: ${theme.spacing.sm} ${theme.spacing.lg};
+  background: ${theme.colors.secondary};
+  border: 1px solid ${theme.colors.primary};
+  border-radius: ${theme.borders.radius.base};
+  color: ${theme.colors.text.inverse};
+  cursor: pointer;
+  font-family: ${theme.typography.fontFamily};
+  font-size: ${theme.typography.size.sm};
+  font-weight: ${theme.typography.fontWeight.medium};
+  transition: all ${theme.transitions.base};
+
+  &:hover {
+    background: ${theme.colors.primary};
+    color: ${theme.colors.secondary};
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
 
 export function Login() {
     const { token, login, logout } = useAuth();
     return (
-        <div style={containerStyle}>
+        <Container>
             {!token &&
-                <button onClick={login} style={btnStyle}>
+                <Button onClick={login}>
                     Login to Zooniverse
-                </button>}
+                </Button>}
             {token &&
-                <button onClick={logout} style={btnStyle}>
+                <Button onClick={logout}>
                     Logout of Zooniverse
-                </button>}
-        </div>
+                </Button>}
+        </Container>
     );
 }
-
-const containerStyle: React.CSSProperties = { display: 'inline-block' };
-const btnStyle: React.CSSProperties = {
-    padding: '8px 16px',
-    background: '#0f3460',
-    border: '1px solid #e94560',
-    borderRadius: 6,
-    color: '#eee',
-    cursor: 'pointer',
-};
