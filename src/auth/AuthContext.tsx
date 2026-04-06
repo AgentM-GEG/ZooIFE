@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useMemo } from "react";
 import { setToken as storeToken } from "./tokenStore";
 
 interface TokenSet {
@@ -89,8 +89,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     storeToken(null);
   }
 
+  const value = useMemo(() => ({ token, login, logout }), [token, login, logout]);
+
   return (
-    <AuthContext.Provider value={{ token, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

@@ -48,11 +48,14 @@ export const BrushEditableImage = forwardRef<
 
   const [canvasImage] = useState(() => document.createElement("canvas"));
 
-  const pushMaskHistory = useClassificationStore(s => s.pushMaskHistory);
-  const undoMask = useClassificationStore(s => s.undoMask);
-  const redoMask = useClassificationStore(s => s.redoMask);
-  const maskHistory = useClassificationStore(s => s.maskHistory);
-  const maskHistoryIndex = useClassificationStore(s => s.maskHistoryIndex);
+  const { pushMaskHistory, undoMask, redoMask, maskHistory, maskHistoryIndex } =
+    useClassificationStore(s => ({
+      pushMaskHistory: s.pushMaskHistory,
+      undoMask: s.undoMask,
+      redoMask: s.redoMask,
+      maskHistory: s.maskHistory,
+      maskHistoryIndex: s.maskHistoryIndex,
+    }));
 
 
   const parseRGBA = (rgba: string): [number, number, number, number] => {

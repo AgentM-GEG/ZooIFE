@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { theme } from '../../theme/zooniverseTheme';
 import { Stage, Layer, Group, Image, Line, Circle } from 'react-konva';
@@ -106,7 +106,13 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
     addAnnotation,
     currentMaskUrl,
     debugImageUrl,
-  } = useClassificationStore();
+  } = useClassificationStore(s => ({
+    imageUrl: s.imageUrl,
+    annotations: s.annotations,
+    addAnnotation: s.addAnnotation,
+    currentMaskUrl: s.currentMaskUrl,
+    debugImageUrl: s.debugImageUrl,
+  }));
 
   const caesarReducedAnnotations = useCaesarAnnotationStore(s => s.annotations);
   const [selectedCaesarAnnotation, setSelectedCaesarAnnotation] = useState<string | null>(null);
@@ -143,14 +149,17 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
           ? 'crosshair'
           : 'default';
 
-  const baseScale = image
-    ? Math.min(STAGE_WIDTH / image.naturalWidth, STAGE_HEIGHT / image.naturalHeight)
-    : 1;
-  const contentScale = baseScale * zoom;
-  const centerX = (STAGE_WIDTH - (image?.naturalWidth ?? 0) * contentScale) / 2;
-  const centerY = (STAGE_HEIGHT - (image?.naturalHeight ?? 0) * contentScale) / 2;
-  const groupX = centerX + pan.x;
-  const groupY = centerY + pan.y;
+  const { baseScale, contentScale, centerX, centerY, groupX, groupY } = useMemo(() => {
+    const baseScale = image
+      ? Math.min(STAGE_WIDTH / image.naturalWidth, STAGE_HEIGHT / image.naturalHeight)
+      : 1;
+    const contentScale = baseScale * zoom;
+    const centerX = (STAGE_WIDTH - (image?.naturalWidth ?? 0) * contentScale) / 2;
+    const centerY = (STAGE_HEIGHT - (image?.naturalHeight ?? 0) * contentScale) / 2;
+    const groupX = centerX + pan.x;
+    const groupY = centerY + pan.y;
+    return { baseScale, contentScale, centerX, centerY, groupX, groupY };
+  }, [image, zoom, pan]);
 
   function animateTo(targetZoom: number, targetPan: { x: number; y: number }) {
     const duration = 0.25; // seconds

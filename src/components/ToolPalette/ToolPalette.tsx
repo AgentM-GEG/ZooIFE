@@ -198,10 +198,13 @@ export function ToolPalette({
   onDebugCoordsChange,
 }: ToolPaletteProps) {
 
-  const annotations = useClassificationStore(s => s.annotations);
-  const clearAnnotations = useClassificationStore(s => s.clearAnnotations);
-  const maskHistory = useClassificationStore(s => s.maskHistory);
-  const maskHistoryIndex = useClassificationStore(s => s.maskHistoryIndex);
+  const { annotations, clearAnnotations, maskHistory, maskHistoryIndex } =
+    useClassificationStore(s => ({
+      annotations: s.annotations,
+      clearAnnotations: s.clearAnnotations,
+      maskHistory: s.maskHistory,
+      maskHistoryIndex: s.maskHistoryIndex,
+    }));
 
   const hasAnnotations = annotations.length > 0;
 

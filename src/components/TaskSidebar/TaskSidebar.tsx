@@ -131,7 +131,11 @@ const SubmitButton = styled.button`
 `;
 
 export function TaskSidebar() {
-  const { taskAnswers, setTaskAnswer, buildPanoptesAnnotations } = useClassificationStore();
+  const { taskAnswers, setTaskAnswer, buildPanoptesAnnotations } = useClassificationStore(s => ({
+    taskAnswers: s.taskAnswers,
+    setTaskAnswer: s.setTaskAnswer,
+    buildPanoptesAnnotations: s.buildPanoptesAnnotations,
+  }));
 
   const handleSubmit = async () => {
     const annotations = await buildPanoptesAnnotations();

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import styled from 'styled-components';
 import { theme } from './theme/zooniverseTheme';
 import { Login } from './components/Login/Login';
@@ -179,14 +179,28 @@ function App() {
 
   const brushRef = useRef<BrushEditableImageHandle>(null);
 
-  const brushProps : BrushProps = {
-    brushSize:brushSize, 
-    brushUri:brushUri, 
-    predModBrushSize:predModBrushSize,
-    predModBrushUri:predModBrushUri,
-    predModBrushMode:brushMode,
-    predModBrushRef:brushRef
-  };
+  const brushProps = useMemo(() => ({
+    brushSize,
+    brushUri,
+    predModBrushSize,
+    predModBrushUri,
+    predModBrushMode: brushMode,
+    predModBrushRef: brushRef,
+  }), [brushSize, brushUri, predModBrushSize, predModBrushUri, brushMode]);
+
+  const handleBrushSizeChange = useCallback((newBrushSize: number) => {
+    setBrushSize(newBrushSize);
+    setBrushUri(makeSvgCursorUri(newBrushSize));
+  }, []);
+
+  const handlePredModBrushModeChange = useCallback((predModBrushMode: string) => {
+    setBrushMode(predModBrushMode);
+  }, []);
+
+  const handlePredModBrushSizeChange = useCallback((newBrushSize: number) => {
+    setPredModBrushSize(newBrushSize);
+    setPredModBrushUri(makeSvgCursorUri(newBrushSize));
+  }, []);
 
   return (
     <AppContainer>
@@ -204,13 +218,13 @@ function App() {
             tool={tool}
             onToolChange={setTool}
             brushProps={brushProps}
-            onBrushSizeChange={(brushSize:number) => {setBrushSize(brushSize); setBrushUri(makeSvgCursorUri(brushSize))}}
-            onPredModBrushModeChange={(predModBrushMode : string) => {setBrushMode(predModBrushMode)}}
+            onBrushSizeChange={handleBrushSizeChange}
+            onPredModBrushModeChange={handlePredModBrushModeChange}
             modelId={modelId}
             onModelChange={setModelId}
             showPoints={showPoints}
             onShowPointsChange={setShowPoints}
-            onPredModBrushSizeChange={(brushSize:number) => {setPredModBrushSize(brushSize); setPredModBrushUri(makeSvgCursorUri(brushSize))}}
+            onPredModBrushSizeChange={handlePredModBrushSizeChange}
             coordinateFix={coordinateFix}
             onCoordinateFixChange={setCoordinateFix}
             debugCoords={debugCoords}
