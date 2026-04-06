@@ -38,10 +38,18 @@ const HiddenInput = styled.input`
   display: none;
 `;
 
+/**
+ * Local image loader component.
+ * Provides file input to load images from the user's device for classification.
+ */
 export function ImageLoader() {
   const inputRef = useRef<HTMLInputElement>(null);
   const { setSubject } = useClassificationStore();
 
+  /**
+   * Handle local file selection and normalization.
+   * @param e - File input change event
+   */
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;

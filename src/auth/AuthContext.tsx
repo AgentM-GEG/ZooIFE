@@ -20,31 +20,15 @@ const AuthContext = createContext<AuthContextValue>({
   logout: () => { },
 });
 
+/**
+ * Authentication context provider for Zooniverse OAuth.
+ * Handles token exchange via Authorization Code flow and provides auth state to children.
+ * @param children - React components to wrap with auth context
+ */
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [token, setToken] = useState<TokenSet | null>(null);
 
   const REACT_APP_CLIENT_ID = import.meta.env.VITE_REACT_APP_CLIENT_ID ?? undefined;
-
-
-  // // Parse token from URL fragment on /auth/callback
-  // useEffect(() => {
-  //   const hash = window.location.hash;
-  //   if (hash.startsWith("#token=")) {
-  //     const base64 = hash.replace("#token=", "");
-  //     try {
-  //       const decoded = JSON.parse(
-  //         atob(base64.replace(/-/g, "+").replace(/_/g, "/"))
-  //       );
-  //       setToken(decoded);
-  //       storeToken(decoded);
-  //     } catch (e) {
-  //       console.error("Token parse error", e);
-  //     }
-
-  //     // Clean up URL
-  //     window.history.replaceState({}, "", "/");
-  //   }
-  // }, []);
 
   useEffect(() => {
   const url = new URL(window.location.href);

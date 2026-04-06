@@ -60,6 +60,12 @@ const initialState = {
 export const useClassificationStore = create<ClassificationState>((set, get) => ({
   ...initialState,
 
+  /**
+   * Set the current subject and image.
+   * @param id - Subject ID
+   * @param imageUrl - Image URL or data URI
+   * @param dimensions - Optional image dimensions (width, height)
+   */
   setSubject: (id, imageUrl, dimensions) =>
     set({
       subjectId: id,
@@ -69,17 +75,29 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
       maskHistoryIndex: 0
     }),
 
+  /**
+   * Add a drawing annotation to the current list.
+   * @param annotation - DrawingAnnotation object to add
+   */
   addAnnotation: (annotation) =>
     set((state) => ({
       annotations: [...state.annotations, { ...annotation, id: crypto.randomUUID() }],
     })),
 
+  /**
+   * Remove an annotation by ID.
+   * @param id - Annotation ID to remove
+   */
   removeAnnotation: (id) =>
     set((state) => ({
       annotations: state.annotations.filter((a) => (a.id ?? '') !== id),
       currentMaskUrl: null,
     })),
 
+  /**
+   * Undo the last added annotation.
+   * @returns The removed annotation or undefined if none to undo
+   */
   undoLastAnnotation: () => {
     const { annotations } = get();
     if (annotations.length === 0) return undefined;
@@ -88,25 +106,49 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
     return removed;
   },
 
+  /**
+   * Clear all annotations.
+   */
   clearAnnotations: () =>
     set({ annotations: [], currentMaskUrl: null, debugImageUrl: null }),
 
+  /**
+   * Set answer for a task.
+   * @param taskId - Task ID
+   * @param value - Answer value (string or array of strings)
+   */
   setTaskAnswer: (taskId, value) =>
     set((state) => ({
       taskAnswers: { ...state.taskAnswers, [taskId]: value },
     })),
 
+  /**
+   * Set the current segmentation mask URL.
+   * @param url - Mask image URL or null to clear
+   */
   setMask: (url) => set({ currentMaskUrl: url, debugImageUrl: null }),
+
+  /**
+   * Set the debug image URL for coordinate debugging.
+   * @param url - Debug image URL or null to clear
+   */
   setDebugImage: (url: string | null) => set({ debugImageUrl: url }),
 
-  // UNDO / REDO FOR MASK HISTORY (used by Konva brush) 
+  /**
+   * Add mask to undo/redo history.
+   * @param imgData - ImageData object to store in history
+   */
   pushMaskHistory: (imgData: ImageData) => set((state) => {
     console.log("pushMaskHistory");
-    
+
     const truncated = state.maskHistory.slice(0, state.maskHistoryIndex + 1);
     return { maskHistory: [...truncated, imgData], maskHistoryIndex: truncated.length, };
   }),
 
+  /**
+   * Undo to previous mask in history.
+   * @returns Previous mask or null if at beginning of history
+   */
   undoMask: () => {
     const { maskHistory, maskHistoryIndex } = get();
     if (maskHistoryIndex <= 0) return null;
@@ -115,6 +157,10 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
     return maskHistory[newIndex];
   },
 
+  /**
+   * Redo to next mask in history.
+   * @returns Next mask or null if at end of history
+   */
   redoMask: () => {
     const { maskHistory, maskHistoryIndex } = get();
     if (maskHistoryIndex >= maskHistory.length - 1) return null;
@@ -123,6 +169,11 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
     return maskHistory[newIndex];
   },
 
+  /**
+   * Build Panoptes-compatible annotations array from current state.
+   * Includes segmentation mask, drawn annotations, and task answers.
+   * @returns Promise resolving to array of Panoptes annotation objects
+   */
    buildPanoptesAnnotations: async () => {
     const { annotations, taskAnswers, maskHistory, maskHistoryIndex } = get();
 
@@ -157,6 +208,11 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
   reset: () => set(initialState),
 }));
 
+/**
+ * Map drawing annotation to Panoptes annotation value format.
+ * @param a - DrawingAnnotation to convert
+ * @returns Panoptes-compatible annotation value
+ */
 function mapAnnotationToValue(a: DrawingAnnotation): PanoptesAnnotation['value'] {
   switch (a.type) {
     case 'point':

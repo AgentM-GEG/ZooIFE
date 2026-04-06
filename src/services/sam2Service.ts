@@ -15,9 +15,7 @@ export interface Sam2Output {
 }
 
 /**
- * Segment image using point prompts.
- * Sends request to local SAM2 server (POST /api/sam2/segment).
- * Accepts image as URL or data URI (data:image/...;base64,...).
+ * Coordinate transformation type for SAM2 point adjustments.
  */
 export type CoordinateFix = 'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY';
 
@@ -38,6 +36,16 @@ export const SEGMENT_MODELS = [
   { id: 'sam1-vit_h', label: 'SAM1 ViT-H (largest)' },
 ] as const;
 
+/**
+ * Segment image using point prompts.
+ * Sends request to local SAM2 server (POST /api/sam2/segment).
+ * Accepts image as URL or data URI (data:image/...;base64,...).
+ * @param imageUrl - URL or data URI of image to segment
+ * @param prompts - Array of point prompts (foreground/background)
+ * @param baseUrl - Base URL for SAM2 server ('' for same-origin proxy)
+ * @param options - Segmentation options (debug mode, coordinate fixes, model ID)
+ * @returns Promise resolving to segmentation output with mask image and optional debug image
+ */
 export async function segmentWithPoints(
   imageUrl: string,
   prompts: PointPrompt[],
@@ -46,6 +54,12 @@ export async function segmentWithPoints(
 ): Promise<Sam2Output> {
   const { debug = false, imageSize, coordinateFix = 'none', modelId = 'sam2-hiera-large' } = options;
 
+  /**
+   * Apply coordinate transformation fix to point prompt.
+   * @param x - X coordinate
+   * @param y - Y coordinate
+   * @returns Transformed coordinate object
+   */
   const applyFix = (x: number, y: number): { x: number; y: number } => {
     let out = { x, y };
     if (imageSize && coordinateFix !== 'none') {

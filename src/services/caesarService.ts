@@ -1,19 +1,25 @@
 import { GraphQLClient } from 'graphql-request'
 import { useMemo } from 'react';
 import { headers } from './panoptesService'
-import { CaesarAnnotation, CaesarAnnotations } from '../types/annotations';
+import { CaesarAnnotations } from '../types/annotations';
 
-
+/**
+ * Caesar reduction API endpoints (GraphQL)
+ */
 export const CAESAR_API_BASE = 'https://caesar.zooniverse.org/graphql';
 export const CAESAR_STAGING_BASE = 'https://caesar-staging.zooniverse.org/graphql';
 
-
+/**
+ * Options for Caesar service configuration.
+ */
 export type CaesarReductionOptions = {
     staging: boolean;
     defaultToolType: "rectangle" | "default";
 };
 
-
+/**
+ * Subject reduction data structure from Caesar.
+ */
 export interface SubjectReduction {
     data: CaesarAnnotations[];
 }
@@ -24,6 +30,12 @@ interface CaesarWorkflowResponse {
     };
 }
 
+/**
+ * Create a memoized GraphQL client for Caesar API.
+ * @param token - Zooniverse authentication token
+ * @param opts - Configuration options (staging, default tool type)
+ * @returns Memoized GraphQL client for Caesar requests
+ */
 export function useCaesarClient(token: string | undefined, opts: CaesarReductionOptions) {
     return useMemo(() => {
         const url = opts.staging ? CAESAR_STAGING_BASE : CAESAR_API_BASE;
@@ -34,6 +46,14 @@ export function useCaesarClient(token: string | undefined, opts: CaesarReduction
 }
 
 
+/**
+ * Fetch machine learning reductions for a subject from Caesar.
+ * @param caesarClient - GraphQL client configured for Caesar API
+ * @param reducerKey - Type of reduction to fetch (e.g., "machineLearnt")
+ * @param subjectID - Zooniverse subject ID to fetch reductions for
+ * @param workflowID - Zooniverse workflow ID
+ * @returns Promise resolving to array of subject reductions
+ */
 export async function fetchCaesarReductions(
     caesarClient: GraphQLClient,
     reducerKey: string,

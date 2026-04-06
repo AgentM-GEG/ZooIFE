@@ -130,6 +130,10 @@ const SubmitButton = styled.button`
   }
 `;
 
+/**
+ * Task sidebar component for displaying and answering Zooniverse workflow tasks.
+ * Shows classification questions and input fields, and provides submit button.
+ */
 export function TaskSidebar() {
   const { taskAnswers, setTaskAnswer, buildPanoptesAnnotations } = useClassificationStore(s => ({
     taskAnswers: s.taskAnswers,

@@ -26,6 +26,13 @@ interface BrushEditableImageProps
   contentScale?: number;
 }
 
+/**
+ * Brush-editable image component for interactive mask drawing and editing.
+ * Provides pointer event handling for brush strokes with undo/redo support.
+ * Renders as a Konva Image with custom drawing capabilities.
+ * @param props - BrushEditableImageProps configuration
+ * @param ref - Imperative handle for brush operations (pointerDown, pointerMove, pointerUp, undo, redo)
+ */
 export const BrushEditableImage = forwardRef<
   BrushEditableImageHandle,
   BrushEditableImageProps
@@ -58,6 +65,11 @@ export const BrushEditableImage = forwardRef<
     }));
 
 
+  /**
+   * Parse RGBA color string into [R, G, B, A] components.
+   * @param rgba - RGBA color string (e.g., "rgba(0,255,200,0.45)")
+   * @returns Tuple of [red, green, blue, alpha] values 0-255
+   */
   const parseRGBA = (rgba: string): [number, number, number, number] => {
     const m = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+),?\s*([\d\.]+)?\)/);
     if (!m) return [0, 255, 0, 0.45]; // fallback
@@ -70,6 +82,10 @@ export const BrushEditableImage = forwardRef<
     ];
   }
 
+  /**
+   * Ensure a mask exists in history for add mode brush operations.
+   * Creates an empty transparent mask if needed.
+   */
   const ensureMaskExists = () => {
     if (brushMode !== "add") return;
 
@@ -81,9 +97,6 @@ export const BrushEditableImage = forwardRef<
     // Create a fully transparent mask with the correct size
     const ctx = canvasImage.getContext("2d")!;
     ctx.clearRect(0, 0, canvasImage.width, canvasImage.height);
-
-    // const emptyMask = ctx.getImageData(0, 0, canvasImage.width, canvasImage.height);
-    // pushMaskHistory(emptyMask);
   };
 
   useEffect(() => {
@@ -137,7 +150,7 @@ export const BrushEditableImage = forwardRef<
     //
     // ✅ Apply addColor to external mask
     //
-    const [r, g, b, a0] = parseRGBA(addColor);
+    const [r, g, b] = parseRGBA(addColor);
 
     const merged = ctx.createImageData(w, h);
 
@@ -184,7 +197,12 @@ export const BrushEditableImage = forwardRef<
   //
   // 2️⃣ Brush drawing modifies the persistent canvas
   //
-  const drawAtPointer = (e: KonvaEventObject<PointerEvent>) => {
+  /**
+   * Draw brush stroke at pointer position.
+   * Applies brush or eraser effect based on brushMode.
+   * @param _e - Pointer event from Konva
+   */
+  const drawAtPointer = (_e: KonvaEventObject<PointerEvent>) => {
     const ctx = canvasImage.getContext("2d")!;
     const imgNode = imageRef.current;
     if (!imgNode) return;
@@ -246,6 +264,9 @@ export const BrushEditableImage = forwardRef<
   // 3️⃣ Imperative brush API
   //
   useImperativeHandle(ref, () => ({
+    /**
+     * Handle pointer down event - start brush drawing.
+     */
     pointerDown: e => {
       if (!enableBrush) return;
 
@@ -261,10 +282,16 @@ export const BrushEditableImage = forwardRef<
         drawAtPointer(e);
       }
     },
+    /**
+     * Handle pointer move event - continue brush drawing.
+     */
     pointerMove: e => {
       if (!isDrawingRef.current) return;
       drawAtPointer(e);
     },
+    /**
+     * Handle pointer up event - end brush drawing.
+     */
     pointerUp: () => {
       if (isDrawingRef.current) {
         const ctx = canvasImage.getContext("2d")!;
@@ -275,6 +302,9 @@ export const BrushEditableImage = forwardRef<
       isDrawingRef.current = false;
       lastPosRef.current = null;
     },
+    /**
+     * Undo last brush stroke.
+     */
     undo: () => {
       const ctx = canvasImage.getContext("2d")!;
       console.log("Undo on canvas 1", [maskHistory, maskHistoryIndex]);
@@ -284,6 +314,9 @@ export const BrushEditableImage = forwardRef<
       ctx.putImageData(restored, 0, 0);
       imageRef.current?.getLayer()?.batchDraw();
     },
+    /**
+     * Redo last undone brush stroke.
+     */
     redo: () => {
       const ctx = canvasImage.getContext("2d")!;
       console.log("Redo on canvas 1", [maskHistory, maskHistoryIndex]);

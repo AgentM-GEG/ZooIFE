@@ -99,6 +99,12 @@ interface ImageCanvasProps {
   showPoints?: boolean;
 }
 
+/**
+ * Main canvas component for image display and annotation tools.
+ * Handles point annotations, freehand drawing, SAM2 segmentation, and brush editing.
+ * Uses Konva for rendering and transformation.
+ * @param props - ImageCanvasProps configuration
+ */
 export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints = true }: ImageCanvasProps) {
   const {
     imageUrl,
@@ -149,7 +155,7 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
           ? 'crosshair'
           : 'default';
 
-  const { baseScale, contentScale, centerX, centerY, groupX, groupY } = useMemo(() => {
+  const { baseScale, contentScale, groupX, groupY } = useMemo(() => {
     const baseScale = image
       ? Math.min(STAGE_WIDTH / image.naturalWidth, STAGE_HEIGHT / image.naturalHeight)
       : 1;
@@ -158,7 +164,7 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
     const centerY = (STAGE_HEIGHT - (image?.naturalHeight ?? 0) * contentScale) / 2;
     const groupX = centerX + pan.x;
     const groupY = centerY + pan.y;
-    return { baseScale, contentScale, centerX, centerY, groupX, groupY };
+    return { baseScale, contentScale, groupX, groupY };
   }, [image, zoom, pan]);
 
   function animateTo(targetZoom: number, targetPan: { x: number; y: number }) {
@@ -183,6 +189,11 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
     requestAnimationFrame(step);
   }
 
+  /**
+   * Convert pointer position in stage coordinates to image coordinates.
+   * @param pos - Position in stage {x, y}
+   * @returns Position in image {x, y}
+   */
   const pointerToImage = useCallback(
     (pos: { x: number; y: number }) => ({
       x: (pos.x - groupX) / contentScale,
@@ -191,12 +202,20 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
     [groupX, groupY, contentScale]
   );
 
+  /**
+   * Handle image load - update store with natural dimensions.
+   * @param img - Loaded HTMLImageElement
+   */
   const handleImageLoad = useCallback((img: HTMLImageElement) => {
     useClassificationStore.setState({
       imageDimensions: { width: img.naturalWidth, height: img.naturalHeight },
     });
   }, []);
 
+  /**
+   * Handle stage click for adding point annotations or starting freehand drawing.
+   * @param e - Konva mouse event
+   */
   const handleStageClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (isPanMode) return;
@@ -227,6 +246,10 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
     [tool, image, addAnnotation, onPointClick, pointerToImage, isPanMode, suppressNextClick]
   );
 
+  /**
+   * Handle right-click context menu - add negative SAM point (background).
+   * @param e - Konva mouse event
+   */
   // TODO: change this callback name to be more intuitive - it just handles adding a negative
   // SAM point!
   const handleContextMenu = useCallback(
@@ -248,6 +271,10 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
     [tool, image, addAnnotation, onPointClick, pointerToImage, isPanMode]
   );
 
+  /**
+   * Handle stage mouse move - update drawing points for freehand/brush tools.
+   * @param e - Konva mouse event
+   */
   const handleStageMouseMove = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (isPanMode) return;
@@ -262,6 +289,9 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
     [tool, image, pointerToImage, isPanMode]
   );
 
+  /**
+   * Handle stage mouse up - finalize drawing annotation when mouse released.
+   */
   const handleStageMouseUp = useCallback(() => {
     if (isPanMode) return;
     if (tool === 'freehand' && drawingPoints.length > 1) {
@@ -279,12 +309,27 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   const ZOOM_MAX = 4;
   const ZOOM_STEP = 1.25;
 
+  /**
+   * Increase zoom level.
+   */
   const zoomIn = useCallback(() => setZoom((z) => Math.min(ZOOM_MAX, z * ZOOM_STEP)), []);
+
+  /**
+   * Decrease zoom level.
+   */
   const zoomOut = useCallback(() => setZoom((z) => Math.max(ZOOM_MIN, z / ZOOM_STEP)), []);
+
+  /**
+   * Reset zoom and pan to fit entire image.
+   */
   const zoomFit = useCallback(() => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
   }, []);
+
+  /**
+   * Zoom to 100% (1:1 pixel ratio).
+   */
   const zoom100 = useCallback(() => {
     if (!image) return;
     const fitScale = Math.min(STAGE_WIDTH / image.naturalWidth, STAGE_HEIGHT / image.naturalHeight);
@@ -293,19 +338,14 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
 
   }, [image]);
 
+  /**
+   * Animate zoom and pan to fit entire image with animation.
+   */
   const zoomFitAnimated = useCallback(() => {
     if (!image) return;
 
     // Zoom that produces fit-to-screen
     const targetZoom = 1;
-    const targetContentScale = baseScale;
-
-    const imageW = image.naturalWidth;
-    const imageH = image.naturalHeight;
-
-    // Compute where the image would be centered at that zoom
-    const targetCenterX = (STAGE_WIDTH - imageW * targetContentScale) / 2;
-    const targetCenterY = (STAGE_HEIGHT - imageH * targetContentScale) / 2;
 
     // We want groupX === targetCenterX, but:
     // groupX = centerX + pan.x
@@ -318,6 +358,10 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
 
   }, [image, baseScale, animateTo]);
 
+  /**
+   * Handle mouse wheel zoom events.
+   * @param e - Konva wheel event
+   */
   const handleWheel = useCallback(
     (e: Konva.KonvaEventObject<WheelEvent>) => {
       e.evt.preventDefault();
@@ -340,6 +384,10 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
     [zoom, baseScale, contentScale, groupX, groupY, image]
   );
 
+  /**
+   * Handle content drag move - pan the image.
+   * @param e - Konva drag event
+   */
   const handleContentDragMove = useCallback(
     (e: Konva.KonvaEventObject<DragEvent>) => {
       const node = e.target;
@@ -411,7 +459,11 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   }, [debugImageUrl]);
 
 
-  const zoomToAnnotation = useCallback(({ x, y, width, height }) => {
+  /**
+   * Zoom and pan to fit annotation rectangle in view.
+   * @param annotation - Rectangle annotation {x, y, width, height}
+   */
+  const zoomToAnnotation = useCallback(({ x, y, width, height }: { x: number; y: number; width: number; height: number }) => {
     if (!image) return;
 
     const padding = 40;
@@ -444,7 +496,12 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   }, [image, baseScale, zoom, pan]);
 
 
-  const handleCaesarAnnotationClick = (annotation, annotationId) => {
+  /**
+   * Handle Caesar overlay annotation click - toggle selection and zoom to annotation.
+   * @param annotation - Rectangle annotation {x, y, width, height}
+   * @param annotationId - ID of the clicked annotation
+   */
+  const handleCaesarAnnotationClick = (annotation: { x: number; y: number; width: number; height: number }, annotationId: string): void => {
     if (selectedCaesarAnnotation === annotationId) {
       zoomFitAnimated();
       setSelectedCaesarAnnotation(null);
@@ -534,12 +591,14 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
               draggable={isPanMode}
               onDragMove={handleContentDragMove}
             >
-              <Image
-                image={image}
-                width={natW}
-                height={natH}
-                listening={isPanMode}
-              />
+              {image && (
+                <Image
+                  image={image}
+                  width={natW}
+                  height={natH}
+                  listening={isPanMode}
+                />
+              )}
               {(
                 <BrushEditableImage
                   image={image}
@@ -558,7 +617,7 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
                 toolCursor={toolCursor}
                 strokeWidth={2 / contentScale}
                 setToolTip={setTooltip}
-                onAnnotationClick={(caesarAnnotation, annotationId) => handleCaesarAnnotationClick(caesarAnnotation, annotationId)}
+                onAnnotationClick={handleCaesarAnnotationClick}
               />)}
               {debugImage && (
                 <Image

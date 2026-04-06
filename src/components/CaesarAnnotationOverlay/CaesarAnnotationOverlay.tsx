@@ -14,6 +14,11 @@ interface CaesarAnnotationOverlayProps {
     setToolTip: Dispatch<SetStateAction<TooltipState>>;
 }
 
+/**
+ * Overlay component for displaying Caesar machine learning annotations.
+ * Renders rectangles from Caesar reductions with tooltips and click handlers.
+ * @param props - CaesarAnnotationOverlayProps configuration
+ */
 export function CaesarAnnotationOverlay({
     annotations,
     strokeWidth = 1,
@@ -51,7 +56,6 @@ export function CaesarAnnotationOverlay({
                             const container = stage?.container();
 
                             if (b.markLabel && stage && container) {
-                                // const group = e.target.getParent();
                                 const pointer = stage.getPointerPosition();
                                 const rect = container.getBoundingClientRect();
                                 if (pointer) {

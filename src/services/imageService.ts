@@ -4,6 +4,11 @@
  * Phase 2: Zooniverse /subjects/queued locations
  */
 
+/**
+ * Load image from file or URL and convert to data URL.
+ * @param file - File object or URL string to load
+ * @returns Promise resolving to data URL string
+ */
 export async function loadImageAsDataUrl(file: File | string): Promise<string> {
   if (file instanceof File) {
     return new Promise((resolve, reject) => {
@@ -30,6 +35,8 @@ export async function loadImageAsDataUrl(file: File | string): Promise<string> {
 /**
  * Normalize image so pixels match what the browser displays (EXIF orientation, etc).
  * Draws to canvas and re-exports. Use before sending to SAM2 to avoid coordinate mismatch.
+ * @param dataUrl - Data URL of image to normalize
+ * @returns Promise resolving to normalized image data URL
  */
 export async function normalizeImageForDisplay(dataUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -51,6 +58,11 @@ export async function normalizeImageForDisplay(dataUrl: string): Promise<string>
   });
 }
 
+/**
+ * Get dimensions of an image from URL.
+ * @param src - Image source URL
+ * @returns Promise resolving to object with width and height in pixels
+ */
 export function getImageDimensions(src: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -61,7 +73,10 @@ export function getImageDimensions(src: string): Promise<{ width: number; height
 }
 
 /**
+ * Extract image URL from Zooniverse subject locations array.
  * For Zooniverse: subject.locations is array of { "image/jpeg": "url" }
+ * @param locations - Array of location objects mapping MIME types to URLs
+ * @returns Image URL or null if no supported format found
  */
 export function getSubjectImageUrl(locations: Array<Record<string, string>>): string | null {
   const imageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];

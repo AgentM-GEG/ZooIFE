@@ -56,12 +56,20 @@ if (SUBJECT_SET_ID) {
     QUEUE_OPTS.subjectSetId = SUBJECT_SET_ID;
 }
 
+/**
+ * Zooniverse image loader component for loading subjects from the Zooniverse platform.
+ * Fetches subjects from the configured workflow and processes Caesar ML annotations.
+ */
 export function ZooniverseImageLoader() {    
     const { token } = useAuth();
     const caesarClient = useCaesarClient(token?.access_token!, CAESAR_REDUCTION_OPTS);
     const [subjects, setSubjects] = useState<Subject[] | null>(null);
     const setSubject = useClassificationStore(s => s.setSubject);
 
+    /**
+     * Process Caesar ML reductions and convert to CaesarAnnotation format.
+     * @param subject - Subject to fetch reductions for
+     */
     const processCaesarReductions = async (subject: Subject) => {
             const reductions: SubjectReduction[] = await fetchCaesarReductions(caesarClient, "machineLearnt", subject.id, WORKFLOW_ID)
             
@@ -74,13 +82,12 @@ export function ZooniverseImageLoader() {
                 return outer.flatMap(d => {
                     const inner = Array.isArray(d?.data) ? d.data : [];
 
-                    return inner.map(b => {
+                    return inner.map((b: any) => {
                         const taskIndex : number = b.taskIndex ?? 0;
                         const toolIndex : number = b.toolIndex ?? 0;
-                        const markTool = workflow.tasks[`T${taskIndex}`].tools[toolIndex];                        
-                        
-                        const toolType = b.toolType ?? CAESAR_REDUCTION_OPTS.defaultToolType;
-                        if (markTool.type === "rectangle") {
+                        const markTool = workflow?.tasks?.[`T${taskIndex}`]?.tools?.[toolIndex];
+
+                        if (markTool?.type === "rectangle") {
                             return {
                                 toolType: "rectangle",
                                 x_center: b.x_center,
@@ -102,6 +109,10 @@ export function ZooniverseImageLoader() {
             useCaesarAnnotationStore.getState().setAnnotations(parsed);
     }
 
+    /**
+     * Process subject: load image, normalize, and fetch Caesar annotations.
+     * @param subject - Subject data from Zooniverse
+     */
     const processSubject = async (subject: Subject) => {
         try {
             const dataUrl = await loadImageAsDataUrl(subject.locations[0]["image/jpeg"]);

@@ -8,6 +8,12 @@ import type { Subject, Classification, Workflow } from '../types/panoptes';
 const API_BASE = 'https://www.zooniverse.org/api';
 const STAGING_BASE = 'https://panoptes-staging.zooniverse.org/api';
 
+/**
+ * Build request headers for Zooniverse API calls.
+ * @param token - Optional OAuth bearer token for authenticated requests
+ * @param content_type - Content-Type header (default: JSON API format)
+ * @returns Headers object for fetch requests
+ */
 export function headers(token?: string, content_type :string = 'application/vnd.api+json; version=1'): HeadersInit {
   const h: HeadersInit = {
     Accept: 'application/vnd.api+json; version=1',
@@ -17,12 +23,22 @@ export function headers(token?: string, content_type :string = 'application/vnd.
   return h;
 }
 
+/**
+ * Options for fetching queued subjects.
+ */
 export type QueuedSubjectsOptions = {
   staging?: boolean;
   /** When set, appended as `subject_set_id` (required for grouped workflows; optional otherwise). */
   subjectSetId?: string;
 };
 
+/**
+ * Fetch next queued subjects for a workflow from Panoptes.
+ * @param workflowId - Zooniverse workflow ID
+ * @param token - Optional authentication token for authenticated endpoints
+ * @param opts - Configuration options (staging API, subject set ID)
+ * @returns Promise resolving to array of subject objects
+ */
 export async function getQueuedSubjects(
   workflowId: string,
   token?: string,
@@ -36,11 +52,18 @@ export async function getQueuedSubjects(
   if (subjectSetId) params.set('subject_set_id', subjectSetId);
   const url = `${base}/subjects/queued?${params.toString()}`;  
   const res = await fetch(url, { headers: headers(token) });  
-  if (!res.ok) throw new Error(`Subjects error: ${res.status}, ${JSON.stringify(response.errors)}`);
+  if (!res.ok) throw new Error(`Subjects error: ${res.status}`);
   const json = await res.json();
   return json.subjects ?? [];
 }
 
+/**
+ * Fetch workflow details by ID from Panoptes.
+ * @param workflowId - Zooniverse workflow ID
+ * @param token - Optional authentication token
+ * @param staging - Whether to use staging API instead of production
+ * @returns Promise resolving to workflow object
+ */
 export async function getWorkflow(
   workflowId: string,
   token?: string,
@@ -53,6 +76,13 @@ export async function getWorkflow(
   return json.workflows?.[0];
 }
 
+/**
+ * Submit a classification annotation to Panoptes.
+ * @param classification - Classification object with annotations and metadata
+ * @param token - Authentication token (required for submission)
+ * @param staging - Whether to use staging API instead of production
+ * @returns Promise resolving to created classification with ID
+ */
 export async function createClassification(
   classification: Classification,
   token: string,

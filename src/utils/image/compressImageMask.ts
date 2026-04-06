@@ -1,5 +1,7 @@
 /**
  * Convert ImageData → binary mask (0/1), based on blue channel > 0
+ * @param imageData - ImageData object from canvas rendering
+ * @returns Uint8Array of binary mask values (0 or 1 per pixel)
  */
 export function maskFromBlueChannel(imageData: ImageData): Uint8Array {
     const { data, width, height } = imageData;
@@ -18,6 +20,8 @@ export function maskFromBlueChannel(imageData: ImageData): Uint8Array {
 /**
  * Bit‑pack a binary mask (0/1 per pixel) into bytes.
  * 8 pixels → 1 byte.
+ * @param mask - Uint8Array of binary values (0 or 1)
+ * @returns Uint8Array of bit-packed bytes
  */
 export function packBits(mask: Uint8Array): Uint8Array {
     const out = new Uint8Array(Math.ceil(mask.length / 8));
@@ -34,8 +38,10 @@ export function packBits(mask: Uint8Array): Uint8Array {
 }
 
 /**
- * RLE encode a Uint8Array of bytes (e.g., bit‑packed mask)
+ * RLE encode a Uint8Array of bytes (e.g., bit‑packed mask).
  * Output format: [count, value, count, value, ...]
+ * @param bytes - Uint8Array to encode
+ * @returns RLE-encoded Uint8Array
  */
 export function rleEncode(bytes: Uint8Array): Uint8Array {
     if (bytes.length === 0) return new Uint8Array();
@@ -81,11 +87,13 @@ function bytesToBase64(bytes: Uint8Array): string {
 
 /**
  * Gzip a Uint8Array using the browser's CompressionStream API.
+ * @param bytes - Uint8Array to compress
+ * @returns Promise resolving to gzip-compressed Uint8Array
  */
 async function gzip(bytes: Uint8Array): Promise<Uint8Array> {
     const cs = new CompressionStream("gzip");
     const writer = cs.writable.getWriter();
-    writer.write(bytes);
+    writer.write(new Uint8Array(bytes));
     writer.close();
 
     const compressed = await new Response(cs.readable).arrayBuffer();
@@ -137,7 +145,10 @@ export class CompressedMask {
         }
     }
 
-    // Now JSON.stringify() will read this
+    /**
+     * Get JSON representation of the mask.
+     * @returns JSON-serializable object (must call prepareForJson() first)
+     */
     toJSON() {
         if (!this._preparedJson) {
             throw new Error(
@@ -150,8 +161,11 @@ export class CompressedMask {
 
 
 /**
- * Full pipeline:
+ * Full compression pipeline:
  * ImageData → binary mask → bit‑pack → RLE encode → CompressedMask
+ * @param imageData - ImageData object from canvas rendering
+ * @param encoding - Encoding type for output ("array", "base64", or "gzip-base64")
+ * @returns Promise resolving to CompressedMask object ready for JSON serialization
  */
 export async function compressSegmentationMask(
     imageData: ImageData,

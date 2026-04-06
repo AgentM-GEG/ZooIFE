@@ -181,6 +181,12 @@ const ButtonGroup = styled.div`
   width: 100%;
 `;
 
+/**
+ * Tool palette component for selecting annotation tools and configuring settings.
+ * Includes tools (point, freehand, brush), brush size, SAM model selection,
+ * and debug/coordinate fix options.
+ * @param props - ToolPaletteProps configuration
+ */
 export function ToolPalette({
   tool,
   onToolChange,
@@ -192,10 +198,6 @@ export function ToolPalette({
   showPoints,
   onShowPointsChange,
   onPredModBrushSizeChange,
-  coordinateFix,
-  onCoordinateFixChange,
-  debugCoords,
-  onDebugCoordsChange,
 }: ToolPaletteProps) {
 
   const { annotations, clearAnnotations, maskHistory, maskHistoryIndex } =

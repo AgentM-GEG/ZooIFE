@@ -28,6 +28,10 @@ const Button = styled.button`
   }
 `;
 
+/**
+ * Login component for Zooniverse authentication.
+ * Displays login button when no token, logout button when authenticated.
+ */
 export function Login() {
     const { token, login, logout } = useAuth();
     return (

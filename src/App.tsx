@@ -10,7 +10,6 @@ import { segmentWithPoints } from './services/sam2Service';
 import { useClassificationStore } from './stores/classificationStore';
 import type { AnnotationTool } from './types/annotations';
 import { BrushEditableImageHandle } from "./components/ImageMask/BrushEditableImage";
-import type { BrushProps } from './types/tools';
 
 // Styled components
 const AppContainer = styled.div`
@@ -78,6 +77,11 @@ const RightAside = styled.aside`
 `;
 
 // TODO: Move to another file
+/**
+ * Create an SVG data URI for a circular brush cursor.
+ * @param size - Brush size in pixels
+ * @returns CSS cursor URL string for use in cursor property
+ */
 function makeSvgCursorUri(size: number) : string {
   const prefix = "data:image/svg+xml";
   const viewBoxSize = 2*size + 25;
@@ -88,6 +92,10 @@ function makeSvgCursorUri(size: number) : string {
   return circle_uri;
 }
 
+/**
+ * Main app component for Zooniverse image classification interface.
+ * Integrates image loading, canvas annotation tools, task sidebar, and SAM2 model.
+ */
 function App() {
   const [tool, setTool] = useState<AnnotationTool>('point');
   const [brushUri, setBrushUri] = useState<string>(makeSvgCursorUri(5));
@@ -102,8 +110,6 @@ function App() {
   const [showPoints, setShowPoints] = useState(true);
   const { imageUrl, annotations, undoLastAnnotation, setMask, setDebugImage, imageDimensions } =
     useClassificationStore();
-
-  // const { caesarClient, setCaesarClient } = useState(new GraphQLClient(API_BASE));
 
   const handleUndo = useCallback(async () => {
     const removed = undoLastAnnotation();
@@ -208,8 +214,8 @@ function App() {
         <HeaderTitle>ZooIFE</HeaderTitle>
         <HeaderSubtitle>Interactive Image Classification for Zooniverse</HeaderSubtitle>
         <HeaderContent>
-          <ZooniverseImageLoader />
           <Login />
+          <ZooniverseImageLoader />
         </HeaderContent>
       </Header>
       <Main>
