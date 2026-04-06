@@ -129,6 +129,9 @@ Point clicks (left = foreground, right = background) append prompts and call `se
 
 ## Files touched in recent documentation updates
 
+- `.gitignore` — ignore `*.tsbuildinfo` (TypeScript incremental cache; avoids committing local build artifacts).
+- `package-lock.json` — lockfile refreshed (npm `peer` metadata normalization after install).
+
 - `src/services/panoptesService.ts` — `getQueuedSubjects` builds query with optional `subject_set_id`; third argument may be `boolean` (staging) or `{ staging?, subjectSetId? }`.
 - `src/components/ImageLoader/ZooniverseImageLoader.tsx` — reads `VITE_ZOONIVERSE_WORKFLOW_ID` / `VITE_ZOONIVERSE_SUBJECT_SET_ID`.
 - `src/vite-env.d.ts` — types for the new `import.meta.env` keys.

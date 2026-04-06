@@ -36,3 +36,6 @@ dist-ssr
 
 # SAM2
 sam2
+
+# TypeScript incremental cache
+*.tsbuildinfo
