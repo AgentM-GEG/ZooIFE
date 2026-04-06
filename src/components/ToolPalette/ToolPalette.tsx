@@ -45,7 +45,7 @@ export function ToolPalette({
 
   const annotations = useClassificationStore(s => s.annotations);
   const clearAnnotations = useClassificationStore(s => s.clearAnnotations);
-  const currentMaskUrl = useClassificationStore(s => s.currentMaskUrl);
+  // const currentMaskUrl = useClassificationStore(s => s.currentMaskUrl);
   const maskHistory = useClassificationStore(s => s.maskHistory);
   const maskHistoryIndex = useClassificationStore(s => s.maskHistoryIndex);
 
@@ -71,13 +71,15 @@ export function ToolPalette({
           {t.label}
         </button>
       ))}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={labelStyle}>Brush size</span>
       {(
-        <input type="range" min="1" max="10" defaultValue="5" id="myRange" onChange={(event) => {
+        <input type="range" min="1" max="10" defaultValue="5" id="brush_size_slider" onChange={(event) => {
           onBrushSizeChange(parseFloat(event.target.value))
         }
         } />
       )}
+      </div>
       {hasAnnotations && (
         <button onClick={clearAnnotations} style={{ ...btnStyle, ...clearBtnStyle }}>
           Clear all
@@ -157,6 +159,7 @@ export function ToolPalette({
             </span>
 
           </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={labelStyle}>Modifier brush size</span>
 
           <input
@@ -164,14 +167,15 @@ export function ToolPalette({
             min="1"
             max="10"
             defaultValue="5"
-            id="myRange"
+            id="predmod_brush_size_slider"
             onChange={(event) =>
               onPredModBrushSizeChange(parseFloat(event.target.value))
             }
           />
+          </div>
         </div>
       )}
-      <span style={{ ...labelStyle, marginTop: 12 }}>Coordinate fix</span>
+      {/* <span style={{ ...labelStyle, marginTop: 12 }}>Coordinate fix</span>
       <select
         value={coordinateFix}
         onChange={(e) => onCoordinateFixChange(e.target.value as typeof coordinateFix)}
@@ -190,7 +194,7 @@ export function ToolPalette({
           onChange={(e) => onDebugCoordsChange(e.target.checked)}
         />
         {' '}Debug coords
-      </label>
+      </label> */}
       <span style={{ ...labelStyle, marginTop: 4, fontSize: 11, lineHeight: '1.5' }}>
         Left-click: positive point (green)<br />
         Right-click: negative point (red)<br />

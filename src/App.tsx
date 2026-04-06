@@ -29,7 +29,7 @@ function App() {
   const [brushSize, setBrushSize] = useState<number>(5);
   const [predModBrushSize, setPredModBrushSize] = useState<number>(5);
   const [predModBrushUri, setPredModBrushUri] = useState<string>(makeSvgCursorUri(5));
-  const [modelId, setModelId] = useState('sam2-hiera-large');
+  const [modelId, setModelId] = useState('sam1-vit_b');
   const [coordinateFix, setCoordinateFix] = useState<
     'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY'
   >('none');

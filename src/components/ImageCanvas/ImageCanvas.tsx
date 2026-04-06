@@ -40,6 +40,8 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanMode, setIsPanMode] = useState(false);
+  const [suppressNextClick, setSuppressNextClick] = useState(false);
+  
 
   const [tooltip, setTooltip] = useState({
     visible: false,
@@ -108,6 +110,14 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   const handleStageClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (isPanMode) return;
+
+      if(suppressNextClick){
+        // pay attention to the next click event...
+        setSuppressNextClick(false);
+        // ... but ignore this one
+        return
+      }
+
       if (e.evt.button !== 0) return;
       const target = e.target as { getClassName?: () => string };
       if (target?.getClassName && ['Circle', 'Line'].includes(target.getClassName()))
@@ -124,14 +134,21 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
         setDrawingPoints((prev) => [...prev, { x, y }]);
       }
     },
-    [tool, image, addAnnotation, onPointClick, pointerToImage, isPanMode]
+    [tool, image, addAnnotation, onPointClick, pointerToImage, isPanMode, suppressNextClick]
   );
 
+  // TODO: change this callback name to be more intuitive - it just handles adding a negative
+  // SAM point!
   const handleContextMenu = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       e.evt.preventDefault();
       if (isPanMode) return;
       if (tool !== 'point' || !stageRef.current || !image) return;
+
+      // This stops a right click also being interpreted as a left click
+      // and thereby adding a positive and a negative point at the same time
+      setSuppressNextClick(true);
+
       const pos = stageRef.current.getPointerPosition();
       if (!pos) return;
       const { x, y } = pointerToImage(pos);
@@ -244,6 +261,19 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   );
 
   useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    stage.container().style.cursor = !debugImageUrl ? toolCursor : "default";
+  }, [tool, isPanMode, toolCursor, debugImageUrl]);
+
+  useEffect(() => {
+    // Disable pan mode whenever the user selects ANY tool
+    setIsPanMode(false);
+  }, [tool]);
+
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
@@ -351,7 +381,7 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   const handleUp = () => brushProps.predModBrushRef?.current?.pointerUp();
 
   return (
-    <div className="image-canvas" style={{ ...containerStyle, cursor: !debugImageUrl ? toolCursor : 'default' }}>
+    <div className="image-canvas"> {/*style={{ ...containerStyle, cursor: !debugImageUrl ? toolCursor : 'default' }}>*/}
       {!debugImageUrl && (
         <div style={toolbarStyle}>
           <button type="button" onClick={zoomOut} style={toolbarBtnStyle} title="Zoom out">-</button>
@@ -485,7 +515,7 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
                           key={si}
                           points={stroke.points.flatMap((p) => [p.x, p.y])}
                           stroke="lime"
-                          strokeWidth={stroke.radius * 2}
+                          strokeWidth={stroke.radius * 2 / contentScale}
                           lineCap="round"
                           lineJoin="round"
                           listening={false}
@@ -499,7 +529,7 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
                 <Line
                   points={drawingPoints.flatMap((p) => [p.x, p.y])}
                   stroke={tool === 'brush' ? 'lime' : 'cyan'}
-                  strokeWidth={tool === 'brush' ? brushProps.brushSize * 4 : 3}
+                  strokeWidth={tool === 'brush' ? brushProps.brushSize * 4 / contentScale : 3}
                   lineCap="round"
                   lineJoin="round"
                 />
