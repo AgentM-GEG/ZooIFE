@@ -46,6 +46,7 @@ interface ClassificationState {
   redoMask: () => ImageData | null
 
   buildPanoptesAnnotations: () => Promise<PanoptesAnnotation[]>;
+  buildPanoptesClassification: (projectId: string, workflowId: string) => Promise<Classification>;
   reset: () => void;
 }
 
@@ -212,6 +213,10 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
   },
 
   buildPanoptesClassification: async (projectId: string, workflowId: string) => {
+    if (!projectId || !workflowId) {
+      throw new Error("Project ID and Workflow ID are required to build classification");
+    }
+
     const {subjectId, startedAt} = get();
     if (!subjectId) throw new Error("No subject is set for classification");
 

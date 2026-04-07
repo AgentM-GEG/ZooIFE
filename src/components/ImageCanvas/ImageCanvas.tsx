@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { theme } from '../../theme/zooniverseTheme';
 import { Stage, Layer, Group, Image, Line, Circle } from 'react-konva';
 import Konva from 'konva';
@@ -13,12 +13,29 @@ import { useCaesarAnnotationStore } from '../../stores/caesarReductionStore';
 import { useAuth } from '../../auth/AuthContext';
 
 // Styled Components
+const fadeIn = keyframes`
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+`;
+
+const fadeOut = keyframes`
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+`;
+
 const Container = styled.div`
   background: ${theme.colors.secondary};
   border-radius: ${theme.borders.radius.lg};
   padding: ${theme.spacing.lg};
   display: inline-block;
-  position: relative;
 `;
 
 const Toolbar = styled.div`
@@ -102,7 +119,7 @@ const DebugImage = styled.img`
   border: 3px solid ${theme.colors.error};
 `;
 
-const WarningBanner = styled.div`
+const WarningBanner = styled.div<{ $isLeaving?: boolean }>`
   background: ${theme.colors.error};
   color: ${theme.colors.text.inverse};
   padding: 12px 16px;
@@ -118,6 +135,12 @@ const WarningBanner = styled.div`
   max-width: 500px;
   z-index: 10;
   transform: translateX(-20px);
+  animation: ${(props) => props.$isLeaving ? fadeOut : fadeIn} 0.1s ease-in-out;
+`;
+
+const WarningWrapper = styled.div`
+  position: relative;
+  width: 100%;
 `;
 
 
@@ -153,11 +176,16 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   const caesarReducedAnnotations = useCaesarAnnotationStore(s => s.annotations);
   const [selectedCaesarAnnotation, setSelectedCaesarAnnotation] = useState<string | null>(null);
   const [noRectangleWarning, setNoRectangleWarning] = useState(false);
+  const [warningFadingOut, setWarningFadingOut] = useState(false);
 
   // Hide warning when a Caesar annotation is selected
   useEffect(() => {
     if (selectedCaesarAnnotation) {
-      setNoRectangleWarning(false);
+      setWarningFadingOut(true);
+      setTimeout(() => {
+        setNoRectangleWarning(false);
+        setWarningFadingOut(false);
+      }, 100);
     }
   }, [selectedCaesarAnnotation]);
 
@@ -579,10 +607,12 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
 
   return (
     <Container>
-      {noRectangleWarning && (
-        <WarningBanner>
-          ⚠️ You have not selected a bounding box so we assume you are annotating an artifact or contaminant that was completely missed by the machine learning model.
-        </WarningBanner>
+      {(noRectangleWarning || warningFadingOut) && (
+        <WarningWrapper>
+          <WarningBanner $isLeaving={warningFadingOut}>
+            ⚠️ You have not selected a bounding box so we assume you are annotating an artifact or contaminant that was completely missed by the machine learning model.
+          </WarningBanner>
+        </WarningWrapper>
       )}
       {!debugImageUrl && (
         <Toolbar>
