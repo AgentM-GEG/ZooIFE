@@ -1,6 +1,10 @@
 import styled from 'styled-components';
 import { theme } from '../../theme/zooniverseTheme';
 import { useClassificationStore } from '../../stores/classificationStore';
+import {
+  buildZooniverseSubjectTalkUrl,
+  isPanoptesSubjectId,
+} from '../../utils/zooniverseTalk';
 
 interface TaskConfig {
   id: string;
@@ -130,24 +134,83 @@ const SubmitButton = styled.button`
   }
 `;
 
+const TalkButton = styled.a`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: ${theme.spacing.md} ${theme.spacing.lg};
+  background: transparent;
+  border: ${theme.borders.width.thin} solid ${theme.colors.primary};
+  border-radius: ${theme.borders.radius.base};
+  color: ${theme.colors.primary};
+  font-family: ${theme.typography.fontFamily};
+  font-size: ${theme.typography.size.sm};
+  font-weight: ${theme.typography.fontWeight.medium};
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+  transition: all ${theme.transitions.base};
+
+  &:hover:not([aria-disabled='true']) {
+    background: ${theme.colors.primaryLight}33;
+  }
+
+  &:active:not([aria-disabled='true']) {
+    transform: scale(0.98);
+  }
+
+  &[aria-disabled='true'] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+`;
+
+const SidebarActions = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${theme.spacing.sm};
+  margin-top: auto;
+`;
+
 const PROJECT_ID = import.meta.env.VITE_ZOONIVERSE_PROJECT_ID || undefined;
 const WORKFLOW_ID = import.meta.env.VITE_ZOONIVERSE_WORKFLOW_ID || undefined;
+const PROJECT_SLUG = import.meta.env.VITE_ZOONIVERSE_PROJECT_SLUG?.trim() || '';
+const SITE_ORIGIN = import.meta.env.VITE_ZOONIVERSE_SITE_ORIGIN?.trim() || undefined;
 
 /**
  * Task sidebar component for displaying and answering Zooniverse workflow tasks.
  * Shows classification questions and input fields, and provides submit button.
  */
 export function TaskSidebar() {
-  const { taskAnswers, setTaskAnswer, buildPanoptesClassification } = useClassificationStore(s => ({
-    taskAnswers: s.taskAnswers,
-    setTaskAnswer: s.setTaskAnswer,
-    buildPanoptesClassification: s.buildPanoptesClassification,
-  }));
+  const { taskAnswers, setTaskAnswer, buildPanoptesClassification, subjectId } =
+    useClassificationStore(s => ({
+      taskAnswers: s.taskAnswers,
+      setTaskAnswer: s.setTaskAnswer,
+      buildPanoptesClassification: s.buildPanoptesClassification,
+      subjectId: s.subjectId,
+    }));
 
   const handleSubmit = async () => {
+    if (!PROJECT_ID || !WORKFLOW_ID) {
+      console.warn(
+        'Set VITE_ZOONIVERSE_PROJECT_ID and VITE_ZOONIVERSE_WORKFLOW_ID to build a full classification payload.'
+      );
+      return;
+    }
     const annotations = await buildPanoptesClassification(PROJECT_ID, WORKFLOW_ID);
     console.log('Classifications (Panoptes format):', annotations);
   };
+
+  const talkHref =
+    PROJECT_SLUG && subjectId && isPanoptesSubjectId(subjectId)
+      ? buildZooniverseSubjectTalkUrl(PROJECT_SLUG, subjectId, SITE_ORIGIN)
+      : undefined;
+  const talkDisabledTitle = !PROJECT_SLUG
+    ? 'Set VITE_ZOONIVERSE_PROJECT_SLUG in .env (path after /projects/ on zooniverse.org).'
+    : !isPanoptesSubjectId(subjectId)
+      ? 'Load a Zooniverse subject (Next subject) to open Talk.'
+      : undefined;
 
   return (
     <Sidebar>
@@ -202,9 +265,20 @@ export function TaskSidebar() {
           )}
         </TaskBlock>
       ))}
-      <SubmitButton onClick={handleSubmit}>
-        Submit Classification
-      </SubmitButton>
+      <SidebarActions>
+        <SubmitButton type="button" onClick={handleSubmit}>
+          Submit Classification
+        </SubmitButton>
+        {talkHref ? (
+          <TalkButton href={talkHref} target="_blank" rel="noopener noreferrer">
+            Go to Talk
+          </TalkButton>
+        ) : (
+          <TalkButton as="span" aria-disabled="true" title={talkDisabledTitle}>
+            Go to Talk
+          </TalkButton>
+        )}
+      </SidebarActions>
     </Sidebar>
   );
 }

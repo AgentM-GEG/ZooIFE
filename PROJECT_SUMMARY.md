@@ -1,6 +1,6 @@
 # ZooIFE Project Summary
 
-**Current status (branch `snapshot_alignment`):** ZooIFE is a React-based Incubator Front End (IFE) that now connects to **live Zooniverse Panoptes** for authenticated subject loading (`/subjects/queued`), while retaining a **local SAM2** segmentation loop and **in-browser mask refinement** on top of model predictions. A small **Python OAuth helper** exchanges authorization codes for tokens and returns them to the SPA via URL fragment. Local file loading via `ImageLoader` remains in the codebase but is **not** mounted in `App.tsx`—the primary header flow is **Login** + **Next subject**. **Workflow / subject set** for the queue are configurable via **Vite env** (see `.env.example`).
+**Current status (branch `snapshot_alignment`):** ZooIFE is a React-based Incubator Front End (IFE) that now connects to **live Zooniverse Panoptes** for authenticated subject loading (`/subjects/queued`), while retaining a **local SAM2** segmentation loop and **in-browser mask refinement** on top of model predictions. A small **Python OAuth helper** exchanges authorization codes for tokens and returns them to the SPA via URL fragment. Local file loading via `ImageLoader` remains in the codebase but is **not** mounted in `App.tsx`—the primary header flow is **Login** + **Next subject**. **Workflow / subject set** for the queue are configurable via **Vite env** (see `.env.example`). The task sidebar includes **Go to Talk**, which opens the subject’s Zooniverse Talk page in a new tab when `VITE_ZOONIVERSE_PROJECT_SLUG` is set (CSSI IFE URL pattern).
 
 ---
 
@@ -50,7 +50,7 @@
 | `components/ImageCanvas/ImageCanvas.tsx` | Konva stage: zoom/pan, tools, SAM/debug/mask layers, pointer routing to mask editor. |
 | `components/ImageMask/BrushEditableImage.tsx` | Offscreen canvas for mask pixels; mask history via store; imperative handle for pointer events. |
 | `components/ToolPalette/ToolPalette.tsx` | Point / freehand / brush, SAM model select, coordinate fix & debug, **Modify prediction** UI when `currentMaskUrl` is set. |
-| `components/TaskSidebar/TaskSidebar.tsx` | Static sample tasks; submit calls `buildPanoptesAnnotations()` and logs (does not `await` the async builder). |
+| `components/TaskSidebar/TaskSidebar.tsx` | Static sample tasks; submit calls `buildPanoptesClassification()` and logs; **Go to Talk** links to `…/projects/<slug>/talk/subjects/<id>` when env slug + Panoptes subject are present. |
 | `auth/AuthContext.tsx` | OAuth callback fragment handling, `login`/`logout`. |
 | `auth/tokenStore.ts` | Module-level token for non-React consumers. |
 | `stores/classificationStore.ts` | Subject, image, annotations, tasks, SAM mask URL, debug image, **mask history** + undo/redo, `buildPanoptesAnnotations`. |
@@ -58,6 +58,7 @@
 | `services/sam2Service.ts` | SAM2 API client (proxied by Vite). |
 | `services/imageService.ts` | File/URL → data URL, EXIF-safe normalization, dimensions, `getSubjectImageUrl` helper. |
 | `utils/image/compressImageMask.ts` | Mask from blue channel → bit-pack → RLE → `CompressedMask` + JSON serialization. |
+| `utils/zooniverseTalk.ts` | Builds Zooniverse subject Talk URLs; `isPanoptesSubjectId` skips `local-*` subjects. |
 | `types/panoptes.ts`, `types/annotations.ts`, `types/tools.ts` | Panoptes and drawing models; `BrushProps` / tool unions including `modifier_brush`. |
 
 ### `server/`
@@ -74,7 +75,7 @@
 - `README.md` — quick start, OAuth + SAM2 + Zooniverse flow (local **Load Image** still optional / not mounted in `App`).
 - `docs/SOLUTION_ARCHITECTURE.md` — CSSI / Panoptes alignment and lifecycle (still describes “phase 2” API subjects in places; implementation has begun).
 - `vite.config.ts` — dev proxy: `/api/sam2` → `http://localhost:3001`.
-- `.env.example` — documents `VITE_ZOONIVERSE_WORKFLOW_ID` and optional `VITE_ZOONIVERSE_SUBJECT_SET_ID` for Panoptes `/subjects/queued` (copy to `.env` / `.env.local` as needed; see `.gitignore`).
+- `.env.example` — documents `VITE_ZOONIVERSE_WORKFLOW_ID`, optional `VITE_ZOONIVERSE_SUBJECT_SET_ID`, and optional `VITE_ZOONIVERSE_PROJECT_SLUG` / `VITE_ZOONIVERSE_SITE_ORIGIN` for Talk links (copy to `.env` / `.env.local` as needed; see `.gitignore`).
 - `package.json` — scripts: `dev`, `build`, `lint`, `preview`, `sam2:server`.
 - `.gitignore` — excludes `*oauth.json`, `node_modules`, `dist`, `.env*`, `sam2` clone, etc.
 
@@ -93,7 +94,7 @@
 2. Run `python server/oauth_server.py` (port **8080**); install `requests` if missing.
 3. Run `python server/sam2_server.py` (port **3001** per README/proxy).
 4. Run `npm run dev` (Vite **5173**).
-5. **Login to Zooniverse** → complete OAuth → **Next subject** → annotate → optional **Modify prediction** on mask → **Submit Classification** (console output).
+5. **Login to Zooniverse** → complete OAuth → **Next subject** → annotate → optional **Modify prediction** on mask → **Submit Classification** (console output) → optional **Go to Talk** (new tab) if `VITE_ZOONIVERSE_PROJECT_SLUG` matches the project’s `/projects/…` path.
 
 ### SAM point loop (unchanged conceptually)
 
@@ -109,6 +110,7 @@ Point clicks (left = foreground, right = background) append prompts and call `se
 | OAuth in browser | Implemented via `oauth_server.py` + fragment callback |
 | `getWorkflow` / dynamic tasks from API | Service exists; UI still uses **sample** tasks in `TaskSidebar` |
 | POST classification to Panoptes | `createClassification` implemented; **not** wired to Submit button |
+| Subject Talk deep link | **Go to Talk** in `TaskSidebar` when `VITE_ZOONIVERSE_PROJECT_SLUG` + queued subject id |
 | Local file **Load Image** | Component exists; **not** in `App` header |
 | Point / freehand / brush tools | Implemented |
 | SAM2 mask overlay + modifier brush + mask undo/redo | Implemented |
@@ -129,11 +131,16 @@ Point clicks (left = foreground, right = background) append prompts and call `se
 
 ## Files touched in recent documentation updates
 
+- `src/utils/zooniverseTalk.ts` — **new** — `buildZooniverseSubjectTalkUrl`, `isPanoptesSubjectId`.
+- `src/components/TaskSidebar/TaskSidebar.tsx` — **Go to Talk** button (new tab); disabled with tooltip when slug or Panoptes subject missing.
+- `src/vite-env.d.ts` — `VITE_ZOONIVERSE_PROJECT_SLUG`, `VITE_ZOONIVERSE_SITE_ORIGIN`, `VITE_ZOONIVERSE_PROJECT_ID`.
+- `.env.example` — documents optional Talk link env vars.
+- `PROJECT_SUMMARY.md` — this sync section.
+
+Earlier batch:
+
 - `src/services/panoptesService.ts` — `getQueuedSubjects` builds query with optional `subject_set_id`; third argument may be `boolean` (staging) or `{ staging?, subjectSetId? }`.
 - `src/components/ImageLoader/ZooniverseImageLoader.tsx` — reads `VITE_ZOONIVERSE_WORKFLOW_ID` / `VITE_ZOONIVERSE_SUBJECT_SET_ID`.
-- `src/vite-env.d.ts` — types for the new `import.meta.env` keys.
-- `.env.example` — template for Panoptes queue configuration.
-- `PROJECT_SUMMARY.md` — this sync section.
 
 Earlier (reference):
 
