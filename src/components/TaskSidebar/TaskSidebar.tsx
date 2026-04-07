@@ -130,19 +130,22 @@ const SubmitButton = styled.button`
   }
 `;
 
+const PROJECT_ID = import.meta.env.VITE_ZOONIVERSE_PROJECT_ID || undefined;
+const WORKFLOW_ID = import.meta.env.VITE_ZOONIVERSE_WORKFLOW_ID || undefined;
+
 /**
  * Task sidebar component for displaying and answering Zooniverse workflow tasks.
  * Shows classification questions and input fields, and provides submit button.
  */
 export function TaskSidebar() {
-  const { taskAnswers, setTaskAnswer, buildPanoptesAnnotations } = useClassificationStore(s => ({
+  const { taskAnswers, setTaskAnswer, buildPanoptesClassification } = useClassificationStore(s => ({
     taskAnswers: s.taskAnswers,
     setTaskAnswer: s.setTaskAnswer,
-    buildPanoptesAnnotations: s.buildPanoptesAnnotations,
+    buildPanoptesClassification: s.buildPanoptesClassification,
   }));
 
   const handleSubmit = async () => {
-    const annotations = await buildPanoptesAnnotations();
+    const annotations = await buildPanoptesClassification(PROJECT_ID, WORKFLOW_ID);
     console.log('Classifications (Panoptes format):', annotations);
   };
 
