@@ -1,12 +1,12 @@
 import { useRef } from 'react';
 import styled from 'styled-components';
-import { theme } from '../../theme/zooniverseTheme';
-import { useClassificationStore } from '../../stores/classificationStore';
+import { theme } from '@/theme/zooniverseTheme';
+import { useClassificationStore } from '@/stores/classificationStore';
 import {
   loadImageAsDataUrl,
   getImageDimensions,
   normalizeImageForDisplay,
-} from '../../services/imageService';
+} from '@/services/imageService';
 
 const Container = styled.div`
   display: inline-block;

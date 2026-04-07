@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { theme } from './zooniverseTheme';
+import { theme } from '@/theme/zooniverseTheme';
 
 /**
  * Reusable styled components for the Zooniverse design system

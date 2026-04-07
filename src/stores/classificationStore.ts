@@ -1,7 +1,9 @@
 import { create } from 'zustand';
-import type { DrawingAnnotation } from '../types/annotations';
-import type { Classification, ClassificationMetadata, Annotation as PanoptesAnnotation } from '../types/panoptes';
-import { compressSegmentationMask } from "../utils/image/compressImageMask";
+import type { DrawingAnnotation } from '@/types/annotations';
+import type { Classification, ClassificationMetadata, Annotation as PanoptesAnnotation } from '@/types/panoptes';
+import { compressSegmentationMask } from "@/utils/image/compressImageMask";
+import { PROJECT_ID, WORKFLOW_ID } from '@/services/panoptesService';
+
 
 
 export interface TaskAnswer {
@@ -181,7 +183,7 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
    * Includes segmentation mask, drawn annotations, and task answers.
    * @returns Promise resolving to array of Panoptes annotation objects
    */
-   buildPanoptesAnnotations: async () => {
+  buildPanoptesAnnotations: async () => {
     const { annotations, taskAnswers, maskHistory, maskHistoryIndex } = get();
 
     const currentMask = maskHistory[maskHistoryIndex];
@@ -212,12 +214,12 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
     return result;
   },
 
-  buildPanoptesClassification: async (projectId: string, workflowId: string) => {
+  buildPanoptesClassification: async (projectId: string = PROJECT_ID, workflowId: string | undefined = WORKFLOW_ID) => {
     if (!projectId || !workflowId) {
       throw new Error("Project ID and Workflow ID are required to build classification");
     }
 
-    const {subjectId, startedAt} = get();
+    const { subjectId, startedAt } = get();
     if (!subjectId) throw new Error("No subject is set for classification");
 
     const classificationMetaData: ClassificationMetadata = {
@@ -243,7 +245,7 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
     console.log(classification);
 
     return classification;
-    
+
   },
 
   reset: () => set(initialState),

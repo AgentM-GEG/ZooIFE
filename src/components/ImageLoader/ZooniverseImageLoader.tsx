@@ -1,20 +1,19 @@
 import { useState } from 'react';
 import styled from 'styled-components';
-import { theme } from '../../theme/zooniverseTheme';
-import { useClassificationStore } from '../../stores/classificationStore';
+import { theme } from '@/theme/zooniverseTheme';
+import { useClassificationStore } from '@/stores/classificationStore';
 import {
     loadImageAsDataUrl,
     getImageDimensions,
     normalizeImageForDisplay,
-} from '../../services/imageService';
-import { getQueuedSubjects, getWorkflow, QueuedSubjectsOptions } from '../../services/panoptesService';
-import { useAuth } from '../../auth/AuthContext';
-// import type { TokenSet } from '../../auth/tokenStore'
-import type { Subject } from '../../types/panoptes';
-import type { CaesarAnnotation } from '../../types/annotations';
-import { useCaesarClient, fetchCaesarReductions, CaesarReductionOptions, SubjectReduction } from '../../services/caesarService';
+} from '@/services/imageService';
+import { getQueuedSubjects, getWorkflow, WORKFLOW_ID, QUEUE_OPTS } from '@/services/panoptesService';
+import { useAuth } from '@/auth/AuthContext';
+import type { Subject } from '@/types/panoptes';
+import type { CaesarAnnotation } from '@/types/annotations';
+import { useCaesarClient, fetchCaesarReductions, CAESAR_REDUCTION_OPTS, SubjectReduction } from '@/services/caesarService';
 
-import { useCaesarAnnotationStore } from '../../stores/caesarReductionStore'
+import { useCaesarAnnotationStore } from '@/stores/caesarReductionStore'
 
 const Container = styled.div`
   display: inline-block;
@@ -41,20 +40,6 @@ const Button = styled.button`
     transform: scale(0.95);
   }
 `;
-
-/** Override via `.env`: `VITE_ZOONIVERSE_WORKFLOW_ID`, optional `VITE_ZOONIVERSE_SUBJECT_SET_ID`. */
-const USE_STAGING_APIS = import.meta.env.VITE_ZOONIVERSE_USE_STAGING_APIS === 'true';
-const WORKFLOW_ID = import.meta.env.VITE_ZOONIVERSE_WORKFLOW_ID?.trim() ?? '29070';
-const SUBJECT_SET_ID = import.meta.env.VITE_ZOONIVERSE_SUBJECT_SET_ID?.trim() || undefined;
-const CEASAR_DEFAULT_TOOL_TYPE = import.meta.env.VITE_CEASAR_DEFAULT_TOOL_TYPE?.trim() || "default";
-
-const QUEUE_OPTS: QueuedSubjectsOptions = { staging: USE_STAGING_APIS };
-
-const CAESAR_REDUCTION_OPTS: CaesarReductionOptions = { staging: USE_STAGING_APIS, defaultToolType : CEASAR_DEFAULT_TOOL_TYPE };
-
-if (SUBJECT_SET_ID) {
-    QUEUE_OPTS.subjectSetId = SUBJECT_SET_ID;
-}
 
 /**
  * Zooniverse image loader component for loading subjects from the Zooniverse platform.

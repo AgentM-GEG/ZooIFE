@@ -1,6 +1,6 @@
 import styled from 'styled-components';
-import { theme } from '../../theme/zooniverseTheme';
-import { useClassificationStore } from '../../stores/classificationStore';
+import { theme } from '@/theme/zooniverseTheme';
+import { useClassificationStore } from '@/stores/classificationStore';
 
 interface TaskConfig {
   id: string;
@@ -129,9 +129,6 @@ const SubmitButton = styled.button`
     transform: scale(0.95);
   }
 `;
-
-const PROJECT_ID = import.meta.env.VITE_ZOONIVERSE_PROJECT_ID || undefined;
-const WORKFLOW_ID = import.meta.env.VITE_ZOONIVERSE_WORKFLOW_ID || undefined;
 
 /**
  * Task sidebar component for displaying and answering Zooniverse workflow tasks.

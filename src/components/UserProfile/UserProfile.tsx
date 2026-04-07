@@ -1,6 +1,6 @@
 import styled from 'styled-components';
-import { useUserStore } from '../../stores/userStore';
-import { theme } from '../../theme/zooniverseTheme';
+import { useUserStore } from '@/stores/userStore';
+import { theme } from '@/theme/zooniverseTheme';
 
 const UserProfileContainer = styled.div`
   display: flex;

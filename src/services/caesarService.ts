@@ -1,13 +1,13 @@
 import { GraphQLClient } from 'graphql-request'
 import { useMemo } from 'react';
-import { headers } from './panoptesService'
-import { CaesarAnnotations } from '../types/annotations';
+import { headers, USE_STAGING_APIS } from '@/services/panoptesService'
+import { CaesarAnnotations } from '@/types/annotations';
 
 /**
  * Caesar reduction API endpoints (GraphQL)
  */
-export const CAESAR_API_BASE = 'https://caesar.zooniverse.org/graphql';
-export const CAESAR_STAGING_BASE = 'https://caesar-staging.zooniverse.org/graphql';
+export const CAESAR_API_BASE = import.meta.env.VITE_CAESAR_API_BASE || 'https://caesar.zooniverse.org/graphql';
+export const CAESAR_STAGING_BASE = import.meta.env.VITE_CAESAR_STAGING_BASE || 'https://caesar-staging.zooniverse.org/graphql';
 
 /**
  * Options for Caesar service configuration.
@@ -15,6 +15,19 @@ export const CAESAR_STAGING_BASE = 'https://caesar-staging.zooniverse.org/graphq
 export type CaesarReductionOptions = {
     staging: boolean;
     defaultToolType: "rectangle" | "default";
+};
+
+/**
+ * Default tool type for Caesar annotations
+ */
+export const CEASAR_DEFAULT_TOOL_TYPE = import.meta.env.VITE_CEASAR_DEFAULT_TOOL_TYPE?.trim() || "default";
+
+/**
+ * Default options for Caesar reductions
+ */
+export const CAESAR_REDUCTION_OPTS: CaesarReductionOptions = {
+    staging: USE_STAGING_APIS,
+    defaultToolType: CEASAR_DEFAULT_TOOL_TYPE
 };
 
 /**

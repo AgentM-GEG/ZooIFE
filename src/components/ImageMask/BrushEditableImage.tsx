@@ -2,7 +2,7 @@ import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from "re
 import { Image as KonvaImage } from "react-konva";
 import type Konva from "konva";
 import type { KonvaEventObject } from "konva/lib/Node";
-import { useClassificationStore } from "../../stores/classificationStore"
+import { useClassificationStore } from "@/stores/classificationStore"
 
 type BrushMode = "add" | "subtract";
 

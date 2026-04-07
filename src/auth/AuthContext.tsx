@@ -6,10 +6,10 @@ import React, {
   useMemo,
   useRef
 } from "react";
-import { setToken as storeToken, TokenSet, loadTokenFromStorage, clearStorage } from "./tokenStore";
-import { getUserDetails } from "../services/panoptesService";
-import { useUserStore } from "../stores/userStore";
-import { decodeJWT } from "../utils/jwt/jwt";
+import { setToken as storeToken, TokenSet, loadTokenFromStorage, clearStorage } from "@/auth/tokenStore";
+import { getUserDetails } from "@/services/panoptesService";
+import { useUserStore } from "@/stores/userStore";
+import { decodeJWT } from "@/utils/jwt/jwt";
 
 
 interface AuthContextValue {

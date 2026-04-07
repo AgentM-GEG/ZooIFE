@@ -1,6 +1,6 @@
 import { Rect } from "react-konva";
-import { CaesarAnnotation } from "../../types/annotations";
-import { TooltipState } from '../../types/tools'
+import { CaesarAnnotation } from "@/types/annotations";
+import { TooltipState } from '@/types/tools'
 import type { Dispatch, SetStateAction } from "react";
 
 

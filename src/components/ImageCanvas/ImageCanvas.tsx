@@ -1,16 +1,16 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { theme } from '../../theme/zooniverseTheme';
+import { theme } from '@/theme/zooniverseTheme';
 import { Stage, Layer, Group, Image, Line, Circle } from 'react-konva';
 import Konva from 'konva';
 import type { KonvaEventObject } from "konva/lib/Node"
-import { useClassificationStore } from '../../stores/classificationStore';
-import { BrushEditableImage } from '../ImageMask/BrushEditableImage';
-import { CaesarAnnotationOverlay } from '../CaesarAnnotationOverlay/CaesarAnnotationOverlay';
-import type { AnnotationTool } from '../../types/annotations';
-import type { BrushProps } from '../../types/tools';
-import { useCaesarAnnotationStore } from '../../stores/caesarReductionStore';
-import { useAuth } from '../../auth/AuthContext';
+import { useClassificationStore } from '@/stores/classificationStore';
+import { BrushEditableImage } from '@/components/ImageMask/BrushEditableImage';
+import { CaesarAnnotationOverlay } from '@/components/CaesarAnnotationOverlay/CaesarAnnotationOverlay';
+import type { AnnotationTool } from '@/types/annotations';
+import type { BrushProps } from '@/types/tools';
+import { useCaesarAnnotationStore } from '@/stores/caesarReductionStore';
+import { useAuth } from '@/auth/AuthContext';
 
 // Styled Components
 const fadeIn = keyframes`
@@ -174,7 +174,8 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   }));
 
   const caesarReducedAnnotations = useCaesarAnnotationStore(s => s.annotations);
-  const [selectedCaesarAnnotation, setSelectedCaesarAnnotation] = useState<string | null>(null);
+  const selectedCaesarAnnotation = useCaesarAnnotationStore(s => s.selectedAnnotationId);
+  const setSelectedCaesarAnnotation = useCaesarAnnotationStore(s => s.setSelectedAnnotationId);
   const [noRectangleWarning, setNoRectangleWarning] = useState(false);
   const [warningFadingOut, setWarningFadingOut] = useState(false);
 

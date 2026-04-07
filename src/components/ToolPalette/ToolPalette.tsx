@@ -1,8 +1,8 @@
 import styled from 'styled-components';
-import { theme } from '../../theme/zooniverseTheme';
-import { useClassificationStore } from '../../stores/classificationStore';
-import { SEGMENT_MODELS } from '../../services/sam2Service';
-import type { AnnotationTool } from '../../types/annotations';
+import { theme } from '@/theme/zooniverseTheme';
+import { useClassificationStore } from '@/stores/classificationStore';
+import { SEGMENT_MODELS } from '@/services/sam2Service';
+import type { AnnotationTool } from '@/types/annotations';
 import { BrushProps } from '@/types/tools';
 
 interface ToolPaletteProps {

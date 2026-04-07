@@ -3,10 +3,23 @@
  * Aligned with CSSI IFE Interoperability
  */
 
-import type { Subject, Classification, Workflow } from '../types/panoptes';
+import type { Subject, Classification, Workflow } from '@/types/panoptes';
 
-const API_BASE = 'https://www.zooniverse.org/api';
-const STAGING_BASE = 'https://panoptes-staging.zooniverse.org/api';
+export const API_BASE = import.meta.env.VITE_PANOPTES_API_BASE || 'https://www.zooniverse.org/api';
+export const STAGING_BASE = import.meta.env.VITE_PANOPTES_STAGING_BASE || 'https://panoptes-staging.zooniverse.org/api';
+
+export const PROJECT_ID = import.meta.env.VITE_ZOONIVERSE_PROJECT_ID || undefined;
+export const WORKFLOW_ID = import.meta.env.VITE_ZOONIVERSE_WORKFLOW_ID?.trim() ?? '29070';
+export const USE_STAGING_APIS = import.meta.env.VITE_ZOONIVERSE_USE_STAGING_APIS === 'true';
+export const SUBJECT_SET_ID = import.meta.env.VITE_ZOONIVERSE_SUBJECT_SET_ID?.trim() || undefined;
+
+/**
+ * Default options for queued subjects endpoint
+ */
+export const QUEUE_OPTS: QueuedSubjectsOptions = { staging: USE_STAGING_APIS };
+if (SUBJECT_SET_ID) {
+  QUEUE_OPTS.subjectSetId = SUBJECT_SET_ID;
+}
 
 /**
  * Build request headers for Zooniverse API calls.
