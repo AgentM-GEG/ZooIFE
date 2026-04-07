@@ -98,3 +98,25 @@ export async function createClassification(
   const json = await res.json();
   return { id: json.classifications?.[0]?.id };
 }
+
+/**
+ * Fetch user profile details by ID from Panoptes.
+ * @param userId - Zooniverse user ID (extracted from JWT payload)
+ * @param token - Optional authentication token (required for authenticated user details)
+ * @param staging - Whether to use staging API instead of production
+ * @returns Promise resolving to user object with profile information
+ */
+export async function getUserDetails(userId: string, token?: string, staging = false) {
+  const base = staging ? STAGING_BASE : API_BASE;
+
+  const res = await fetch(`${base}/users/${userId}`, {
+    headers: headers(token)
+  });
+
+  if (!res.ok) {
+    throw new Error(`User fetch error: ${res.status}`);
+  }
+
+  const json = await res.json();
+  return json.users?.[0]; // Panoptes returns { users: [...] }
+}

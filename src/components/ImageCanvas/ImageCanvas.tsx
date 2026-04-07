@@ -10,6 +10,7 @@ import { CaesarAnnotationOverlay } from '../CaesarAnnotationOverlay/CaesarAnnota
 import type { AnnotationTool } from '../../types/annotations';
 import type { BrushProps } from '../../types/tools';
 import { useCaesarAnnotationStore } from '../../stores/caesarReductionStore';
+import { useAuth } from '../../auth/AuthContext';
 
 // Styled Components
 const Container = styled.div`
@@ -17,6 +18,7 @@ const Container = styled.div`
   border-radius: ${theme.borders.radius.lg};
   padding: ${theme.spacing.lg};
   display: inline-block;
+  position: relative;
 `;
 
 const Toolbar = styled.div`
@@ -37,10 +39,15 @@ const ToolbarButton = styled.button<{ $active?: boolean }>`
   font-size: ${theme.typography.size.sm};
   transition: all ${theme.transitions.base};
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: ${theme.colors.primary};
     color: ${theme.colors.secondary};
     border-color: ${theme.colors.primary};
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 `;
 
@@ -49,9 +56,14 @@ const UndoButton = styled(ToolbarButton)`
   color: ${theme.colors.warning};
   border-color: ${theme.colors.warning};
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: ${theme.colors.warning};
     color: ${theme.colors.text.inverse};
+  }
+
+  &:disabled {
+    color: ${theme.colors.warning};
+    opacity: 0.5;
   }
 `;
 
@@ -90,6 +102,24 @@ const DebugImage = styled.img`
   border: 3px solid ${theme.colors.error};
 `;
 
+const WarningBanner = styled.div`
+  background: ${theme.colors.error};
+  color: ${theme.colors.text.inverse};
+  padding: 12px 16px;
+  border-radius: ${theme.borders.radius.base};
+  font-size: ${theme.typography.size.sm};
+  font-weight: ${theme.typography.fontWeight.medium};
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+  position: absolute;
+  top: ${theme.spacing.lg};
+  right: ${theme.spacing.lg};
+  max-width: 500px;
+  z-index: 10;
+  transform: translateX(-20px);
+`;
+
 
 interface ImageCanvasProps {
   tool: AnnotationTool;
@@ -122,6 +152,14 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
 
   const caesarReducedAnnotations = useCaesarAnnotationStore(s => s.annotations);
   const [selectedCaesarAnnotation, setSelectedCaesarAnnotation] = useState<string | null>(null);
+  const [noRectangleWarning, setNoRectangleWarning] = useState(false);
+
+  // Hide warning when a Caesar annotation is selected
+  useEffect(() => {
+    if (selectedCaesarAnnotation) {
+      setNoRectangleWarning(false);
+    }
+  }, [selectedCaesarAnnotation]);
 
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [maskImage, setMaskImage] = useState<HTMLImageElement | null>(null);
@@ -134,7 +172,7 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanMode, setIsPanMode] = useState(false);
   const [suppressNextClick, setSuppressNextClick] = useState(false);
-  
+
 
   const [tooltip, setTooltip] = useState({
     visible: false,
@@ -232,6 +270,11 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
       if (target?.getClassName && ['Circle', 'Line'].includes(target.getClassName()))
         return;
       if (!stageRef.current || !image) return;
+
+      if (tool === 'point' && !selectedCaesarAnnotation) {
+        setNoRectangleWarning(true);
+      }
+
       const pos = stageRef.current.getPointerPosition();
       if (!pos) return;
       const { x, y } = pointerToImage(pos);
@@ -243,7 +286,7 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
         setDrawingPoints((prev) => [...prev, { x, y }]);
       }
     },
-    [tool, image, addAnnotation, onPointClick, pointerToImage, isPanMode, suppressNextClick]
+    [tool, image, addAnnotation, onPointClick, pointerToImage, isPanMode, suppressNextClick, selectedCaesarAnnotation]
   );
 
   /**
@@ -513,9 +556,11 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   }
 
   if (!imageUrl) {
+    const { token } = useAuth();
+    const placeholderText = token ? "Click 'Next subject' to start classifying" : "Log in to get started";
     return (
       <Placeholder>
-        Load an image to get started
+        {placeholderText}
       </Placeholder>
     );
   }
@@ -523,12 +568,22 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
   const natW = image?.naturalWidth ?? 0;
   const natH = image?.naturalHeight ?? 0;
 
-  const handleDown = (e: KonvaEventObject<PointerEvent>) => brushProps.predModBrushRef?.current?.pointerDown(e);
+  const handleDown = (e: KonvaEventObject<PointerEvent>) => {
+    if (!selectedCaesarAnnotation) {
+      setNoRectangleWarning(true);
+    }
+    brushProps.predModBrushRef?.current?.pointerDown(e);
+  };
   const handleMove = (e: KonvaEventObject<PointerEvent>) => brushProps.predModBrushRef?.current?.pointerMove(e);
   const handleUp = () => brushProps.predModBrushRef?.current?.pointerUp();
 
   return (
     <Container>
+      {noRectangleWarning && (
+        <WarningBanner>
+          ⚠️ You have not selected a bounding box so we assume you are annotating an artifact or contaminant that was completely missed by the machine learning model.
+        </WarningBanner>
+      )}
       {!debugImageUrl && (
         <Toolbar>
           <ToolbarButton type="button" onClick={zoomOut} title="Zoom out">-</ToolbarButton>
@@ -544,15 +599,14 @@ export function ImageCanvas({ tool, brushProps, onPointClick, onUndo, showPoints
           >
             Pan
           </ToolbarButton>
-          {annotations.length > 0 && (
-            <UndoButton
-              type="button"
-              onClick={() => onUndo?.()}
-              title="Undo last point (Ctrl+Z / ⌘Z)"
-            >
-              Undo
-            </UndoButton>
-          )}
+          <UndoButton
+            type="button"
+            onClick={() => onUndo?.()}
+            disabled={annotations.length === 0 || !currentMaskUrl}
+            title="Undo last point (Ctrl+Z / ⌘Z)"
+          >
+            Undo
+          </UndoButton>
         </Toolbar>
       )}
       {debugImageUrl && (

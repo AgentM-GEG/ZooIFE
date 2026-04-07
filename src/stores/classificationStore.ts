@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { DrawingAnnotation } from '../types/annotations';
-import type { Annotation as PanoptesAnnotation } from '../types/panoptes';
+import type { Classification, ClassificationMetadata, Annotation as PanoptesAnnotation } from '../types/panoptes';
 import { compressSegmentationMask } from "../utils/image/compressImageMask";
 
 
@@ -14,6 +14,10 @@ interface ClassificationState {
   subjectId: string | null;
   imageUrl: string | null;
   imageDimensions: { width: number; height: number } | null;
+
+  // Start and end times for classification
+  startedAt: string;
+  finishedAt: string | null;
 
   // Annotations (drawing layer)
   annotations: DrawingAnnotation[];
@@ -55,6 +59,8 @@ const initialState = {
   maskHistory: [],
   maskHistoryIndex: 0,
   debugImageUrl: null,
+  startedAt: new Date().toISOString(),
+  finishedAt: null,
 };
 
 export const useClassificationStore = create<ClassificationState>((set, get) => ({
@@ -205,8 +211,39 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
     return result;
   },
 
+  buildPanoptesClassification: async (projectId: string, workflowId: string) => {
+    const {subjectId, startedAt} = get();
+    if (!subjectId) throw new Error("No subject is set for classification");
+
+    const classificationMetaData: ClassificationMetadata = {
+      user_agent: navigator.userAgent,
+      started_at: startedAt,
+      finished_at: new Date().toISOString(),
+      user_language: navigator.language,
+      workflow_version: "1.0",
+    };
+
+    console.log(classificationMetaData);
+
+    const classification: Classification = {
+      metadata: classificationMetaData,
+      annotations: await get().buildPanoptesAnnotations(),
+      links: {
+        subjects: get().subjectId ? [get().subjectId!] : [],
+        workflow: workflowId,
+        project: projectId,
+      },
+    };
+
+    console.log(classification);
+
+    return classification;
+    
+  },
+
   reset: () => set(initialState),
 }));
+
 
 /**
  * Map drawing annotation to Panoptes annotation value format.

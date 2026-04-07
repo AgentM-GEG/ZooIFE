@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useMemo } from 'react';
 import styled from 'styled-components';
 import { theme } from './theme/zooniverseTheme';
 import { Login } from './components/Login/Login';
+import { UserProfile } from './components/UserProfile/UserProfile';
 import { ZooniverseImageLoader } from './components/ImageLoader/ZooniverseImageLoader';
 import { ImageCanvas } from './components/ImageCanvas/ImageCanvas';
 import { ToolPalette } from './components/ToolPalette/ToolPalette';
@@ -26,6 +27,13 @@ const Header = styled.header`
   border-bottom: ${theme.borders.width.thin} solid ${theme.colors.border};
   background-color: ${theme.colors.secondary};
   color: ${theme.colors.text.inverse};
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+`;
+
+const HeaderLeft = styled.div`
+  flex: 1;
 `;
 
 const HeaderTitle = styled.h1`
@@ -43,6 +51,11 @@ const HeaderSubtitle = styled.p`
 const HeaderContent = styled.div`
   display: flex;
   gap: ${theme.spacing.md};
+  align-items: center;
+`;
+
+const HeaderRight = styled.div`
+  display: flex;
   align-items: center;
 `;
 
@@ -211,12 +224,17 @@ function App() {
   return (
     <AppContainer>
       <Header>
-        <HeaderTitle>ZooIFE</HeaderTitle>
-        <HeaderSubtitle>Interactive Image Classification for Zooniverse</HeaderSubtitle>
-        <HeaderContent>
-          <Login />
-          <ZooniverseImageLoader />
-        </HeaderContent>
+        <HeaderLeft>
+          <HeaderTitle>ZooIFE</HeaderTitle>
+          <HeaderSubtitle>Interactive Image Classification for Zooniverse</HeaderSubtitle>
+          <HeaderContent>
+            <Login />
+            <ZooniverseImageLoader />
+          </HeaderContent>
+        </HeaderLeft>
+        <HeaderRight>
+          <UserProfile />
+        </HeaderRight>
       </Header>
       <Main>
         <LeftAside>
