@@ -1,5 +1,4 @@
-import { GraphQLClient } from 'graphql-request'
-import { useMemo } from 'react';
+import { GraphQLClient, gql } from 'graphql-request'
 import { headers, USE_STAGING_APIS } from '@/services/panoptesService'
 import { CaesarAnnotations } from '@/types/annotations';
 
@@ -44,28 +43,43 @@ interface CaesarWorkflowResponse {
 }
 
 /**
- * Create a memoized GraphQL client for Caesar API.
+ * GraphQL query for fetching subject reductions with proper variable substitution.
+ * Uses GraphQL variables to prevent injection vulnerabilities.
+ * 
+ * Note: workflowId and subjectId are ID types (strings) in the Caesar GraphQL schema
+ */
+const FETCH_REDUCTIONS_QUERY = gql`
+    query FetchSubjectReductions($workflowId: ID!, $subjectId: ID!, $reducerKey: String!) {
+        workflow(id: $workflowId) {
+            subject_reductions(subjectId: $subjectId, reducerKey: $reducerKey) {
+                data
+            }
+        }
+    }
+`;
+
+/**
+ * Create a GraphQL client for Caesar API.
  * @param token - Zooniverse authentication token
  * @param opts - Configuration options (staging, default tool type)
- * @returns Memoized GraphQL client for Caesar requests
+ * @returns Configured GraphQL client for Caesar requests
  */
-export function useCaesarClient(token: string | undefined, opts: CaesarReductionOptions) {
-    return useMemo(() => {
-        const url = opts.staging ? CAESAR_STAGING_BASE : CAESAR_API_BASE;
-        return new GraphQLClient(url, {
-            headers: headers(token, "application/json"),
-        });
-    }, [token]);
+export function createCaesarClient(token: string | undefined, opts: CaesarReductionOptions): GraphQLClient {
+    const url = opts.staging ? CAESAR_STAGING_BASE : CAESAR_API_BASE;
+    return new GraphQLClient(url, {
+        headers: headers(token, "application/json"),
+    });
 }
-
 
 /**
  * Fetch machine learning reductions for a subject from Caesar.
+ * Uses GraphQL variables to safely pass parameters.
  * @param caesarClient - GraphQL client configured for Caesar API
  * @param reducerKey - Type of reduction to fetch (e.g., "machineLearnt")
  * @param subjectID - Zooniverse subject ID to fetch reductions for
  * @param workflowID - Zooniverse workflow ID
- * @returns Promise resolving to array of subject reductions
+ * @returns Promise resolving to array of subject reductions, empty array on error
+ * @throws Error with context if request fails
  */
 export async function fetchCaesarReductions(
     caesarClient: GraphQLClient,
@@ -73,28 +87,44 @@ export async function fetchCaesarReductions(
     subjectID: string,
     workflowID: string
 ): Promise<SubjectReduction[]> {
-    if (!reducerKey) return [];
+    if (!reducerKey) {
+        console.warn('fetchCaesarReductions: reducerKey is required');
+        return [];
+    }
 
     try {
-        const query = `{
-                            workflow(id: ${workflowID}) {
-                            subject_reductions(subjectId: ${subjectID}, reducerKey: "${reducerKey}") {
-                                data
-                            }
-                            }
-                        }
-                        `;
+        // Validate IDs are present (they're passed as strings, which is what Caesar API expects)
+        if (!workflowID || !subjectID) {
+            throw new Error(
+                `Invalid workflow or subject ID: workflowID=${workflowID}, subjectID=${subjectID}`
+            );
+        }
 
-        console.log({ q: query.replace(/\s+/g, " ") });
-
+        console.debug('Fetching Caesar reductions:', {
+            workflowID,
+            subjectID,
+            reducerKey,
+        });
 
         const response = await caesarClient.request<CaesarWorkflowResponse>(
-            query.replace(/\s+/g, " ")
+            FETCH_REDUCTIONS_QUERY,
+            {
+                workflowId: workflowID,
+                subjectId: subjectID,
+                reducerKey: reducerKey,
+            }
         );
 
+        console.debug('Caesar reductions response:', response);
         return response.workflow?.subject_reductions ?? [];
     } catch (error) {
-        console.error(error);
+        const message = error instanceof Error ? error.message : String(error);
+        const errorDetails = error instanceof Error ? error : { error };
+        console.error(`Failed to fetch Caesar reductions for subject ${subjectID}:`, {
+            message,
+            details: errorDetails,
+            stack: error instanceof Error ? error.stack : undefined,
+        });
         return [];
     }
 }

@@ -1,3 +1,8 @@
+/**
+ * Token persistence and expiry tracking
+ */
+import { STORAGE } from '@/auth/constants';
+
 export type TokenSet = {
   access_token: string;
   refresh_token?: string;
@@ -7,8 +12,6 @@ export type TokenSet = {
 type StoredTokenSet = TokenSet & {
   token_expires_at?: number; // timestamp when token expires
 };
-
-const STORAGE_KEY = "zoo_tokens";
 
 let token: TokenSet | null = null;
 let tokenExpiresAt: number = 0; // timestamp in milliseconds
@@ -33,9 +36,9 @@ export function setToken(t: TokenSet | null) {
       ...t,
       token_expires_at: tokenExpiresAt,
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+    localStorage.setItem(STORAGE.TOKENS_KEY, JSON.stringify(stored));
   } else {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE.TOKENS_KEY);
   }
 }
 
@@ -53,7 +56,7 @@ export function getToken() {
  */
 export function loadTokenFromStorage(): TokenSet | null {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(STORAGE.TOKENS_KEY);
     if (!stored) return null;
 
     const parsed = JSON.parse(stored) as StoredTokenSet;
@@ -62,7 +65,7 @@ export function loadTokenFromStorage(): TokenSet | null {
     // Check if token has expired
     if (expiresAt && Date.now() > expiresAt) {
       // Token expired; clear storage
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE.TOKENS_KEY);
       return null;
     }
 
@@ -98,6 +101,6 @@ export function getTokenExpiry(): number {
 export function clearStorage() {
   token = null;
   tokenExpiresAt = 0;
-  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(STORAGE.TOKENS_KEY);
 }
 

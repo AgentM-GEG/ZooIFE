@@ -3,6 +3,8 @@
  * Calls locally hosted SAM2 backend (Python server with model checkpoints)
  */
 
+import { transformPoints, type CoordinateFix } from '@/utils/coordinates';
+
 export interface PointPrompt {
   x: number;
   y: number;
@@ -13,11 +15,6 @@ export interface Sam2Output {
   image?: { url: string; width?: number; height?: number };
   debug_url?: string;
 }
-
-/**
- * Coordinate transformation type for SAM2 point adjustments.
- */
-export type CoordinateFix = 'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY';
 
 export interface Sam2Options {
   debug?: boolean;
@@ -40,11 +37,13 @@ export const SEGMENT_MODELS = [
  * Segment image using point prompts.
  * Sends request to local SAM2 server (POST /api/sam2/segment).
  * Accepts image as URL or data URI (data:image/...;base64,...).
+ *
  * @param imageUrl - URL or data URI of image to segment
  * @param prompts - Array of point prompts (foreground/background)
  * @param baseUrl - Base URL for SAM2 server ('' for same-origin proxy)
  * @param options - Segmentation options (debug mode, coordinate fixes, model ID)
  * @returns Promise resolving to segmentation output with mask image and optional debug image
+ * @throws Error if segmentation request fails
  */
 export async function segmentWithPoints(
   imageUrl: string,
@@ -54,55 +53,39 @@ export async function segmentWithPoints(
 ): Promise<Sam2Output> {
   const { debug = false, imageSize, coordinateFix = 'none', modelId = 'sam2-hiera-large' } = options;
 
-  /**
-   * Apply coordinate transformation fix to point prompt.
-   * @param x - X coordinate
-   * @param y - Y coordinate
-   * @returns Transformed coordinate object
-   */
-  const applyFix = (x: number, y: number): { x: number; y: number } => {
-    let out = { x, y };
-    if (imageSize && coordinateFix !== 'none') {
-      const { width, height } = imageSize;
-      switch (coordinateFix) {
-        case 'flipX':
-          out = { x: width - 1 - x, y };
-          break;
-        case 'flipY':
-          out = { x, y: height - 1 - y };
-          break;
-        case 'flipBoth':
-          out = { x: width - 1 - x, y: height - 1 - y };
-          break;
-        case 'swapXY':
-          out = { x: y, y: x };
-          break;
-        default:
-          break;
-      }
-    }
-    return out;
-  };
-
-  const resolvedPrompts = prompts.map((p) => {
-    const { x, y } = applyFix(p.x, p.y);
-    return { x: Math.round(x), y: Math.round(y), label: p.label };
-  });
+  // Transform prompts using coordinate fix utility
+  const transformedPrompts = transformPoints(prompts, imageSize, coordinateFix);
 
   const url = baseUrl ? `${baseUrl}/api/sam2/segment` : '/api/sam2/segment';
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      image_url: imageUrl,
-      prompts: resolvedPrompts,
-      debug,
-      model_id: modelId,
-    }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail ?? err.error ?? `SAM2 error: ${res.status}`);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image_url: imageUrl,
+        prompts: transformedPrompts,
+        debug,
+        model_id: modelId,
+      }),
+    });
+
+    if (!response.ok) {
+      let errorMessage: string;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.detail ?? errorData.error ?? `HTTP ${response.status}`;
+      } catch {
+        errorMessage = `HTTP ${response.status}`;
+      }
+      throw new Error(`SAM2 segmentation failed: ${errorMessage}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(`SAM2 segmentation error: ${String(error)}`);
   }
-  return res.json();
 }

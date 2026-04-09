@@ -8,7 +8,11 @@ Interactive image classification frontend for **Zooniverse / Panoptes**, with **
 - **OAuth (dev)** — Small Python server exchanges the authorization code for tokens and returns them to the SPA via URL fragment.
 - **Annotation tools** — Point prompts (positive / negative for SAM), freehand polylines, brush strokes.
 - **SAM2** — Point-click segmentation via a **locally hosted** FastAPI server; Vite proxies `/api/sam2` to it.
+  - Each SAM-generated mask is added to undo/redo history as a single entry
+  - Can be undone like a brush stroke, then refined with additional points
 - **Mask editing** — When a SAM mask is shown, **Modify prediction** adds or subtracts on the overlay with undo/redo.
+  - Per-annotation mask history tracks every SAM result and brush stroke
+  - Composite display shows all visible masks at current undo/redo state
 - **Task sidebar** — Sample single/multiple choice and text tasks (workflow-driven tasks are not loaded yet).
 - **Panoptes-shaped export** — **Submit Classification** builds annotations (including a compressed segmentation mask) and logs JSON; posting to `POST /classifications` is implemented in code but not wired to the button yet.
 

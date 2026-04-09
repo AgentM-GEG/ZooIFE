@@ -1,30 +1,12 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from "react";
 import { Image as KonvaImage } from "react-konva";
 import type Konva from "konva";
-import type { KonvaEventObject } from "konva/lib/Node";
-import { useClassificationStore } from "@/stores/classificationStore"
-
-type BrushMode = "add" | "subtract";
-
-export interface BrushEditableImageHandle {
-  pointerDown: (e: KonvaEventObject<PointerEvent>) => void;
-  pointerMove: (e: KonvaEventObject<PointerEvent>) => void;
-  pointerUp: () => void;
-  undo: () => void;
-  redo: () => void;
-}
-
-interface BrushEditableImageProps
-  extends Omit<Konva.ImageConfig, "image"> {
-
-  image?: HTMLImageElement | null;
-  externalMask?: ImageData | HTMLImageElement | null;
-  enableBrush?: boolean;
-  brushRadius?: number;
-  brushMode?: BrushMode;
-  addColor?: string;
-  contentScale?: number;
-}
+import type { BrushEditableImageHandle } from "@/types/tools";
+import type { BrushEditableImageProps } from "./types";
+import { BRUSH_DEFAULTS, DRAWING_CONFIG } from "./constants";
+import { parseRGBA, sourceToImageData, applyColorToMask, normalizeAlpha } from "./brushUtils";
+import { useMaskHistory } from "./useMaskHistory";
+import { useClassificationStore } from "@/stores/classificationStore";
 
 /**
  * Brush-editable image component for interactive mask drawing and editing.
@@ -37,10 +19,10 @@ export const BrushEditableImage = forwardRef<
   BrushEditableImageHandle,
   BrushEditableImageProps
 >(({
-  enableBrush = false,
-  brushRadius = 20,
-  brushMode = "add",
-  addColor = "rgba(0,255,200,0.45)",
+  enableBrush = BRUSH_DEFAULTS.ENABLE_BRUSH,
+  brushRadius = BRUSH_DEFAULTS.BRUSH_RADIUS,
+  brushMode = BRUSH_DEFAULTS.BRUSH_MODE,
+  addColor = BRUSH_DEFAULTS.ADD_COLOR,
   image,
   externalMask,
   contentScale,
@@ -52,35 +34,14 @@ export const BrushEditableImage = forwardRef<
   const isDrawingRef = useRef(false);
   const lastPosRef = useRef<{ x: number; y: number } | null>(null);
   
-
   const [canvasImage] = useState(() => document.createElement("canvas"));
 
-  const { pushMaskHistory, undoMask, redoMask, maskHistory, maskHistoryIndex } =
-    useClassificationStore(s => ({
-      pushMaskHistory: s.pushMaskHistory,
-      undoMask: s.undoMask,
-      redoMask: s.redoMask,
-      maskHistory: s.maskHistory,
-      maskHistoryIndex: s.maskHistoryIndex,
-    }));
+  const {
+    handlePushMaskHistory,
+    handleUndoMask,
+    handleRedoMask,
+  } = useMaskHistory();
 
-
-  /**
-   * Parse RGBA color string into [R, G, B, A] components.
-   * @param rgba - RGBA color string (e.g., "rgba(0,255,200,0.45)")
-   * @returns Tuple of [red, green, blue, alpha] values 0-255
-   */
-  const parseRGBA = (rgba: string): [number, number, number, number] => {
-    const m = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+),?\s*([\d\.]+)?\)/);
-    if (!m) return [0, 255, 0, 0.45]; // fallback
-
-    return [
-      Number(m[1]),
-      Number(m[2]),
-      Number(m[3]),
-      Math.floor((Number(m[4] ?? 1)) * 255)
-    ];
-  }
 
   /**
    * Ensure a mask exists in history for add mode brush operations.
@@ -90,91 +51,51 @@ export const BrushEditableImage = forwardRef<
     if (brushMode !== "add") return;
 
     const store = useClassificationStore.getState();
-    const hasMask = store.maskHistory.length > 0;
+    const annotationId = store.activeAnnotationId || '-1';
+    const activeMaskState = store.perAnnotationMasks[annotationId];
+
+    const hasMask = activeMaskState && activeMaskState.history.length > 0;
 
     if (hasMask) return;
 
-    // Create a fully transparent mask with the correct size
     const ctx = canvasImage.getContext("2d")!;
     ctx.clearRect(0, 0, canvasImage.width, canvasImage.height);
   };
 
   useEffect(() => {
-    if (!externalMask) return;
+    if (!externalMask) {
+      // Clear the canvas when there's no external mask (e.g., historyIndex = -1)
+      const ctx = canvasImage.getContext("2d")!;
+      ctx.clearRect(0, 0, canvasImage.width, canvasImage.height);
+      imageRef.current?.getLayer()?.batchDraw();
+      return;
+    }
 
     const ctx = canvasImage.getContext("2d")!;
 
-    //
-    // ✅ Extract existing mask BEFORE resizing
-    //
-    let currentMask: ImageData | null = null;
-    if (canvasImage.width > 0 && canvasImage.height > 0) {
-      currentMask = ctx.getImageData(0, 0, canvasImage.width, canvasImage.height);
-      pushMaskHistory(currentMask);
-    }
+    // Convert externalMask to ImageData and get dimensions
+    const { data: extData, width: w, height: h } = sourceToImageData(externalMask);
 
-    //
-    // ✅ Convert externalMask (ImageData | HTMLImageElement) into ImageData
-    //
-    let extData: ImageData;
-    let w: number;
-    let h: number;
-
-    if (externalMask instanceof ImageData) {
-      extData = externalMask;
-      w = externalMask.width;
-      h = externalMask.height;
-    } else {
-      w = externalMask.width || externalMask.naturalWidth;
-      h = externalMask.height || externalMask.naturalHeight;
-
-      const temp = document.createElement("canvas");
-      temp.width = w;
-      temp.height = h;
-      const tctx = temp.getContext("2d")!;
-      tctx.drawImage(externalMask, 0, 0);
-      extData = tctx.getImageData(0, 0, w, h);
-    }
-
-    //
-    // ✅ Resize canvas AFTER extracting existing mask
-    //
+    // Resize canvas to match external mask
     canvasImage.width = w;
     canvasImage.height = h;
 
-    // If sizes mismatch, treat existing mask as empty
-    if (!currentMask || currentMask.width !== w || currentMask.height !== h) {
-      currentMask = ctx.createImageData(w, h);
-    }
-
-    //
-    // ✅ Apply addColor to external mask
-    //
-    const [r, g, b] = parseRGBA(addColor);
-
+    // Apply addColor to external mask and display it
+    const colorTuple = parseRGBA(addColor);
     const merged = ctx.createImageData(w, h);
-
-    for (let i = 0; i < merged.data.length; i += 4) {
-      const alpha = extData.data[i + 3] || currentMask.data[i + 3];
-
-      merged.data[i] = r;
-      merged.data[i + 1] = g;
-      merged.data[i + 2] = b;
-      merged.data[i + 3] = alpha;
-    }
+    applyColorToMask(merged, extData, colorTuple);
 
     ctx.putImageData(merged, 0, 0);
-    
-    pushMaskHistory(merged);
+
+    // NOTE: We do NOT push to history here. The externalMask is a display update
+    // (e.g., from undo/redo or switching annotations). Only user-initiated drawing
+    // (pointerUp) should create history entries.
 
     imageRef.current?.getLayer()?.batchDraw();
   }, [externalMask]);
 
 
 
-  //
-  // 1️⃣ Load initial image ONCE into persistent canvas
-  //
   useEffect(() => {
     if (!image) return;
 
@@ -186,7 +107,6 @@ export const BrushEditableImage = forwardRef<
     canvasImage.width = w;
     canvasImage.height = h;
 
-    // ⚠️ DO NOT draw base image into canvasImage.
     const ctx = canvasImage.getContext("2d")!;
     ctx.clearRect(0, 0, w, h);
 
@@ -194,46 +114,39 @@ export const BrushEditableImage = forwardRef<
   }, [image]);
 
 
-  //
-  // 2️⃣ Brush drawing modifies the persistent canvas
-  //
   /**
    * Draw brush stroke at pointer position.
    * Applies brush or eraser effect based on brushMode.
    * @param _e - Pointer event from Konva
    */
-  const drawAtPointer = (_e: KonvaEventObject<PointerEvent>) => {
+  const drawAtPointer = (_e: any) => {
     const ctx = canvasImage.getContext("2d")!;
     const imgNode = imageRef.current;
     if (!imgNode) return;
 
-    // Get LOCAL (image-space) pointer location
     const pos = imgNode.getRelativePointerPosition();
     if (!pos) return;
 
     if (brushMode === "add") {
-      ctx.globalCompositeOperation = "source-over";
+      ctx.globalCompositeOperation = DRAWING_CONFIG.ADD_COMPOSITE;
       ctx.strokeStyle = addColor;
     } else {
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.strokeStyle = "rgba(0,0,0,1)"; // stroke color irrelevant in erase mode
+      ctx.globalCompositeOperation = DRAWING_CONFIG.ERASE_COMPOSITE;
+      ctx.strokeStyle = DRAWING_CONFIG.ERASE_STROKE_COLOR;
     }
 
     const scale = contentScale ?? 1;
+    ctx.lineWidth = DRAWING_CONFIG.LINE_WIDTH_MULTIPLIER * brushRadius / scale;
+    ctx.lineCap = DRAWING_CONFIG.LINE_CAP;
+    ctx.lineJoin = DRAWING_CONFIG.LINE_JOIN;
 
-    ctx.lineWidth = 4 * brushRadius / scale;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    // If this is the first point, just move to it
     if (!lastPosRef.current) {
       lastPosRef.current = pos;
       ctx.beginPath();
       ctx.moveTo(pos.x, pos.y);
-      ctx.lineTo(pos.x, pos.y); // a dot
+      ctx.lineTo(pos.x, pos.y);
       ctx.stroke();
     } else {
-      // Draw a line from previous point to this point
       ctx.beginPath();
       ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
       ctx.lineTo(pos.x, pos.y);
@@ -242,100 +155,62 @@ export const BrushEditableImage = forwardRef<
     }
 
     if (isDrawingRef.current) {
-      // rewrite alpha
-
       const imgData = ctx.getImageData(0, 0, canvasImage.width, canvasImage.height);
-      const data = imgData.data;
-
-      for (let i = 0; i < data.length; i += 4) {
-        if (data[i + 3] > 0) {
-          data[i + 3] = Math.floor(255 * 0.45); // set alpha channel 
-        }
-      }
-
+      normalizeAlpha(imgData, DRAWING_CONFIG.STROKE_ALPHA);
       ctx.putImageData(imgData, 0, 0);
     }
+
     imageRef.current?.getLayer()?.batchDraw();
   };
 
 
 
-  //
-  // 3️⃣ Imperative brush API
-  //
   useImperativeHandle(ref, () => ({
-    /**
-     * Handle pointer down event - start brush drawing.
-     */
-    pointerDown: e => {
+    pointerDown: (e) => {
       if (!enableBrush) return;
 
-      // must be a real left-button PRESS, not synthetic or hover
       if (e.evt.buttons === 1 && !isDrawingRef.current) {
         ensureMaskExists();
         isDrawingRef.current = true;
 
-        const ctx = canvasImage.getContext("2d")!;
-        const snapshot = ctx.getImageData(0, 0, canvasImage.width, canvasImage.height);
-        pushMaskHistory(snapshot);
-
         drawAtPointer(e);
       }
     },
-    /**
-     * Handle pointer move event - continue brush drawing.
-     */
-    pointerMove: e => {
+    pointerMove: (e) => {
       if (!isDrawingRef.current) return;
       drawAtPointer(e);
     },
-    /**
-     * Handle pointer up event - end brush drawing.
-     */
     pointerUp: () => {
       if (isDrawingRef.current) {
         const ctx = canvasImage.getContext("2d")!;
         const snapshot = ctx.getImageData(0, 0, canvasImage.width, canvasImage.height);
-        pushMaskHistory(snapshot);
+        handlePushMaskHistory(snapshot);
       }
 
       isDrawingRef.current = false;
       lastPosRef.current = null;
     },
-    /**
-     * Undo last brush stroke.
-     */
     undo: () => {
       const ctx = canvasImage.getContext("2d")!;
-      console.log("Undo on canvas 1", [maskHistory, maskHistoryIndex]);
-      const restored = undoMask();
-      console.log("Undo on canvas 2", [maskHistory, maskHistoryIndex]);
+      const restored = handleUndoMask();
       if (!restored) return;
       ctx.putImageData(restored, 0, 0);
       imageRef.current?.getLayer()?.batchDraw();
     },
-    /**
-     * Redo last undone brush stroke.
-     */
     redo: () => {
       const ctx = canvasImage.getContext("2d")!;
-      console.log("Redo on canvas 1", [maskHistory, maskHistoryIndex]);
-      const restored = redoMask();
-      console.log("Redo on canvas 2", [maskHistory, maskHistoryIndex, restored]);
+      const restored = handleRedoMask();
       if (!restored) return;
       ctx.putImageData(restored, 0, 0);
       imageRef.current?.getLayer()?.batchDraw();
-    }
+    },
   }));
 
 
-  //
-  // 4️⃣ Render — always use the SAME canvas instance
-  //
   return (
     <KonvaImage
       ref={imageRef}
-      image={canvasImage}  // <--- stable canvas always
+      image={canvasImage}
       {...rest}
     />
   );

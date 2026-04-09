@@ -1,108 +1,57 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
-import styled from 'styled-components';
-import { theme } from './theme/zooniverseTheme';
 import { Login } from './components/Login/Login';
 import { UserProfile } from './components/UserProfile/UserProfile';
 import { ZooniverseImageLoader } from './components/ImageLoader/ZooniverseImageLoader';
-import { ImageCanvas } from './components/ImageCanvas/ImageCanvas';
+import ImageCanvas from './components/ImageCanvas/ImageCanvas';
 import { ToolPalette } from './components/ToolPalette/ToolPalette';
 import { TaskSidebar } from './components/TaskSidebar/TaskSidebar';
 import { segmentWithPoints } from './services/sam2Service';
 import { useClassificationStore } from './stores/classificationStore';
 import type { AnnotationTool } from './types/annotations';
-import { BrushEditableImageHandle } from "./components/ImageMask/BrushEditableImage";
+import type { BrushEditableImageHandle } from '@/types/tools';
+import {
+  AppContainer,
+  AppHeader,
+  HeaderLeft,
+  HeaderTitle,
+  HeaderSubtitle,
+  HeaderContent,
+  HeaderRight,
+  AppMain,
+  AppLeftAside,
+  CanvasSection,
+  AppRightAside,
+} from './theme/styles';
 
-// Styled components
-const AppContainer = styled.div`
-  min-height: 100vh;
-  background-color: ${theme.colors.background.default};
-  color: ${theme.colors.text.primary};
-  font-family: ${theme.typography.fontFamily};
-  display: flex;
-  flex-direction: column;
-`;
-
-const Header = styled.header`
-  padding: ${theme.spacing.lg};
-  border-bottom: ${theme.borders.width.thin} solid ${theme.colors.border};
-  background-color: ${theme.colors.secondary};
-  color: ${theme.colors.text.inverse};
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-`;
-
-const HeaderLeft = styled.div`
-  flex: 1;
-`;
-
-const HeaderTitle = styled.h1`
-  margin: 0;
-  font-size: ${theme.typography.heading.h2.fontSize};
-  font-weight: ${theme.typography.fontWeight.medium};
-`;
-
-const HeaderSubtitle = styled.p`
-  margin: ${theme.spacing.xs} 0 ${theme.spacing.md};
-  color: ${theme.colors.neutral.light};
-  font-size: ${theme.typography.size.sm};
-`;
-
-const HeaderContent = styled.div`
-  display: flex;
-  gap: ${theme.spacing.md};
-  align-items: center;
-`;
-
-const HeaderRight = styled.div`
-  display: flex;
-  align-items: center;
-`;
-
-const Main = styled.main`
-  display: flex;
-  gap: ${theme.spacing.xl};
-  padding: ${theme.spacing.xl};
-  align-items: flex-start;
-  flex: 1;
-  overflow: hidden;
-`;
-
-const LeftAside = styled.aside`
-  flex-shrink: 0;
-  width: 15%;
-  min-width: 280px;
-`;
-
-const CanvasSection = styled.section`
-  flex: 1;
-  min-width: 0;
-  overflow: auto;
-  max-height: calc(100vh - 120px);
-  background-color: ${theme.colors.background.surface};
-  border-radius: ${theme.borders.radius.lg};
-  box-shadow: ${theme.shadows.sm};
-`;
-
-const RightAside = styled.aside`
-  flex-shrink: 0;
-  width: 320px;
-`;
-
-// TODO: Move to another file
 /**
- * Create an SVG data URI for a circular brush cursor.
- * @param size - Brush size in pixels
- * @returns CSS cursor URL string for use in cursor property
+ * Convert a data URI image to ImageData for storage in mask history.
+ * 
+ * Used when SAM returns a segmentation mask as a PNG data URI.
+ * Converts it to ImageData so it can be stored in the per-annotation mask history
+ * and treated as a single undo/redo entry.
+ * 
+ * @param dataUri - Data URI string (e.g., "data:image/png;base64,...")
+ * @returns Promise resolving to ImageData
  */
-function makeSvgCursorUri(size: number) : string {
-  const prefix = "data:image/svg+xml";
-  const viewBoxSize = 2*size + 25;
-  const circleCentre = viewBoxSize/2
-  const circle_svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${viewBoxSize}" height="${viewBoxSize}" viewBox="0 0 ${viewBoxSize} ${viewBoxSize}"><circle cx="${circleCentre}" cy="${circleCentre}" r="${2*size}" fill="none" stroke="purple" stroke-width="1"/></svg>`;
-  const encoded_circle_svg = encodeURIComponent(circle_svg);
-  const circle_uri = `url(${prefix},${encoded_circle_svg}) ${circleCentre} ${circleCentre}, auto`;
-  return circle_uri;
+function dataUriToImageData(dataUri: string): Promise<ImageData> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      resolve(imageData);
+    };
+    img.onerror = () => reject(new Error('Failed to load image from data URI'));
+    img.src = dataUri;
+  });
 }
 
 /**
@@ -111,19 +60,36 @@ function makeSvgCursorUri(size: number) : string {
  */
 function App() {
   const [tool, setTool] = useState<AnnotationTool>('point');
-  const [brushUri, setBrushUri] = useState<string>(makeSvgCursorUri(5));
   const [brushSize, setBrushSize] = useState<number>(5);
   const [predModBrushSize, setPredModBrushSize] = useState<number>(5);
-  const [predModBrushUri, setPredModBrushUri] = useState<string>(makeSvgCursorUri(5));
   const [modelId, setModelId] = useState('sam1-vit_b');
   const [coordinateFix, setCoordinateFix] = useState<
     'none' | 'flipX' | 'flipY' | 'flipBoth' | 'swapXY'
   >('none');
   const [debugCoords, setDebugCoords] = useState(false);
   const [showPoints, setShowPoints] = useState(true);
-  const { imageUrl, annotations, undoLastAnnotation, setMask, setDebugImage, imageDimensions } =
-    useClassificationStore();
+  const {
+    imageUrl,
+    annotations,
+    undoLastAnnotation,
+    setDebugImage,
+    setPerAnnotationMask,
+    pushPerAnnotationMaskHistory,
+    imageDimensions,
+    activeAnnotationId,
+  } = useClassificationStore();
 
+  /**
+   * Handle undo of point annotations.
+   * When a point is undone, re-run SAM with remaining points to update mask.
+   * 
+   * This allows users to undo individual point clicks and see the mask update
+   * accordingly. The SAM mask stored in history is replaced with the new result.
+   * 
+   * Note: The mask history (SAM results + brush strokes) is separate from the
+   * annotation history (point clicks). Undoing a point updates the mask but
+   * doesn't undo mask refinements (those use mask undo/redo buttons).
+   */
   const handleUndo = useCallback(async () => {
     const removed = undoLastAnnotation();
     if (!removed) return;
@@ -132,8 +98,10 @@ function App() {
       .filter((a) => a.type === 'point')
       .map((a) => ({ x: a.x, y: a.y, label: (a as { label: 0 | 1 }).label }));
 
+    const currentAnnotationId = activeAnnotationId || '-1';
+
     if (points.length === 0) {
-      setMask(null);
+      setPerAnnotationMask(currentAnnotationId, null);
       setDebugImage(null);
       return;
     }
@@ -147,16 +115,40 @@ function App() {
       });
       if (debugCoords && result.debug_url) {
         setDebugImage(result.debug_url);
-        setMask(null);
+        setPerAnnotationMask(currentAnnotationId, null);
       } else {
         setDebugImage(null);
-        if (result.image?.url) setMask(result.image.url);
+        if (result.image?.url) {
+          // Convert SAM mask to ImageData and add to history
+          const maskUrl = result.image.url;
+          dataUriToImageData(maskUrl).then((imageData) => {
+            pushPerAnnotationMaskHistory(currentAnnotationId, imageData);
+            setPerAnnotationMask(currentAnnotationId, maskUrl);
+          }).catch((err) => {
+            console.warn('Failed to convert SAM mask to ImageData:', err);
+            setPerAnnotationMask(currentAnnotationId, maskUrl);
+          });
+        }
       }
     } catch (err) {
       console.warn('SAM2 not available:', err);
     }
-  }, [imageUrl, undoLastAnnotation, setMask, setDebugImage, imageDimensions, coordinateFix, debugCoords, modelId]);
+  }, [imageUrl, undoLastAnnotation, setPerAnnotationMask, setDebugImage, imageDimensions, coordinateFix, debugCoords, modelId, activeAnnotationId, pushPerAnnotationMaskHistory]);
 
+  /**
+   * Handle point click for SAM segmentation.
+   * Calls SAM with accumulated point prompts and stores resulting mask in history.
+   * 
+   * Flow:
+   * 1. Collect all existing points + new click
+   * 2. Call SAM server with point coordinates
+   * 3. Convert returned PNG data URI to ImageData
+   * 4. Push ImageData to per-annotation mask history as single entry
+   * 5. Display mask to canvas
+   * 
+   * Each SAM result counts as one undo/redo entry, even though SAM internally
+   * runs multiple iterations to generate the mask.
+   */
   const handlePointClick = useCallback(
     async (x: number, y: number, label: 0 | 1) => {
       if (!imageUrl) return;
@@ -167,6 +159,9 @@ function App() {
         { x, y, label },
       ];
       if (points.length === 0) return;
+
+      const currentAnnotationId = activeAnnotationId || '-1';
+
       try {
         const result = await segmentWithPoints(imageUrl, points, '', {
           debug: debugCoords,
@@ -177,21 +172,41 @@ function App() {
         if (debugCoords) {
           if (result.debug_url) {
             setDebugImage(result.debug_url);
-            setMask(null);
+            setPerAnnotationMask(currentAnnotationId, null);
           } else {
             setDebugImage(null);
             console.warn('Debug requested but no debug_url in response:', result);
-            if (result.image?.url) setMask(result.image.url);
+            if (result.image?.url) {
+              // Convert SAM mask to ImageData and add to history
+              const maskUrl = result.image.url;
+              dataUriToImageData(maskUrl).then((imageData) => {
+                pushPerAnnotationMaskHistory(currentAnnotationId, imageData);
+                setPerAnnotationMask(currentAnnotationId, maskUrl);
+              }).catch((err) => {
+                console.warn('Failed to convert SAM mask to ImageData:', err);
+                setPerAnnotationMask(currentAnnotationId, maskUrl);
+              });
+            }
           }
         } else {
           setDebugImage(null);
-          if (result.image?.url) setMask(result.image.url);
+          if (result.image?.url) {
+            // Convert SAM mask to ImageData and add to history
+            const maskUrl = result.image.url;
+            dataUriToImageData(maskUrl).then((imageData) => {
+              pushPerAnnotationMaskHistory(currentAnnotationId, imageData);
+              setPerAnnotationMask(currentAnnotationId, maskUrl);
+            }).catch((err) => {
+              console.warn('Failed to convert SAM mask to ImageData:', err);
+              setPerAnnotationMask(currentAnnotationId, maskUrl);
+            });
+          }
         }
       } catch (err) {
         console.warn('SAM2 not available:', err);
       }
     },
-    [imageUrl, annotations, setMask, setDebugImage, imageDimensions, coordinateFix, debugCoords, modelId]
+    [imageUrl, annotations, setPerAnnotationMask, setDebugImage, imageDimensions, coordinateFix, debugCoords, modelId, activeAnnotationId, pushPerAnnotationMaskHistory]
   );
 
   const [brushMode, setBrushMode] = useState("add");
@@ -200,16 +215,13 @@ function App() {
 
   const brushProps = useMemo(() => ({
     brushSize,
-    brushUri,
     predModBrushSize,
-    predModBrushUri,
     predModBrushMode: brushMode,
     predModBrushRef: brushRef,
-  }), [brushSize, brushUri, predModBrushSize, predModBrushUri, brushMode]);
+  }), [brushSize, predModBrushSize, brushMode]);
 
   const handleBrushSizeChange = useCallback((newBrushSize: number) => {
     setBrushSize(newBrushSize);
-    setBrushUri(makeSvgCursorUri(newBrushSize));
   }, []);
 
   const handlePredModBrushModeChange = useCallback((predModBrushMode: string) => {
@@ -218,12 +230,11 @@ function App() {
 
   const handlePredModBrushSizeChange = useCallback((newBrushSize: number) => {
     setPredModBrushSize(newBrushSize);
-    setPredModBrushUri(makeSvgCursorUri(newBrushSize));
   }, []);
 
   return (
     <AppContainer>
-      <Header>
+      <AppHeader>
         <HeaderLeft>
           <HeaderTitle>ZooIFE</HeaderTitle>
           <HeaderSubtitle>Interactive Image Classification for Zooniverse</HeaderSubtitle>
@@ -235,9 +246,9 @@ function App() {
         <HeaderRight>
           <UserProfile />
         </HeaderRight>
-      </Header>
-      <Main>
-        <LeftAside>
+      </AppHeader>
+      <AppMain>
+        <AppLeftAside>
           <ToolPalette
             tool={tool}
             onToolChange={setTool}
@@ -254,14 +265,14 @@ function App() {
             debugCoords={debugCoords}
             onDebugCoordsChange={setDebugCoords}
           />
-        </LeftAside>
+        </AppLeftAside>
         <CanvasSection>
           <ImageCanvas tool={tool} brushProps={brushProps} onPointClick={handlePointClick} onUndo={handleUndo} showPoints={showPoints} />
         </CanvasSection>
-        <RightAside>
+        <AppRightAside>
           <TaskSidebar />
-        </RightAside>
-      </Main>
+        </AppRightAside>
+      </AppMain>
     </AppContainer>
   );
 }

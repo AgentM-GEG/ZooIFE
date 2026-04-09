@@ -4,6 +4,7 @@
  */
 
 import type { Subject, Classification, Workflow } from '@/types/panoptes';
+import { apiCall, buildQueryString } from './apiClient';
 
 export const API_BASE = import.meta.env.VITE_PANOPTES_API_BASE || 'https://www.zooniverse.org/api';
 export const STAGING_BASE = import.meta.env.VITE_PANOPTES_STAGING_BASE || 'https://panoptes-staging.zooniverse.org/api';
@@ -27,7 +28,7 @@ if (SUBJECT_SET_ID) {
  * @param content_type - Content-Type header (default: JSON API format)
  * @returns Headers object for fetch requests
  */
-export function headers(token?: string, content_type :string = 'application/vnd.api+json; version=1'): HeadersInit {
+export function headers(token?: string, content_type: string = 'application/vnd.api+json; version=1'): HeadersInit {
   const h: HeadersInit = {
     Accept: 'application/vnd.api+json; version=1',
     'Content-Type': content_type,
@@ -61,13 +62,19 @@ export async function getQueuedSubjects(
     typeof opts === 'boolean' ? { staging: opts } : (opts ?? {});
   const { staging = false, subjectSetId } = options;
   const base = staging ? STAGING_BASE : API_BASE;
-  const params = new URLSearchParams({ workflow_id: workflowId });
-  if (subjectSetId) params.set('subject_set_id', subjectSetId);
-  const url = `${base}/subjects/queued?${params.toString()}`;  
-  const res = await fetch(url, { headers: headers(token) });  
-  if (!res.ok) throw new Error(`Subjects error: ${res.status}`);
-  const json = await res.json();
-  return json.subjects ?? [];
+
+  const queryString = buildQueryString({
+    workflow_id: workflowId,
+    subject_set_id: subjectSetId,
+  });
+
+  const response = await apiCall<{ subjects: Subject[] }>(
+    base,
+    `/subjects/queued${queryString}`,
+    { token }
+  );
+
+  return response.subjects ?? [];
 }
 
 /**
@@ -83,10 +90,14 @@ export async function getWorkflow(
   staging = false
 ): Promise<Workflow> {
   const base = staging ? STAGING_BASE : API_BASE;
-  const res = await fetch(`${base}/workflows/${workflowId}`, { headers: headers(token) });
-  if (!res.ok) throw new Error(`Workflow error: ${res.status}`);
-  const json = await res.json();
-  return json.workflows?.[0];
+
+  const response = await apiCall<{ workflows: Workflow[] }>(
+    base,
+    `/workflows/${workflowId}`,
+    { token }
+  );
+
+  return response.workflows?.[0];
 }
 
 /**
@@ -102,14 +113,18 @@ export async function createClassification(
   staging = false
 ): Promise<{ id: string }> {
   const base = staging ? STAGING_BASE : API_BASE;
-  const res = await fetch(`${base}/classifications`, {
-    method: 'POST',
-    headers: headers(token),
-    body: JSON.stringify({ classifications: classification }),
-  });
-  if (!res.ok) throw new Error(`Classification error: ${res.status}`);
-  const json = await res.json();
-  return { id: json.classifications?.[0]?.id };
+
+  const response = await apiCall<{ classifications: Array<{ id: string }> }>(
+    base,
+    '/classifications',
+    {
+      token,
+      method: 'POST',
+      body: { classifications: classification },
+    }
+  );
+
+  return { id: response.classifications?.[0]?.id ?? '' };
 }
 
 /**
@@ -122,14 +137,11 @@ export async function createClassification(
 export async function getUserDetails(userId: string, token?: string, staging = false) {
   const base = staging ? STAGING_BASE : API_BASE;
 
-  const res = await fetch(`${base}/users/${userId}`, {
-    headers: headers(token)
-  });
+  const response = await apiCall<{ users: unknown[] }>(
+    base,
+    `/users/${userId}`,
+    { token }
+  );
 
-  if (!res.ok) {
-    throw new Error(`User fetch error: ${res.status}`);
-  }
-
-  const json = await res.json();
-  return json.users?.[0]; // Panoptes returns { users: [...] }
+  return response.users?.[0];
 }

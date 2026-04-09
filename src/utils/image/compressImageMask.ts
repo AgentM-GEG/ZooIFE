@@ -188,3 +188,42 @@ export async function compressSegmentationMask(
 
     return cm;
 }
+
+/**
+ * Composite multiple ImageData masks by overlaying them on top of each other.
+ * Later masks in the array are drawn on top of earlier ones.
+ * 
+ * @param masks - Array of ImageData masks to composite (must all have same dimensions)
+ * @returns Composite ImageData with all masks overlaid, or null if empty array
+ */
+export function compositeImageDataMasks(masks: ImageData[]): ImageData | null {
+    if (masks.length === 0) return null;
+    if (masks.length === 1) return masks[0];
+
+    const firstMask = masks[0];
+    const { width, height } = firstMask;
+
+    // Create canvas for compositing
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d')!;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Overlay each mask on top
+    for (const mask of masks) {
+        if (mask.width !== width || mask.height !== height) {
+            console.warn(`[compositeImageDataMasks] Mask dimension mismatch: expected ${width}x${height}, got ${mask.width}x${mask.height}`);
+            continue;
+        }
+        ctx.putImageData(mask, 0, 0);
+    }
+
+    // Get composite result
+    const composite = ctx.getImageData(0, 0, width, height);
+    console.log(`[compositeImageDataMasks] Composited ${masks.length} masks, result=${width}x${height}`);
+    
+    return composite;
+}

@@ -1,45 +1,6 @@
-import styled from 'styled-components';
 import { useUserStore } from '@/stores/userStore';
-import { theme } from '@/theme/zooniverseTheme';
-
-const UserProfileContainer = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.sm};
-`;
-
-const Avatar = styled.img`
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid ${theme.colors.text.inverse};
-`;
-
-const DefaultAvatar = styled.div`
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 2px solid ${theme.colors.text.inverse};
-  background-color: ${theme.colors.neutral.dark};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-
-  svg {
-    width: 20px;
-    height: 20px;
-    color: ${theme.colors.text.inverse};
-  }
-`;
-
-const DisplayName = styled.span`
-  font-size: ${theme.typography.size.sm};
-  font-weight: ${theme.typography.fontWeight.medium};
-  color: ${theme.colors.text.inverse};
-  white-space: nowrap;
-`;
+import { UserProfileContainer, Avatar, DefaultAvatar, DisplayName } from './styled';
+import { DEFAULT_AVATAR_ICON_SIZE } from './constants';
 
 /**
  * Displays the logged-in user's profile info in the header.
@@ -70,6 +31,8 @@ export function UserProfile() {
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            width={DEFAULT_AVATAR_ICON_SIZE}
+            height={DEFAULT_AVATAR_ICON_SIZE}
           >
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
             <circle cx="12" cy="7" r="4" />
