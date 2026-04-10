@@ -2,21 +2,29 @@ import { create } from 'zustand';
 import type { DrawingAnnotation } from '@/types/annotations';
 import type { Classification, ClassificationMetadata, Annotation as PanoptesAnnotation } from '@/types/panoptes';
 import { compressSegmentationMask } from '@/utils/image/compressImageMask';
+import { getSimpleComposite } from '@/utils/image/maskCompositing';
 import { PROJECT_ID, WORKFLOW_ID } from '@/services/panoptesService';
-import { CLASSIFICATION_TASKS } from '@/stores/constants';
 import { loggers } from '@/utils/logger';
 
 /**
  * Single entry in mask history - tracks origin (SAM or brush stroke)
  * 
  * Types:
- * - 'sam': SAM model prediction. Includes raw prediction in samPredictionRaw.
- * - 'modifier_brush': User brush stroke (either regular brush or refinement). Does not include samPredictionRaw.
+ * - 'sam': SAM model prediction. Contains raw model output (no pre-compositing).
+ * - 'modifier_brush': User brush stroke (either regular brush or refinement).
+ * 
+ * IMPORTANT: Storage vs Display
+ * - Storage: imageData contains ONLY the raw atomic mask (SAM or brush)
+ * - Display: User sees composite of all masks up to historyIndex (calculated at display time)
+ * - Export: Composite calculated fresh from all entries (bitwise OR)
+ * 
+ * This separation ensures:
+ * 1. Clean undo/redo (each entry is atomic)\n * 2. Correct export composites (per-rect not accumulating across rects)
+ * 3. Accurate mask type tracking (SAM vs brush vs composite)
  */
 export interface HistoryEntry {
   type: 'sam' | 'modifier_brush';
-  imageData: ImageData;
-  samPredictionRaw?: ImageData; // Only for 'sam' entries: raw SAM prediction before compositing
+  imageData: ImageData; // Raw atomic mask (SAM prediction or brush stroke)
 }
 
 /**
@@ -499,25 +507,97 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
 
     const result: PanoptesAnnotation[] = [];
 
-    // Per-annotation masks with metadata (including "-1" for unmarked objects)
-    for (const [annotationId, maskState] of Object.entries(perAnnotationMasks)) {
-      if (maskState.history.length > 0 && maskState.historyIndex < maskState.history.length) {
-        const entry = maskState.history[maskState.historyIndex];
-        const compressedPerAnnotationMask = await compressSegmentationMask(entry.imageData);
-        result.push({
-          task: `${CLASSIFICATION_TASKS.PER_ANNOTATION_MASK}-${annotationId}`,
-          value: {
-            compressedMask: compressedPerAnnotationMask,
-            annotationId,
-          },
-        });
+    // Build per-rect annotations with SAM points, latest SAM mask, and composite mask
+    const rectAnnotations: Array<{
+      annotationId: string;
+      samPoints: Array<{ x: number; y: number; label: 0 | 1; pointId: number }>;
+      latestSamMask: any; // CompressedMask or null
+      compositeMask: any;  // CompressedMask or null
+    }> = [];
+
+    // Get all unique annotationIds from point annotations (to include rects with only points, no masks yet)
+    // Normalize all ids to strings for consistency - Caesar IDs may be numbers, but we export as strings
+    const annotationIdsWithPoints = new Set(
+      annotations
+        .filter((a) => a.type === 'point')
+        .map((p) => String(p.annotationId ?? '-1'))
+    );
+
+    // Combine: all rects with masks + all rects with only points
+    // Normalize perAnnotationMasks keys to strings as well
+    const allAnnotationIds = new Set([
+      ...Object.keys(perAnnotationMasks).map(id => String(id)),
+      ...annotationIdsWithPoints,
+    ]);
+
+    // Process each annotation (rect or "-1" for unmarked)
+    for (const annotationId of allAnnotationIds) {
+      const maskState = perAnnotationMasks[annotationId];
+
+      // 1. Collect SAM points for this rect with pointId (order of placement)
+      // Normalize comparison to string since annotationId may be stored as number from Caesar
+      const rectPoints = annotations.filter(
+        (a): a is Extract<typeof a, { type: 'point'; annotationId?: string }> =>
+          a.type === 'point' && String(a.annotationId ?? '-1') === annotationId
+      );
+      const samPoints = rectPoints.map((p, idx) => ({
+        x: p.x,
+        y: p.y,
+        label: p.label,
+        pointId: idx,
+      }));
+
+      // If no points and no mask history, skip this rect
+      if (samPoints.length === 0 && (!maskState || maskState.history.length === 0)) {
+        continue;
       }
+
+      // 2. Get latest SAM mask at historyIndex (if mask history exists)
+      // Searches backwards through history to find the most recent 'sam' type entry
+      // This extracts the raw SAM prediction (not composited with modifiers)
+      let latestSamMask: any = null;
+      if (maskState && maskState.history.length > 0) {
+        const historyUpToNow = maskState.history.slice(0, maskState.historyIndex + 1);
+        for (let i = historyUpToNow.length - 1; i >= 0; i--) {
+          if (historyUpToNow[i].type === 'sam') {
+            latestSamMask = await compressSegmentationMask(historyUpToNow[i].imageData, 'gzip-base64', 'sam');
+            break;
+          }
+        }
+      }
+
+      // 3. Get composite mask at historyIndex (if mask history exists)
+      // Composite = bitwise OR of all masks (both SAM and brush strokes) up to historyIndex
+      // Uses getSimpleComposite (same function as display) to ensure consistency
+      let compositeMask: any = null;
+      if (maskState && maskState.history.length > 0) {
+        const historyUpToNow = maskState.history.slice(0, maskState.historyIndex + 1);
+        const compositeImageData = getSimpleComposite(historyUpToNow, maskState.historyIndex);
+        compositeMask = compositeImageData ? await compressSegmentationMask(compositeImageData, 'gzip-base64', 'composite') : null;
+      }
+
+      rectAnnotations.push({
+        annotationId,
+        samPoints,
+        latestSamMask,
+        compositeMask,
+      });
     }
 
-    // Drawing annotations
-    annotations.forEach((a, i) => {
+    // Add rect annotations as a single task
+    if (rectAnnotations.length > 0) {
       result.push({
-        task: `drawing-${i}`,
+        task: 'rect-annotations',
+        value: rectAnnotations,
+      });
+    }
+
+    // Drawing annotations (exclude point annotations - they're already in rect-annotations)
+    let drawingIndex = 0;
+    annotations.forEach((a) => {
+      if (a.type === 'point') return; // Skip points, they're in rect-annotations
+      result.push({
+        task: `drawing-${drawingIndex++}`,
         value: mapAnnotationToValue(a),
       });
     });

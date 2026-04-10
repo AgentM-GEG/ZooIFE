@@ -15,8 +15,7 @@ Masks are stored in the `classificationStore` with the following structure:
 ```typescript
 interface HistoryEntry {
   type: 'sam' | 'modifier_brush';
-  imageData: ImageData;
-  samPredictionRaw?: ImageData; // Only for 'sam' entries
+  imageData: ImageData;  // Raw atomic mask (SAM prediction or brush stroke)
 }
 
 interface PerAnnotationMaskState {

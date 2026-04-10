@@ -62,6 +62,25 @@ High-level system architecture with diagrams and component relationships. Start 
 - Learning React hooks patterns
 - Checking component prop signatures
 
+#### [CLASSIFICATION_EXPORT.md](CLASSIFICATION_EXPORT.md) ⭐
+**Complete reference for classification export format and rect-annotations** — Data structures, examples, and processing guidelines.
+
+**Key sections**:
+- Rect annotations structure (primary format)
+- Drawing annotations and task answers
+- CompressedMask format and encoding options
+- Example classifications
+- Backend processing guidelines
+- Compression and mask decoding examples
+- FAQ
+
+**Use this when**:
+- Exporting classifications to Panoptes
+- Understanding the annotation data structure
+- Processing compressed masks
+- Integrating with backend systems
+- Analyzing user annotations programmatically
+
 ### Debugging & Troubleshooting
 
 #### [HOOKS_DEBUGGING.md](HOOKS_DEBUGGING.md) ⭐ 
@@ -113,6 +132,12 @@ High-level system architecture with diagrams and component relationships. Start 
 3. Check [COMPONENTS.md](COMPONENTS.md) for using `useAuth()` hook
 4. Review configuration in [AUTH.md](AUTH.md) constants section
 
+### I'm a **Backend Developer** working with classifications
+1. Start with [CLASSIFICATION_EXPORT.md](CLASSIFICATION_EXPORT.md) — Understand the export format
+2. Learn about rect-annotations structure and CompressedMask encoding
+3. Use the decoding examples for processing masks
+4. Review the complete classification example and FAQ
+
 ### I'm **Debugging an Error**
 1. If it's a React hooks error → [HOOKS_DEBUGGING.md](HOOKS_DEBUGGING.md)
 2. If it's an API error → [SERVICES.md](SERVICES.md)
@@ -134,6 +159,7 @@ High-level system architecture with diagrams and component relationships. Start 
 | [AUTH.md](AUTH.md) | Authentication system reference | 400+ lines | All developers using login |
 | [SERVICES.md](SERVICES.md) | Services architecture reference | 450+ lines | Developers working with APIs |
 | [COMPONENTS.md](COMPONENTS.md) | Component and hooks reference | 400+ lines | Frontend developers |
+| [CLASSIFICATION_EXPORT.md](CLASSIFICATION_EXPORT.md) | Classification export format reference | 500+ lines | Backend developers, data analysts |
 | [HOOKS_DEBUGGING.md](HOOKS_DEBUGGING.md) | React hooks guide | 500+ lines | All developers using hooks |
 | [REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md) | What changed and why | 300+ lines | Code reviewers, maintainers |
 | [SOLUTION_ARCHITECTURE.md](SOLUTION_ARCHITECTURE.md) | System architecture | Varies | System designers, architects |

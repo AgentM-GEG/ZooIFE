@@ -131,6 +131,27 @@ Coordinates must be **normalized** (0–1) or stored with image dimensions for Z
 
 **Setup:** Clone [facebookresearch/sam2](https://github.com/facebookresearch/sam2), install with `pip install -e ./sam2`, then run `python server/sam2_server.py`.
 
+### 4.3b Mask Layer Architecture
+
+The canvas uses a multi-layer approach to support per-annotation mask editing while displaying a global reference context:
+
+| Layer | Purpose | Opacity | Editable |
+|-------|---------|---------|----------|
+| **Base Image** | Subject image | 1.0 | No |
+| **Composite Reference** | Global composite showing all visible masks | 0.9 | No |
+| **Per-Annotation Editable** | Current annotation's mask for brush editing | 1.0 | Yes |
+| **Annotation Overlays** | Points, lines, Caesar marks | Varies | No |
+| **Debug Layers** (optional) | Debug visualizations | Varies | No |
+
+**Key Design Decisions:**
+
+- **Per-Annotation Masks:** Each annotation (rect or whole-image "-1") maintains its own mask history with full undo/redo support. Masks are stored in `classificationStore` with `{ maskUrl, history[], historyIndex }`.
+- **Composite Reference (0.9 opacity):** A semi-transparent overlay computed from all visible per-annotation masks. Provides visual context while editing one annotation. The 0.9 opacity level distinguishes it from active rect marks; the underlying mask pixels already contain alpha channel values.
+- **Brush Editing:** Only the current per-annotation mask can be edited. Brush strokes add/remove pixels from the editable layer only, preventing cross-contamination with other rects' masks.
+- **Export:** When saving classifications, each annotation exports only its own per-annotation mask (from its history), not the global composite. This ensures clean, rect-specific segmentation data.
+
+**Rationale:** This separation allows users to see the context of related annotations while ensuring that modifications to one rect do not contaminate the stored masks of other rects.
+
 ### 4.4 Task Sidebar
 
 Mirror **Panoptes workflow tasks**:

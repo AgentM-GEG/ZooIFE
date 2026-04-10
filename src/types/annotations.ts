@@ -36,7 +36,7 @@ export interface PointAnnotation {
   y: number;
   label: 0 | 1; // 0 = background, 1 = foreground
   id?: string;
-  annotationId?: string; // Which rect these prompts apply to ('-1' = whole image)
+  annotationId?: string; // Which rect this point belongs to ('-1' = whole image)
 }
 
 /**
@@ -54,6 +54,7 @@ export interface PolylineAnnotation {
   type: 'polyline';
   points: Array<{ x: number; y: number }>;
   id?: string;
+  annotationId?: string; // Which rect this polyline belongs to ('-1' = whole image)
 }
 
 /**
@@ -91,6 +92,7 @@ export interface BrushAnnotation {
   type: 'brush';
   strokes: BrushStroke[];
   id?: string;
+  annotationId?: string; // Which rect this brush belongs to ('-1' = whole image)
 }
 
 /**
@@ -117,6 +119,7 @@ export interface Sam2MaskAnnotation {
   maskUrl?: string;
   prompts: Array<{ x: number; y: number; label: 0 | 1 }>;
   id?: string;
+  annotationId?: string; // Which rect this mask belongs to ('-1' = whole image)
 }
 
 /**

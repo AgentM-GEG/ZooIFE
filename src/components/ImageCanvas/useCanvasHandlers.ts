@@ -120,7 +120,9 @@ export function useCanvasHandlers(props: UseCanvasHandlersProps) {
       const { x, y } = pointerToImage(pos);
 
       if (tool === 'point') {
-        addAnnotation({ type: 'point', x, y, label: 1, annotationId: selectedCaesarAnnotation || '-1' });
+        // Normalize annotationId to string - Caesar IDs may be numbers, but we store as strings
+        // for consistent serialization in classification export
+        addAnnotation({ type: 'point', x, y, label: 1, annotationId: selectedCaesarAnnotation ? String(selectedCaesarAnnotation) : '-1' });
         const newPoint = { x, y, label: 1 };
         loggers.canvas('[handleStageClick] Adding positive point (left-click):', newPoint);
         onPointClick?.(x, y, 1);
@@ -146,7 +148,9 @@ export function useCanvasHandlers(props: UseCanvasHandlersProps) {
       const pos = stageRef.current.getPointerPosition();
       if (!pos) return;
       const { x, y } = pointerToImage(pos);
-      addAnnotation({ type: 'point', x, y, label: 0, annotationId: selectedCaesarAnnotation || '-1' });
+      // Normalize annotationId to string - Caesar IDs may be numbers, but we store as strings
+      // for consistent serialization in classification export
+      addAnnotation({ type: 'point', x, y, label: 0, annotationId: selectedCaesarAnnotation ? String(selectedCaesarAnnotation) : '-1' });
       const newPoint = { x, y, label: 0 };
       loggers.canvas('[handleContextMenu] Adding negative point (right-click):', newPoint);
       onPointClick?.(x, y, 0);
@@ -177,16 +181,18 @@ export function useCanvasHandlers(props: UseCanvasHandlersProps) {
    */
   const handleStageMouseUp = useCallback(() => {
     if (isPanMode) return;
+    // Normalize annotationId to string - Caesar IDs may be numbers, but we store as strings
+    // for consistent serialization in classification export
     if (tool === 'freehand' && drawingPoints.length > 1) {
-      addAnnotation({ type: 'polyline', points: [...drawingPoints] });
+      addAnnotation({ type: 'polyline', points: [...drawingPoints], annotationId: selectedCaesarAnnotation ? String(selectedCaesarAnnotation) : '-1' });
       setDrawingPoints([]);
     } else if (tool === 'brush' && drawingPoints.length > 1) {
-      addAnnotation({ type: 'brush', strokes: [{ points: [...drawingPoints], radius: 2 * brushProps.brushSize }] });
+      addAnnotation({ type: 'brush', strokes: [{ points: [...drawingPoints], radius: 2 * brushProps.brushSize }], annotationId: selectedCaesarAnnotation ? String(selectedCaesarAnnotation) : '-1' });
       setDrawingPoints([]);
     } else if ((tool === 'freehand' || tool === 'brush') && drawingPoints.length <= 1) {
       setDrawingPoints([]);
     }
-  }, [tool, drawingPoints, addAnnotation, isPanMode, brushProps.brushSize, setDrawingPoints]);
+  }, [tool, drawingPoints, addAnnotation, isPanMode, brushProps.brushSize, setDrawingPoints, selectedCaesarAnnotation]);
 
   /**
    * Increase zoom level by ZOOM_STEP.

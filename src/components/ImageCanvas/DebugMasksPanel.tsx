@@ -35,7 +35,7 @@ const ControlsRow = styled.div`
 const ControlLabel = styled.label`
   font-size: ${theme.typography.size.sm};
   color: ${theme.colors.text.secondary};
-  font-weight: ${theme.typography.fontWeight.semibold};
+  font-weight: ${theme.typography.fontWeight.medium};
 `;
 
 const Select = styled.select`

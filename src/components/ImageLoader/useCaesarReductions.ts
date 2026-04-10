@@ -55,7 +55,7 @@ export function useCaesarReductions(
                 y_center: b.y_center,
                 width: b.width,
                 height: b.height,
-                markId: b.markId ?? crypto.randomUUID(),
+                markId: b.markId ? String(b.markId) : crypto.randomUUID(),
                 markColour: markTool.color,
                 markLabel: markTool.label,
               };

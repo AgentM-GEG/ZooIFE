@@ -27,6 +27,12 @@ export interface Sam2Output {
     url: string;
     is_selected: boolean;
   }>;
+  debug_crop?: {
+    crop_x0: number;
+    crop_y0: number;
+    crop_w: number;
+    crop_h: number;
+  };
 }
 
 export interface Sam2Options {

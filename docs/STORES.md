@@ -207,8 +207,36 @@ annotations: DrawingAnnotation[]; // User-drawn marks
 
 Each annotation has:
 - `type`: 'point' | 'polyline' | 'brush' | 'sam2_mask'
+- `annotationId?: string` — Which rect this annotation belongs to (`'-1'` = unmarked)
 - Position/shape data specific to type
 - Auto-assigned `id` (UUID)
+
+**Example point annotation:**
+```typescript
+{
+  type: 'point',
+  x: 150,
+  y: 200,
+  label: 1,                          // 0 = background, 1 = foreground
+  id: 'uuid-123',                    // Auto-assigned
+  annotationId: 'caesar-rect-456'    // or '-1' for unmarked
+}
+```
+
+**Example brush annotation:**
+```typescript
+{
+  type: 'brush',
+  strokes: [
+    {
+      points: [{x: 10, y: 20}, {x: 15, y: 25}, ...],
+      radius: 10
+    }
+  ],
+  id: 'uuid-789',
+  annotationId: '-1'  // Whole image, no specific rect
+}
+```
 
 #### Task Answers
 
@@ -431,23 +459,191 @@ saveMask('annotation-uuid');
 
 **`buildPanoptesAnnotations(): Promise<PanoptesAnnotation[]>`**
 
-Build Panoptes-compatible annotations array from current state.
+Build Panoptes-compatible annotations array from current classification state.
 
-Includes:
-- Global segmentation mask (task: 'segmentation-mask')
-- Per-annotation masks (task: 'segmentation-mask-{annotationId}')
-- Drawing annotations (task: 'drawing-{index}')
-- Task answers (task: {taskId})
+Exports:
+1. **Rect Annotations** (task: `'rect-annotations'`) - Comprehensive per-rect data
+2. **Drawing Annotations** (task: `'drawing-{index}'`) - User-drawn marks
+3. **Task Answers** (task: `{taskId}`) - Sidebar task responses
 
 ```typescript
 const { buildPanoptesAnnotations } = useClassificationStore();
 const annotations = await buildPanoptesAnnotations();
 // [
-//   { task: 'segmentation-mask', value: {...} },
+//   {
+//     task: 'rect-annotations',
+//     value: [
+//       {
+//         annotationId: 'caesar-rect-123',
+//         samPoints: [...],
+//         latestSamMask: {...},
+//         compositeMask: {...},
+//       },
+//       {
+//         annotationId: '-1',  // unmarked objects
+//         samPoints: [...],
+//         latestSamMask: {...},
+//         compositeMask: {...},
+//       }
+//     ]
+//   },
 //   { task: 'drawing-0', value: {...} },
 //   { task: 'species-id', value: 'monarch' },
 // ]
 ```
+
+See [Rect-Annotations Structure](#rect-annotations-structure) below for detailed format.
+
+---
+
+## Rect-Annotations Structure
+
+Per-rect annotations bundle all SAM-related data for each classified region (Caesar rectangle or unmarked object).
+
+### Motivation
+
+Encapsulates one annotation per rectangle, containing:
+1. **SAM points** placed for that rect
+2. **Latest SAM mask** from the most recent SAM prediction
+3. **Composite mask** at current undo/redo position
+
+This enables analysis of mask refinement, point effectiveness, and modifier brush impact per rect.
+
+### Format
+
+```typescript
+interface RectAnnotation {
+  annotationId: string;  // Caesar rect ID or '-1' for unmarked
+  samPoints: Array<{
+    x: number;
+    y: number;
+    label: 0 | 1;       // 0 = background, 1 = foreground
+  }>;
+  latestSamMask: CompressedMask | null;   // Most recent SAM prediction
+  compositeMask: CompressedMask | null;   // Current composite at historyIndex
+}
+
+interface CompressedMask {
+  width: number;
+  height: number;
+  rle: number[] | string;  // RLE-encoded binary mask (default: gzip-base64)
+  encoding: 'array' | 'base64' | 'gzip-base64';
+  maskType: 'sam' | 'modifier_brush' | 'composite';  // Origin of mask
+}
+```
+
+### annotationId
+
+- **Caesar rectangle ID** (e.g., `'mark_123'`) — Masks for specific bounding boxes
+- **`'-1'`** — Whole image masks or artifacts/contaminants (no specific rect selected)
+
+### samPoints Array
+
+All foreground (label: 1) and background (label: 0) SAM prompts placed for this rect, in order of placement.
+
+**Structure:**
+```typescript
+{
+  x: number;              // X coordinate in image
+  y: number;              // Y coordinate in image
+  label: 0 | 1;           // 0 = background, 1 = foreground
+  pointId: number;        // Index (0-based) showing order placed for this rect
+}
+```
+
+**Example:**
+```json
+{
+  "annotationId": "caesar-rect-456",
+  "samPoints": [
+    { "x": 150, "y": 200, "label": 1, "pointId": 0 },  // First point
+    { "x": 50, "y": 50, "label": 0, "pointId": 1 }     // Second point
+  ],
+  ...
+}
+```
+
+**pointId use cases:**
+- Replay point placement sequence
+- Audit decision-making process
+- Debug SAM prompt effectiveness by order
+
+### latestSamMask
+
+The most recent SAM2 prediction mask for this rect (searching history backwards).
+
+- **null** if no SAM predictions exist for this rect
+- **CompressedMask** in gzip-base64 format (default)
+
+**CompressedMask structure:**
+```typescript
+{
+  width: number;                      // Image width in pixels
+  height: number;                     // Image height in pixels
+  encoding: 'array' | 'base64' | 'gzip-base64';  // Compression format
+  maskType: 'sam' | 'modifier_brush' | 'composite';  // Origin of mask
+  rle: number[] | string;             // RLE-encoded binary mask
+}
+```
+
+**maskType field:**
+- `'sam'` — Mask came from SAM2 model prediction
+- `'modifier_brush'` — Mask is a user brush stroke refinement
+- `'composite'` — Mask is bitwise OR of all masks (SAM + brush) up to historyIndex
+
+Use maskType to identify which masks are model predictions vs user edits.
+
+**Encoding types:**
+- `'array'` — RLE as number array, smallest code size
+- `'base64'` — RLE bytes base64-encoded, medium size
+- `'gzip-base64'` — (Default) RLE bytes gzipped then base64, smallest transmission size
+
+The combined mask at current undo/redo history position:
+- **SAM mask + all modifier brush strokes** applied up to `historyIndex`
+- **null** if no history for this rect
+
+Represents the final user-approved segmentation state.
+
+### Full Example
+
+```json
+{
+  "task": "rect-annotations",
+  "value": [
+    {
+      "annotationId": "caesar-rect-abc123",
+      "samPoints": [
+        { "x": 200, "y": 300, "label": 1 },
+        { "x": 150, "y": 150, "label": 0 }
+      ],
+      "latestSamMask": {
+        "width": 800,
+        "height": 600,
+        "encoding": "gzip-base64",
+        "rle": "H4sIAB5K4WYC..."
+      },
+      "compositeMask": {
+        "width": 800,
+        "height": 600,
+        "encoding": "gzip-base64",
+        "rle": "H4sIAB5K4WYC..."
+      }
+    },
+    {
+      "annotationId": "-1",
+      "samPoints": [
+        { "x": 400, "y": 200, "label": 1 }
+      ],
+      "latestSamMask": null,
+      "compositeMask": null
+    }
+  ]
+}
+```
+
+In this example:
+- First rect (caesar-rect-abc123) has 2 SAM points, latest prediction, and composite from edits
+- Unmarked object rect ('-1') has 1 point but no predictions or edits yet
 
 **`buildPanoptesClassification(projectId?, workflowId?): Promise<Classification>`**
 

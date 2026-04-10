@@ -37,6 +37,20 @@ import { theme } from '@/theme/zooniverseTheme';
  * Supports multiple annotation tools (points, freehand drawing, brush editing), pan/zoom controls,
  * Caesar overlay annotations, and mask editing.
  *
+ * Layer Architecture:
+ * 1. Base image layer (subject image)
+ * 2. Global composite reference layer (0.9 opacity) - semi-transparent overlay showing all visible masks
+ *    (opacity 0.9 to distinguish from active rect marks; pixels already have alpha channel)
+ * 3. Brush-editable layer - per-annotation mask that can be edited with brush strokes
+ * 4. Annotation overlay (points, lines, Caesar marks)
+ * 5. Debug layers (when enabled)
+ *
+ * Mask Management:
+ * - Each annotation stores separate per-annotation masks with full editing history (SAM + brush strokes)
+ * - Global composite mask computed on-the-fly from all visible per-annotation masks
+ * - Composite reference layer displays cumulative masks for context while editing a specific annotation
+ * - Saves export only the per-annotation mask (not contaminated by other rects' masks)
+ *
  * Major optimizations:
  * - Separate Zustand store selectors to minimize re-renders
  * - Memoized sub-components (AnnotationRenderer, CanvasToolbar)
@@ -89,6 +103,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const [brushCursorPos, setBrushCursorPos] = useState({ x: 0, y: 0 });
   const [isCursorOverCanvas, setIsCursorOverCanvas] = useState(false);
   const [isHoveringOverRect, setIsHoveringOverRect] = useState(false);
+  const [compositeImageElement, setCompositeImageElement] = useState<HTMLImageElement | null>(null);
 
   // Get current annotation ID for editing
   const currentAnnotationId = activeAnnotationId || '-1';
@@ -103,9 +118,31 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     }
   }, [noRectangleWarning, suppressWarningForSession]);
 
+  // Convert global composite mask data URI to HTMLImageElement for Konva rendering
+  useEffect(() => {
+    if (!globalCompositeMask) {
+      setCompositeImageElement(null);
+      return;
+    }
+
+    const imageElement = document.createElement('img');
+    imageElement.onload = () => setCompositeImageElement(imageElement);
+    imageElement.onerror = () => {
+      loggers.canvas('[useEffect] Failed to load composite mask image');
+      setCompositeImageElement(null);
+    };
+    imageElement.src = globalCompositeMask;
+  }, [globalCompositeMask]);
+
   // ============ EXTRACTED STATE MANAGEMENT ============
-  // But pass the global composite as the display mask to show all masks
-  const canvasState = useCanvasState(imageUrl, globalCompositeMask, debugImageUrl);
+  // Use per-annotation mask for editing, global composite for display reference
+  // Default to "-1" rect if no annotation is explicitly selected
+  const effectiveAnnotationId = activeAnnotationId || '-1';
+  const perAnnotationMaskUrl = perAnnotationMasks[effectiveAnnotationId]
+    ? perAnnotationMasks[effectiveAnnotationId].maskUrl
+    : null;
+  
+  const canvasState = useCanvasState(imageUrl, perAnnotationMaskUrl, debugImageUrl);
   const {
     setViewportState,
     stageRef,
@@ -556,6 +593,17 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
                         width={image?.naturalWidth ?? 0}
                         height={image?.naturalHeight ?? 0}
                         listening={isPanMode}
+                      />
+                    )}
+                    {compositeImageElement && (
+                      // Global composite reference layer: shows all visible masks for context
+                      // Opacity set to 0.9 to distinguish from active rect marks (mask pixels already have alpha)
+                      <Image
+                        image={compositeImageElement}
+                        width={image?.naturalWidth ?? 0}
+                        height={image?.naturalHeight ?? 0}
+                        opacity={0.9}
+                        listening={false}
                       />
                     )}
                     {(

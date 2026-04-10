@@ -42,3 +42,8 @@ __pycache__/
 *.pyc
 *.ipynb_checkpoints
 *.ipynb
+# Exception: Track test classification notebook
+!python_classification_handling/test_read_classification.ipynb
+
+# typescript
+*.tsbuildinfo

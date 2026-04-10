@@ -51,6 +51,41 @@ export function compositeImageDataMasks(masks: ImageData[]): ImageData | null {
 }
 
 /**
+ * Simple composite: bitwise OR all masks up to the given index.
+ * IMPORTANT: This is the CANONICAL compositing logic used for both display and export.
+ * It ensures display and export are consistent.
+ * 
+ * Do NOT use SAM-aware compositing (finding latest SAM, pre/post positioning) for display,
+ * as that can cause earlier SAM predictions to be lost when multiple SAMs are placed.
+ * 
+ * @param history - HistoryEntry array from mask history
+ * @param upToIndex - Max index to composite (inclusive)
+ * @returns Composited ImageData or null if no valid history
+ */
+export function getSimpleComposite(history: HistoryEntry[], upToIndex: number): ImageData | null {
+  if (history.length === 0 || upToIndex < 0) {
+    return null;
+  }
+
+  // Clamp to valid range
+  const maxIndex = Math.min(upToIndex, history.length - 1);
+  
+  // Start with empty (all zeros)
+  const firstEntry = history[0];
+  const compositeData = new Uint8ClampedArray(firstEntry.imageData.data.length);
+  
+  // OR all entries from 0 to maxIndex (inclusive)
+  for (let i = 0; i <= maxIndex && i < history.length; i++) {
+    const hEntry = history[i];
+    for (let j = 0; j < hEntry.imageData.data.length; j++) {
+      compositeData[j] = compositeData[j] | hEntry.imageData.data[j];
+    }
+  }
+  
+  return new ImageData(compositeData, firstEntry.imageData.width, firstEntry.imageData.height);
+}
+
+/**
  * Composite a mask history up to the given index.
  * Implements the rule: modifier strokes before latest SAM + SAM + modifier strokes after SAM.
  * 
@@ -188,18 +223,18 @@ export function compositeHistoryUpToIndexDebug(history: HistoryEntry[], upToInde
   }
 
   const latestSam = history[latestSamIndex];
-  if (!latestSam.samPredictionRaw) {
-    loggers.masks(`[compositeHistoryUpToIndexDebug] No samPredictionRaw found at index ${latestSamIndex}`);
+  if (!latestSam.imageData) {
+    loggers.masks(`[compositeHistoryUpToIndexDebug] No imageData found at index ${latestSamIndex}`);
     return normalComposite;
   }
 
-  loggers.masks(`[compositeHistoryUpToIndexDebug] Found latestSamIndex=${latestSamIndex}, samPredictionRaw exists, dimensions=${latestSam.samPredictionRaw.width}x${latestSam.samPredictionRaw.height}`);
+  loggers.masks(`[compositeHistoryUpToIndexDebug] Found latestSamIndex=${latestSamIndex}, SAM imageData exists, dimensions=${latestSam.imageData.width}x${latestSam.imageData.height}`);
 
-  // Log sample pixels from raw SAM to understand the format
-  const rawSamData = latestSam.samPredictionRaw.data;
-  loggers.masks('[compositeHistoryUpToIndexDebug] Sample raw SAM pixels:');
-  for (let i = 0; i < Math.min(40, rawSamData.length); i += 4) {
-    loggers.masks(`  Pixel ${i/4}: R=${rawSamData[i]}, G=${rawSamData[i+1]}, B=${rawSamData[i+2]}, A=${rawSamData[i+3]}`);
+  // Log sample pixels from SAM to understand the format
+  const samData = latestSam.imageData.data;
+  loggers.masks('[compositeHistoryUpToIndexDebug] Sample SAM pixels:');
+  for (let i = 0; i < Math.min(40, samData.length); i += 4) {
+    loggers.masks(`  Pixel ${i/4}: R=${samData[i]}, G=${samData[i+1]}, B=${samData[i+2]}, A=${samData[i+3]}`);
   }
 
   // Create debug image: copy normal composite and overlay raw SAM with red
@@ -215,12 +250,12 @@ export function compositeHistoryUpToIndexDebug(history: HistoryEntry[], upToInde
   let redPixelsAdded = 0;
 
   // Try multiple approach: check if any channel is non-zero (mask pixel)
-  for (let i = 0; i < rawSamData.length; i += 4) {
+  for (let i = 0; i < samData.length; i += 4) {
     // Check if this pixel is part of the mask (any channel > 0)
-    const r = rawSamData[i];
-    const g = rawSamData[i + 1];
-    const b = rawSamData[i + 2];
-    const a = rawSamData[i + 3];
+    const r = samData[i];
+    const g = samData[i + 1];
+    const b = samData[i + 2];
+    const a = samData[i + 3];
     
     // Consider it a mask pixel if alpha > 0 and any color channel > 0
     if (a > 0 && (r > 0 || g > 0 || b > 0)) {

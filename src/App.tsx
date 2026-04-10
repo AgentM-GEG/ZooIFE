@@ -7,8 +7,7 @@ import { ToolPalette } from './components/ToolPalette/ToolPalette';
 import { TaskSidebar } from './components/TaskSidebar/TaskSidebar';
 import { segmentWithPoints } from './services/sam2Service';
 import { useClassificationStore } from './stores/classificationStore';
-import { compositeImageDataMasks } from '@/utils/image/maskCompositing';
-import { getCompositeForHistoryIndex } from '@/utils/image/maskCompositing';
+import { getSimpleComposite } from '@/utils/image/maskCompositing';
 import { loggers } from '@/utils/logger';
 import type { AnnotationTool, PointAnnotation } from './types/annotations';
 import type { BrushEditableImageHandle } from '@/types/tools';
@@ -75,33 +74,21 @@ function imageDataToDataUri(imageData: ImageData): string {
 }
 
 /**
- * Create a SAM history entry that stores both the raw prediction and the composited result.
- * The composited result = pre-SAM modifier strokes + SAM prediction (preserves user refinements).
+ * Create a SAM history entry that stores ONLY the raw SAM prediction.
+ * Compositing (combining with modifier strokes) happens at export/display time, not storage time.
+ * This ensures clean separation between:
+ * - Raw model output (what gets stored)
+ * - Display state (what user sees, including pre-SAM modifiers)
+ * - Export state (what gets sent to backend)
  * 
- * @param rawSamImageData - Raw ImageData from SAM segmentation
- * @param annotationId - ID of the annotation being edited
- * @returns HistoryEntry with type 'sam' and samPredictionRaw set
+ * @param rawSamImageData - Raw ImageData from SAM segmentation (model output only)
+ * @returns HistoryEntry with type 'sam' containing only raw prediction
  */
-function createSamHistoryEntry(rawSamImageData: ImageData, annotationId: string): HistoryEntry {
-  const state = useClassificationStore.getState();
-  const maskState = state.perAnnotationMasks[annotationId];
-  
-  // Composite with existing mask to preserve any modifier strokes made before this SAM call
-  let compositedImageData = rawSamImageData;
-  if (maskState && maskState.history.length > 0 && maskState.historyIndex >= 0) {
-    // Get the composite of everything up to current history point
-    const currentComposite = getCompositeForHistoryIndex(maskState.history, maskState.historyIndex);
-    if (currentComposite) {
-      // Layer the new SAM prediction on top of the current composite
-      compositedImageData = compositeImageDataMasks([currentComposite, rawSamImageData]) || rawSamImageData;
-      loggers.app(`[createSamHistoryEntry] Composited new SAM with existing composite (historyIndex=${maskState.historyIndex})`);
-    }
-  }
-
+function createSamHistoryEntry(rawSamImageData: ImageData): HistoryEntry {
+  // Store ONLY raw SAM prediction - no pre-compositing with modifier strokes
   return {
     type: 'sam',
-    imageData: compositedImageData,
-    samPredictionRaw: rawSamImageData,
+    imageData: rawSamImageData,
   };
 }
 
@@ -183,10 +170,28 @@ function App() {
           const maskUrl = result.image.url;
           dataUriToImageData(maskUrl).then((imageData) => {
             // Create SAM history entry with raw prediction
-            const samEntry = createSamHistoryEntry(imageData, currentAnnotationId);
+            const samEntry = createSamHistoryEntry(imageData);
+            
+            // Calculate display composite BEFORE pushing to avoid async state race condition
+            const currentMaskState = useClassificationStore.getState().perAnnotationMasks[currentAnnotationId];
+            let newHistory: typeof currentMaskState.history = [];
+            let newHistoryIndex = 0;
+            if (currentMaskState) {
+              // Simulate what pushPerAnnotationMaskHistory will do
+              const truncated = currentMaskState.history.slice(0, currentMaskState.historyIndex + 1);
+              newHistory = [...truncated, samEntry];
+              newHistoryIndex = truncated.length; // New entry is at this index
+            } else {
+              newHistory = [samEntry];
+              newHistoryIndex = 0;
+            }
+            
+            // Use simple composite (canonical logic for both display and export)
+            const displayComposite = getSimpleComposite(newHistory, newHistoryIndex) || samEntry.imageData;
+            const compositedMaskUrl = imageDataToDataUri(displayComposite);
+            
+            // Now push to history and update UI
             pushPerAnnotationMaskHistory(currentAnnotationId, samEntry);
-            // Display the composited result (SAM + pre-SAM modifiers)
-            const compositedMaskUrl = imageDataToDataUri(samEntry.imageData);
             setPerAnnotationMask(currentAnnotationId, compositedMaskUrl);
           }).catch((err) => {
             loggers.app('Failed to convert SAM mask to ImageData:', err);
@@ -256,10 +261,28 @@ function App() {
               const maskUrl = result.image.url;
               dataUriToImageData(maskUrl).then((imageData) => {
                 // Create SAM history entry with raw prediction
-                const samEntry = createSamHistoryEntry(imageData, currentAnnotationId);
+                const samEntry = createSamHistoryEntry(imageData);
+                
+                // Calculate display composite BEFORE pushing to avoid async state race condition
+                const currentMaskState = useClassificationStore.getState().perAnnotationMasks[currentAnnotationId];
+                let newHistory: typeof currentMaskState.history = [];
+                let newHistoryIndex = 0;
+                if (currentMaskState) {
+                  // Simulate what pushPerAnnotationMaskHistory will do
+                  const truncated = currentMaskState.history.slice(0, currentMaskState.historyIndex + 1);
+                  newHistory = [...truncated, samEntry];
+                  newHistoryIndex = truncated.length; // New entry is at this index
+                } else {
+                  newHistory = [samEntry];
+                  newHistoryIndex = 0;
+                }
+                
+                // Use simple composite (canonical logic for both display and export)
+                const displayComposite = getSimpleComposite(newHistory, newHistoryIndex) || samEntry.imageData;
+                const compositedMaskUrl = imageDataToDataUri(displayComposite);
+                
+                // Now push to history and update UI
                 pushPerAnnotationMaskHistory(currentAnnotationId, samEntry);
-                // Display the composited result (SAM + pre-SAM modifiers)
-                const compositedMaskUrl = imageDataToDataUri(samEntry.imageData);
                 setPerAnnotationMask(currentAnnotationId, compositedMaskUrl);
               }).catch((err) => {
                 loggers.app('Failed to convert SAM mask to ImageData: %O', err);
@@ -275,10 +298,28 @@ function App() {
             const maskUrl = result.image.url;
             dataUriToImageData(maskUrl).then((imageData) => {
               // Create SAM history entry with raw prediction
-              const samEntry = createSamHistoryEntry(imageData, currentAnnotationId);
+              const samEntry = createSamHistoryEntry(imageData);
+              
+              // Calculate display composite BEFORE pushing to avoid async state race condition
+              const currentMaskState = useClassificationStore.getState().perAnnotationMasks[currentAnnotationId];
+              let newHistory: typeof currentMaskState.history = [];
+              let newHistoryIndex = 0;
+              if (currentMaskState) {
+                // Simulate what pushPerAnnotationMaskHistory will do
+                const truncated = currentMaskState.history.slice(0, currentMaskState.historyIndex + 1);
+                newHistory = [...truncated, samEntry];
+                newHistoryIndex = truncated.length; // New entry is at this index
+              } else {
+                newHistory = [samEntry];
+                newHistoryIndex = 0;
+              }
+              
+              // Use simple composite (canonical logic for both display and export)
+              const displayComposite = getSimpleComposite(newHistory, newHistoryIndex) || samEntry.imageData;
+              const compositedMaskUrl = imageDataToDataUri(displayComposite);
+              
+              // Now push to history and update UI
               pushPerAnnotationMaskHistory(currentAnnotationId, samEntry);
-              // Display the composited result (SAM + pre-SAM modifiers)
-              const compositedMaskUrl = imageDataToDataUri(samEntry.imageData);
               setPerAnnotationMask(currentAnnotationId, compositedMaskUrl);
             }).catch((err) => {
               loggers.app('Failed to convert SAM mask to ImageData:', err);

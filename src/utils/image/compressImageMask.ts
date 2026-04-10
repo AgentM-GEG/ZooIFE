@@ -108,7 +108,8 @@ export class CompressedMask {
         public width: number,
         public height: number,
         public rle: Uint8Array,
-        public encoding: MaskEncoding = "array"   // default
+        public encoding: MaskEncoding = "array",   // default
+        public maskType: 'sam' | 'modifier_brush' | 'composite' = 'composite'  // Track origin of mask
     ) {}
 
     private _preparedJson: any = null;
@@ -123,6 +124,8 @@ export class CompressedMask {
             this._preparedJson = {
                 width: this.width,
                 height: this.height,
+                encoding: this.encoding,
+                maskType: this.maskType,
                 rle: Array.from(this.rle)
             };
         }
@@ -131,6 +134,8 @@ export class CompressedMask {
             this._preparedJson = {
                 width: this.width,
                 height: this.height,
+                encoding: this.encoding,
+                maskType: this.maskType,
                 rle: bytesToBase64(this.rle)
             };
         }
@@ -140,6 +145,8 @@ export class CompressedMask {
             this._preparedJson = {
                 width: this.width,
                 height: this.height,
+                encoding: this.encoding,
+                maskType: this.maskType,
                 rle: bytesToBase64(gz)
             };
         }
@@ -165,11 +172,13 @@ export class CompressedMask {
  * ImageData → binary mask → bit‑pack → RLE encode → CompressedMask
  * @param imageData - ImageData object from canvas rendering
  * @param encoding - Encoding type for output ("array", "base64", or "gzip-base64")
+ * @param maskType - Type of mask ("sam", "modifier_brush", or "composite")
  * @returns Promise resolving to CompressedMask object ready for JSON serialization
  */
 export async function compressSegmentationMask(
     imageData: ImageData,
-    encoding: MaskEncoding = "gzip-base64"
+    encoding: MaskEncoding = "gzip-base64",
+    maskType: 'sam' | 'modifier_brush' | 'composite' = 'composite'
 ): Promise<CompressedMask> {
 
     const mask      = maskFromBlueChannel(imageData);
@@ -180,7 +189,8 @@ export async function compressSegmentationMask(
         imageData.width,
         imageData.height,
         rlePacked,
-        encoding
+        encoding,
+        maskType
     );
 
     // Prepare JSON-safe output according to encoding
