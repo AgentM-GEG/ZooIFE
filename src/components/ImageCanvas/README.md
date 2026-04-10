@@ -331,7 +331,7 @@ displayCompositeOfVisibleMasks() called via setTimeout
     ↓
 Collects all annotations with historyIndex >= 0
     ↓
-compositeImageDataMasks() overlays all visible masks
+compositeImageDataMasks() [from maskCompositing.ts] overlays all visible masks
     ↓
 setPerAnnotationMask() updates display
     ↓

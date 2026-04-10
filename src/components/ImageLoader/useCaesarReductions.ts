@@ -3,6 +3,7 @@ import { fetchCaesarReductions, CAESAR_REDUCTION_OPTS, SubjectReduction } from '
 import { getWorkflow } from '@/services/panoptesService';
 import type { CaesarAnnotation } from '@/types/annotations';
 import { useCaesarAnnotationStore } from '@/stores/caesarReductionStore';
+import { loggers } from '@/utils/logger';
 
 /**
  * Custom hook for fetching and processing Caesar ML reductions.
@@ -97,7 +98,7 @@ export function useCaesarReductions(
 
         useCaesarAnnotationStore.getState().setAnnotations(parsed);
       } catch (err) {
-        console.error('Failed to process Caesar reductions:', err);
+        loggers.app('Failed to process Caesar reductions:', err);
       }
     },
     [workflowId, parseReductions]  // Only stable dependencies

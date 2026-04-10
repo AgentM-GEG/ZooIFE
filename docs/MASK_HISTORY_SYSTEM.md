@@ -13,10 +13,16 @@ The ZooIFE application implements a **per-annotation mask history system** that 
 Masks are stored in the `classificationStore` with the following structure:
 
 ```typescript
+interface HistoryEntry {
+  type: 'sam' | 'modifier_brush';
+  imageData: ImageData;
+  samPredictionRaw?: ImageData; // Only for 'sam' entries
+}
+
 interface PerAnnotationMaskState {
-  maskUrl: string | null;      // Current mask display URL (data URI)
-  history: ImageData[];        // Array of historical mask states
-  historyIndex: number;        // Index into history array (-1 = no mask)
+  maskUrl: string | null;          // Current mask display URL (data URI)
+  history: HistoryEntry[];         // Array of historical mask entries
+  historyIndex: number;            // Index into history array (-1 = no mask)
 }
 
 // Store maps annotation IDs to their mask state
@@ -25,6 +31,20 @@ activeAnnotationId: string | null  // Currently selected annotation for editing
 ```
 
 **Special ID**: The string `"-1"` is used for unmarked objects (when no annotation rectangle is selected).
+
+### History Entry Types
+
+Each entry in the history array has a `type` field that indicates its origin:
+
+| Type | Created By | Description |
+|---|---|---|
+| `'sam'` | SAM model | AI segmentation prediction (includes raw prediction data) |
+| `'modifier_brush'` | User | Brush stroke refinement (adds or removes pixels) |
+
+**Compositing Rule**: When calculating the composite mask, the system preserves all brush strokes around SAM predictions. Specifically:
+- Pre-SAM modifier strokes + SAM prediction + post-SAM modifier strokes = final mask
+
+This ensures user refinements are never lost when new SAM predictions are made.
 
 ### History Index States
 
@@ -253,6 +273,8 @@ When the user performs undo/redo, the canvas should show a **composite** of all 
 
 4. **Composite all visible masks:**
    ```typescript
+   import { compositeImageDataMasks } from '@/utils/image/maskCompositing';
+   
    const composite = compositeImageDataMasks(visibleMasks);
    // Returns overlaid combination of all masks
    ```

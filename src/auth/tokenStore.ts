@@ -2,6 +2,7 @@
  * Token persistence and expiry tracking
  */
 import { STORAGE } from '@/auth/constants';
+import { loggers } from '@/utils/logger';
 
 export type TokenSet = {
   access_token: string;
@@ -79,7 +80,7 @@ export function loadTokenFromStorage(): TokenSet | null {
     tokenExpiresAt = expiresAt || 0;
     return tokenSet;
   } catch (err) {
-    console.error("Failed to load token from storage:", err);
+    loggers.auth("Failed to load token from storage:", err);
     return null;
   }
 }

@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { setToken as storeToken, TokenSet, loadTokenFromStorage, clearStorage } from "@/auth/tokenStore";
 import { useTokenRefresh } from "@/auth/useTokenRefresh";
+import { loggers } from "@/utils/logger";
 import { OAUTH_SERVER, ZOONIVERSE_OAUTH, OAUTH_PARAMS } from "@/auth/constants";
 import { getUserDetails } from "@/services/panoptesService";
 import { useUserStore } from "@/stores/userStore";
@@ -48,10 +49,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         useUserStore.getState().setLoading(true);
         const user = await getUserDetails(userId, token.access_token);
-        console.log("User details fetched:", user);
+        loggers.auth("User details fetched:", user);
         useUserStore.getState().setUser(user as any);  // API type not strictly typed
       } catch (err) {
-        console.error("Failed to fetch user details:", err);
+        loggers.auth("Failed to fetch user details:", err);
         useUserStore.getState().setError(
           err instanceof Error ? err.message : "Failed to fetch user details"
         );
@@ -70,7 +71,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const storedToken = loadTokenFromStorage();
     if (storedToken) {
       setToken(storedToken);
-      console.log("[AuthContext] Token loaded from localStorage");
+      loggers.auth("[AuthContext] Token loaded from localStorage");
     }
   }, []);
 
@@ -129,7 +130,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         window.history.replaceState({}, "", "/");
 
       } catch (err) {
-        console.error("Token exchange error:", err);
+        loggers.auth("Token exchange error:", err);
       }
     })();
 

@@ -7,9 +7,12 @@ import { ToolPalette } from './components/ToolPalette/ToolPalette';
 import { TaskSidebar } from './components/TaskSidebar/TaskSidebar';
 import { segmentWithPoints } from './services/sam2Service';
 import { useClassificationStore } from './stores/classificationStore';
-import { compositeImageDataMasks } from '@/utils/image/compressImageMask';
-import type { AnnotationTool } from './types/annotations';
+import { compositeImageDataMasks } from '@/utils/image/maskCompositing';
+import { getCompositeForHistoryIndex } from '@/utils/image/maskCompositing';
+import { loggers } from '@/utils/logger';
+import type { AnnotationTool, PointAnnotation } from './types/annotations';
 import type { BrushEditableImageHandle } from '@/types/tools';
+import type { HistoryEntry } from '@/stores/classificationStore';
 import {
   AppContainer,
   AppHeader,
@@ -72,33 +75,34 @@ function imageDataToDataUri(imageData: ImageData): string {
 }
 
 /**
- * Blend a new SAM result with the current mask to preserve modifier strokes.
- * If there's already a mask with modifier strokes, composite the new SAM result with it.
- * Otherwise, just return the new SAM result.
+ * Create a SAM history entry that stores both the raw prediction and the composited result.
+ * The composited result = pre-SAM modifier strokes + SAM prediction (preserves user refinements).
  * 
- * @param newSamImageData - ImageData from new SAM segmentation
+ * @param rawSamImageData - Raw ImageData from SAM segmentation
  * @param annotationId - ID of the annotation being edited
- * @returns Blended ImageData (composite of current mask + new SAM result)
+ * @returns HistoryEntry with type 'sam' and samPredictionRaw set
  */
-function blendSamResultWithCurrentMask(newSamImageData: ImageData, annotationId: string): ImageData {
+function createSamHistoryEntry(rawSamImageData: ImageData, annotationId: string): HistoryEntry {
   const state = useClassificationStore.getState();
   const maskState = state.perAnnotationMasks[annotationId];
   
-  // If no existing mask history, just return the new SAM result
-  if (!maskState || maskState.history.length === 0 || maskState.historyIndex < 0) {
-    return newSamImageData;
+  // Composite with existing mask to preserve any modifier strokes made before this SAM call
+  let compositedImageData = rawSamImageData;
+  if (maskState && maskState.history.length > 0 && maskState.historyIndex >= 0) {
+    // Get the composite of everything up to current history point
+    const currentComposite = getCompositeForHistoryIndex(maskState.history, maskState.historyIndex);
+    if (currentComposite) {
+      // Layer the new SAM prediction on top of the current composite
+      compositedImageData = compositeImageDataMasks([currentComposite, rawSamImageData]) || rawSamImageData;
+      loggers.app(`[createSamHistoryEntry] Composited new SAM with existing composite (historyIndex=${maskState.historyIndex})`);
+    }
   }
-  
-  // Get the current mask from history (at current historyIndex)
-  const currentMaskImageData = maskState.history[maskState.historyIndex];
-  if (!currentMaskImageData) {
-    return newSamImageData;
-  }
-  
-  // Composite: new SAM result + current mask (preserves modifier strokes)
-  const composite = compositeImageDataMasks([currentMaskImageData, newSamImageData]);
-  console.log(`[blendSamResultWithCurrentMask] Blended new SAM result with current mask (historyIndex=${maskState.historyIndex})`);
-  return composite || newSamImageData;
+
+  return {
+    type: 'sam',
+    imageData: compositedImageData,
+    samPredictionRaw: rawSamImageData,
+  };
 }
 
 /**
@@ -120,6 +124,7 @@ function App() {
     annotations,
     undoLastAnnotation,
     setDebugImage,
+    setDebugMasks,
     setPerAnnotationMask,
     pushPerAnnotationMaskHistory,
     imageDimensions,
@@ -141,15 +146,18 @@ function App() {
     const removed = undoLastAnnotation();
     if (!removed) return;
     const remaining = useClassificationStore.getState().annotations;
-    const points = remaining
-      .filter((a) => a.type === 'point')
-      .map((a) => ({ x: a.x, y: a.y, label: (a as { label: 0 | 1 }).label }));
-
     const currentAnnotationId = activeAnnotationId || '-1';
+    const points = remaining
+      .filter((a) => a.type === 'point' && ((a as PointAnnotation).annotationId || '-1') === currentAnnotationId)
+      .map((a) => {
+        const pa = a as PointAnnotation;
+        return { x: pa.x, y: pa.y, label: pa.label };
+      });
 
     if (points.length === 0) {
       setPerAnnotationMask(currentAnnotationId, null);
       setDebugImage(null);
+      setDebugMasks(null, null);
       return;
     }
     if (!imageUrl) return;
@@ -162,29 +170,34 @@ function App() {
       });
       if (debugCoords && result.debug_url) {
         setDebugImage(result.debug_url);
+        if (result.debug_masks && result.mask_selection) {
+          const debugPrompts = points.map((p: any) => ({ x: p.x, y: p.y, label: p.label }));
+          setDebugMasks(result.debug_masks, result.mask_selection, result.debug_crop || undefined, debugPrompts);
+        }
         setPerAnnotationMask(currentAnnotationId, null);
       } else {
         setDebugImage(null);
+        setDebugMasks(null, null);
         if (result.image?.url) {
           // Convert SAM mask to ImageData and add to history
           const maskUrl = result.image.url;
           dataUriToImageData(maskUrl).then((imageData) => {
-            // Blend new SAM result with current mask to preserve modifier strokes
-            const blendedImageData = blendSamResultWithCurrentMask(imageData, currentAnnotationId);
-            pushPerAnnotationMaskHistory(currentAnnotationId, blendedImageData);
-            // Display the blended result (not just the raw SAM output)
-            const blendedMaskUrl = imageDataToDataUri(blendedImageData);
-            setPerAnnotationMask(currentAnnotationId, blendedMaskUrl);
+            // Create SAM history entry with raw prediction
+            const samEntry = createSamHistoryEntry(imageData, currentAnnotationId);
+            pushPerAnnotationMaskHistory(currentAnnotationId, samEntry);
+            // Display the composited result (SAM + pre-SAM modifiers)
+            const compositedMaskUrl = imageDataToDataUri(samEntry.imageData);
+            setPerAnnotationMask(currentAnnotationId, compositedMaskUrl);
           }).catch((err) => {
-            console.warn('Failed to convert SAM mask to ImageData:', err);
+            loggers.app('Failed to convert SAM mask to ImageData:', err);
             setPerAnnotationMask(currentAnnotationId, maskUrl);
           });
         }
       }
     } catch (err) {
-      console.warn('SAM2 not available:', err);
+      loggers.app('SAM2 not available:', err);
     }
-  }, [imageUrl, undoLastAnnotation, setPerAnnotationMask, setDebugImage, imageDimensions, coordinateFix, debugCoords, modelId, activeAnnotationId, pushPerAnnotationMaskHistory]);
+  }, [imageUrl, undoLastAnnotation, setPerAnnotationMask, setDebugImage, setDebugMasks, imageDimensions, coordinateFix, debugCoords, modelId, activeAnnotationId, pushPerAnnotationMaskHistory]);
 
   /**
    * Handle point click for SAM segmentation.
@@ -203,15 +216,17 @@ function App() {
   const handlePointClick = useCallback(
     async (x: number, y: number, label: 0 | 1) => {
       if (!imageUrl) return;
+      const currentAnnotationId = activeAnnotationId || '-1';
       const points = [
         ...annotations
-          .filter((a) => a.type === 'point')
-          .map((a) => ({ x: a.x, y: a.y, label: (a as { label: 0 | 1 }).label })),
+          .filter((a) => a.type === 'point' && ((a as PointAnnotation).annotationId || '-1') === currentAnnotationId)
+          .map((a) => {
+            const pa = a as PointAnnotation;
+            return { x: pa.x, y: pa.y, label: pa.label };
+          }),
         { x, y, label },
       ];
       if (points.length === 0) return;
-
-      const currentAnnotationId = activeAnnotationId || '-1';
 
       try {
         const result = await segmentWithPoints(imageUrl, points, '', {
@@ -220,52 +235,62 @@ function App() {
           coordinateFix,
           modelId,
         });
+        loggers.sam2('[handlePointClick] SAM response: %O', { debugMode: debugCoords, hasDebugUrl: !!result.debug_url, hasDebugMasks: !!result.debug_masks, maskSelection: result.mask_selection, debugMasksLength: result.debug_masks?.length });
         if (debugCoords) {
           if (result.debug_url) {
             setDebugImage(result.debug_url);
+            if (result.debug_masks && result.mask_selection) {
+              loggers.debug('[handlePointClick] Setting debug masks: %d masks', result.debug_masks.length);
+              const debugPrompts = points.map((p: any) => ({ x: p.x, y: p.y, label: p.label }));
+              setDebugMasks(result.debug_masks, result.mask_selection, result.debug_crop || undefined, debugPrompts);
+            } else {
+              loggers.debug('[handlePointClick] Debug masks missing: %O', { hasDebugMasks: !!result.debug_masks, hasMaskSelection: !!result.mask_selection });
+            }
             setPerAnnotationMask(currentAnnotationId, null);
           } else {
             setDebugImage(null);
-            console.warn('Debug requested but no debug_url in response:', result);
+            setDebugMasks(null, null);
+            loggers.debug('Debug requested but no debug_url in response: %O', result);
             if (result.image?.url) {
               // Convert SAM mask to ImageData and add to history
               const maskUrl = result.image.url;
               dataUriToImageData(maskUrl).then((imageData) => {
-                // Blend new SAM result with current mask to preserve modifier strokes
-                const blendedImageData = blendSamResultWithCurrentMask(imageData, currentAnnotationId);
-                pushPerAnnotationMaskHistory(currentAnnotationId, blendedImageData);
-                // Display the blended result (not just the raw SAM output)
-                const blendedMaskUrl = imageDataToDataUri(blendedImageData);
-                setPerAnnotationMask(currentAnnotationId, blendedMaskUrl);
+                // Create SAM history entry with raw prediction
+                const samEntry = createSamHistoryEntry(imageData, currentAnnotationId);
+                pushPerAnnotationMaskHistory(currentAnnotationId, samEntry);
+                // Display the composited result (SAM + pre-SAM modifiers)
+                const compositedMaskUrl = imageDataToDataUri(samEntry.imageData);
+                setPerAnnotationMask(currentAnnotationId, compositedMaskUrl);
               }).catch((err) => {
-                console.warn('Failed to convert SAM mask to ImageData:', err);
+                loggers.app('Failed to convert SAM mask to ImageData: %O', err);
                 setPerAnnotationMask(currentAnnotationId, maskUrl);
               });
             }
           }
         } else {
           setDebugImage(null);
+          setDebugMasks(null, null);
           if (result.image?.url) {
             // Convert SAM mask to ImageData and add to history
             const maskUrl = result.image.url;
             dataUriToImageData(maskUrl).then((imageData) => {
-              // Blend new SAM result with current mask to preserve modifier strokes
-              const blendedImageData = blendSamResultWithCurrentMask(imageData, currentAnnotationId);
-              pushPerAnnotationMaskHistory(currentAnnotationId, blendedImageData);
-              // Display the blended result (not just the raw SAM output)
-              const blendedMaskUrl = imageDataToDataUri(blendedImageData);
-              setPerAnnotationMask(currentAnnotationId, blendedMaskUrl);
+              // Create SAM history entry with raw prediction
+              const samEntry = createSamHistoryEntry(imageData, currentAnnotationId);
+              pushPerAnnotationMaskHistory(currentAnnotationId, samEntry);
+              // Display the composited result (SAM + pre-SAM modifiers)
+              const compositedMaskUrl = imageDataToDataUri(samEntry.imageData);
+              setPerAnnotationMask(currentAnnotationId, compositedMaskUrl);
             }).catch((err) => {
-              console.warn('Failed to convert SAM mask to ImageData:', err);
+              loggers.app('Failed to convert SAM mask to ImageData:', err);
               setPerAnnotationMask(currentAnnotationId, maskUrl);
             });
           }
         }
       } catch (err) {
-        console.warn('SAM2 not available:', err);
+        loggers.app('SAM2 not available:', err);
       }
     },
-    [imageUrl, annotations, setPerAnnotationMask, setDebugImage, imageDimensions, coordinateFix, debugCoords, modelId, activeAnnotationId, pushPerAnnotationMaskHistory]
+    [imageUrl, annotations, setPerAnnotationMask, setDebugImage, setDebugMasks, imageDimensions, coordinateFix, debugCoords, modelId, activeAnnotationId, pushPerAnnotationMaskHistory]
   );
 
   const [brushMode, setBrushMode] = useState("add");

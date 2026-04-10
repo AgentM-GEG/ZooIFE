@@ -4,6 +4,7 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { TOKEN_REFRESH, OAUTH_SERVER } from '@/auth/constants';
 import type { TokenSet } from '@/auth/tokenStore';
+import { loggers } from '@/utils/logger';
 
 interface UseTokenRefreshOptions {
   /** Called when token is successfully refreshed */
@@ -35,13 +36,13 @@ export function useTokenRefresh(
     async (retryCount = 0): Promise<boolean> => {
       // Skip if already refreshing
       if (isRefreshingRef.current) {
-        console.log('[useTokenRefresh] Refresh already in progress, skipping');
+        loggers.auth('[useTokenRefresh] Refresh already in progress, skipping');
         return false;
       }
 
       // Can't refresh without a refresh token
       if (!token?.refresh_token) {
-        console.error('[useTokenRefresh] No refresh token available');
+        loggers.auth('[useTokenRefresh] No refresh token available');
         if (retryCount === 0) onRefreshFailed?.();
         return false;
       }
@@ -64,11 +65,11 @@ export function useTokenRefresh(
 
         const newTokenSet = (await res.json()) as TokenSet;
         onTokenRefreshed(newTokenSet);
-        console.log('[useTokenRefresh] Token refreshed successfully');
+        loggers.auth('[useTokenRefresh] Token refreshed successfully');
         return true;
       } catch (err) {
         isRefreshingRef.current = false;
-        console.error(
+        loggers.auth(
           `[useTokenRefresh] Token refresh error (attempt ${retryCount + 1}/${TOKEN_REFRESH.MAX_RETRIES}):`,
           err
         );
@@ -76,12 +77,12 @@ export function useTokenRefresh(
         if (retryCount < TOKEN_REFRESH.MAX_RETRIES - 1) {
           // Retry with exponential backoff: 1s, 2s, 4s
           const delay = Math.pow(2, retryCount) * TOKEN_REFRESH.RETRY_DELAY_BASE_MS;
-          console.log(`[useTokenRefresh] Retrying refresh in ${delay}ms...`);
+          loggers.auth(`[useTokenRefresh] Retrying refresh in ${delay}ms...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
           return refreshToken(retryCount + 1);
         } else {
           // All retries exhausted
-          console.error(
+          loggers.auth(
             `[useTokenRefresh] Token refresh failed after ${TOKEN_REFRESH.MAX_RETRIES} attempts`
           );
           onRefreshFailed?.();
@@ -104,7 +105,7 @@ export function useTokenRefresh(
 
       const delaySeconds = Math.max(0, expiresIn - TOKEN_REFRESH.BUFFER_SECONDS);
 
-      console.log(
+      loggers.auth(
         `[useTokenRefresh] Scheduling refresh in ${delaySeconds}s (token expires in ${expiresIn}s)`
       );
 
@@ -114,7 +115,7 @@ export function useTokenRefresh(
       } else {
         // Schedule refresh at deadline
         refreshTimerRef.current = setTimeout(() => {
-          console.log('[useTokenRefresh] Refresh deadline reached, refreshing token...');
+          loggers.auth('[useTokenRefresh] Refresh deadline reached, refreshing token...');
           refreshToken();
         }, delaySeconds * 1000);
       }

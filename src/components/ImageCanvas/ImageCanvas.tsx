@@ -6,12 +6,14 @@ import { BrushEditableImage } from '@/components/ImageMask/BrushEditableImage';
 import { CaesarAnnotationOverlay } from '@/components/CaesarAnnotationOverlay/CaesarAnnotationOverlay';
 import { useCaesarAnnotationStore } from '@/stores/caesarReductionStore';
 import { useAuth } from '@/auth/AuthContext';
-import { compositeImageDataMasks } from '@/utils/image/compressImageMask';
+import { compositeImageDataMasks } from '@/utils/image/maskCompositing';
 
 // Extracted components and hooks
 import AnnotationRenderer from './AnnotationRenderer';
 import CanvasToolbar from './CanvasToolbar';
 import BrushCursor from './BrushCursor';
+import { DebugMasksPanel } from './DebugMasksPanel';
+import { loggers } from '@/utils/logger';
 import type { ImageCanvasProps } from './types';
 import {
   Container,
@@ -26,6 +28,7 @@ import {
 import { useCanvasState } from './useCanvasState';
 import { useCanvasHandlers } from './useCanvasHandlers';
 import { useAnnotationEffects } from './useAnnotationEffects';
+import { theme } from '@/theme/zooniverseTheme';
 
 /**
  * ImageCanvas Component
@@ -57,6 +60,10 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   // Individual selectors prevent re-render cascades when unrelated store fields change
   const imageUrl = useClassificationStore(s => s.imageUrl);
   const debugImageUrl = useClassificationStore(s => s.debugImageUrl);
+  const debugMasks = useClassificationStore(s => s.debugMasks);
+  const maskSelectionInfo = useClassificationStore(s => s.maskSelectionInfo);
+  const debugCrop = useClassificationStore(s => s.debugCrop);
+  const debugPrompts = useClassificationStore(s => s.debugPrompts);
   const annotations = useClassificationStore(s => s.annotations);
   const activeAnnotationId = useClassificationStore(s => s.activeAnnotationId);
   const undoPerAnnotationMask = useClassificationStore(s => s.undoPerAnnotationMask);
@@ -64,6 +71,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const addAnnotation = useClassificationStore(s => s.addAnnotation);
   const perAnnotationMasks = useClassificationStore(s => s.perAnnotationMasks);
   const globalCompositeMask = useClassificationStore(s => s.globalCompositeMask);
+  const setDebugImage = useClassificationStore(s => s.setDebugImage);
 
   const caesarReducedAnnotations = useCaesarAnnotationStore(s => s.annotations);
   const selectedCaesarAnnotation = useCaesarAnnotationStore(s => s.selectedAnnotationId);
@@ -188,22 +196,22 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     const state = useClassificationStore.getState();
     const visibleMasks: ImageData[] = [];
 
-    console.log('[displayCompositeOfVisibleMasks] Computing composite...');
+    loggers.canvas('[displayCompositeOfVisibleMasks] Computing composite...');
 
     // Collect all masks that have history and are at a valid history point (>= 0)
     for (const [annotationId, maskState] of Object.entries(state.perAnnotationMasks)) {
       if (maskState.history.length > 0 && maskState.historyIndex >= 0) {
-        const maskImageData = maskState.history[maskState.historyIndex];
-        visibleMasks.push(maskImageData);
-        console.log(`  - Including mask from ${annotationId}, historyIndex=${maskState.historyIndex}`);
+        const entry = maskState.history[maskState.historyIndex];
+        visibleMasks.push(entry.imageData);
+        loggers.canvas(`  - Including mask from ${annotationId}, historyIndex=${maskState.historyIndex}`);
       }
     }
 
-    console.log(`[displayCompositeOfVisibleMasks] Found ${visibleMasks.length} visible masks`);
+    loggers.canvas(`[displayCompositeOfVisibleMasks] Found ${visibleMasks.length} visible masks`);
 
     if (visibleMasks.length === 0) {
       // Clear the mask display when no masks are visible
-      console.log(`[displayCompositeOfVisibleMasks] No masks - clearing display`);
+      loggers.canvas(`[displayCompositeOfVisibleMasks] No masks - clearing display`);
       state.setGlobalCompositeMask(null);
       return;
     }
@@ -211,7 +219,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     // Composite all visible masks
     const composite = compositeImageDataMasks(visibleMasks);
     if (!composite) {
-      console.error('[displayCompositeOfVisibleMasks] Failed to create composite');
+      loggers.canvas('[displayCompositeOfVisibleMasks] Failed to create composite');
       return;
     }
 
@@ -224,7 +232,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     const compositeUrl = canvas.toDataURL();
 
     // Update the global composite mask to show all masks
-    console.log(`[displayCompositeOfVisibleMasks] Setting global composite with ${visibleMasks.length} masks`);
+    loggers.canvas(`[displayCompositeOfVisibleMasks] Setting global composite with ${visibleMasks.length} masks`);
     state.setGlobalCompositeMask(compositeUrl);
   }, []);
 
@@ -233,7 +241,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
    */
   const handleUndoMask = useCallback(() => {
     const annotationId = activeAnnotationId || '-1';
-    console.log(`[handleUndoMask] Undoing for annotationId=${annotationId}`);
+    loggers.canvas(`[handleUndoMask] Undoing for annotationId=${annotationId}`);
     undoPerAnnotationMask(annotationId);
     // The useEffect watching perAnnotationMasks will recompute the composite
   }, [activeAnnotationId, undoPerAnnotationMask]);
@@ -243,7 +251,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
    */
   const handleRedoMask = useCallback(() => {
     const annotationId = activeAnnotationId || '-1';
-    console.log(`[handleRedoMask] Redoing for annotationId=${annotationId}`);
+    loggers.canvas(`[handleRedoMask] Redoing for annotationId=${annotationId}`);
     const { redoPerAnnotationMask } = useClassificationStore.getState();
     redoPerAnnotationMask(annotationId);
     // The useEffect watching perAnnotationMasks will recompute the composite
@@ -255,7 +263,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
    * which annotation is active.
    */
   useEffect(() => {
-    console.log('[useEffect] perAnnotationMasks changed - triggering composite recompute');
+    loggers.canvas('[useEffect] perAnnotationMasks changed - triggering composite recompute');
     displayCompositeOfVisibleMasks();
   }, [perAnnotationMasks, displayCompositeOfVisibleMasks]);
 
@@ -451,7 +459,8 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
 
   // Check if there's a mask to work with using per-annotation history
   const currentMaskState = perAnnotationMasks[currentAnnotationId] || { history: [], historyIndex: -1 };
-  const disableUndoRedo = currentMaskState.history.length === 0;
+  const disableUndo = currentMaskState.historyIndex < 0; // Can only undo if we have at least one item (index 0+)
+  const disableRedo = currentMaskState.historyIndex >= currentMaskState.history.length - 1; // Can't redo at the end
 
   // Get the label of the selected annotation for display
   const selectedAnnotationLabel: string | undefined = selectedCaesarAnnotation && caesarReducedAnnotations
@@ -488,7 +497,8 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
         isPanMode={isPanMode}
         isDebugMode={!!debugImageUrl}
         activeAnnotationId={activeAnnotationId}
-        disableUndoRedo={disableUndoRedo}
+        disableUndo={disableUndo}
+        disableRedo={disableRedo}
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
         onZoomFit={zoomFit}
@@ -501,11 +511,15 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
       {debugImageUrl && (
         <>
           <DebugBanner>
-            Debug: Red marker shows where server received your click
+            Debug: Green = foreground (positive), Red = background (negative)&nbsp;
+            <button style={{ marginLeft: 'auto', padding: '4px 8px', cursor: 'pointer', background: 'rgba(255,255,255,0.3)', border: '1px solid white', color: 'white', borderRadius: '4px' }} onClick={() => setDebugImage(null)}>Close ✕</button>
           </DebugBanner>
-          <DebugImage
-            src={debugImageUrl}
-            alt="Debug: server received point location"
+          <DebugMasksPanel 
+            debugImageUrl={debugImageUrl}
+            debugMasks={debugMasks}
+            maskSelectionInfo={maskSelectionInfo}
+            debugCrop={debugCrop}
+            debugPrompts={debugPrompts}
           />
         </>
       )}
@@ -600,7 +614,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
                   </Group>
                 </Layer>
               </Stage>
-            {(activeAnnotationId || !disableUndoRedo) && (
+            {(activeAnnotationId || !disableUndo || !disableRedo) && (
               <MarkingBanner>
                 {selectedAnnotationLabel ? `Marking a ${selectedAnnotationLabel}` : 'Marking a new object'}
               </MarkingBanner>

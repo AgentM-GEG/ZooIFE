@@ -7,6 +7,7 @@ import {
 import { getQueuedSubjects, WORKFLOW_ID, QUEUE_OPTS } from '@/services/panoptesService';
 import { useClassificationStore } from '@/stores/classificationStore';
 import type { Subject } from '@/types/panoptes';
+import { loggers } from '@/utils/logger';
 
 /**
  * Custom hook for managing subject loading and queue management.
@@ -49,7 +50,7 @@ export function useSubjectLoader(accessToken: string | undefined, onSubjectProce
         setSubject(subject.id, normalizedUrl, dims);
         await onSubjectProcessedRef.current?.(subject.id);
       } catch (err) {
-        console.error('Failed to load and process subject:', err);
+        loggers.app('Failed to load and process subject:', err);
       }
     },
     [setSubject]
@@ -73,7 +74,7 @@ export function useSubjectLoader(accessToken: string | undefined, onSubjectProce
           subjectsQueueRef.current = newSubjects;
           hasInitializedRef.current = true;
         } catch (error) {
-          console.error('Failed to fetch queued subjects:', error);
+          loggers.app('Failed to fetch queued subjects:', error);
           return;
         }
       }
@@ -81,7 +82,7 @@ export function useSubjectLoader(accessToken: string | undefined, onSubjectProce
       // Get current subject from ref queue
       const queue = subjectsQueueRef.current;
       if (!queue || queue.length === 0) {
-        console.warn('No subjects available in queue');
+        loggers.app('No subjects available in queue');
         return;
       }
 

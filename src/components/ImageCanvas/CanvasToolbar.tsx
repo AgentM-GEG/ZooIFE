@@ -16,7 +16,8 @@ import {
  * @param isPanMode - Whether pan mode is currently active
  * @param isDebugMode - Whether debug mode is enabled (hides toolbar when true)
  * @param activeAnnotationId - ID of currently active annotation (shows action buttons when set)
- * @param disableUndoRedo - Whether undo/redo buttons should be disabled
+ * @param disableUndo - Whether undo button should be disabled
+ * @param disableRedo - Whether redo button should be disabled
  * @param onZoomIn - Callback for zoom in button
  * @param onZoomOut - Callback for zoom out button
  * @param onZoomFit - Callback for fit-to-view button
@@ -32,7 +33,8 @@ const CanvasToolbar = memo(({
   isPanMode,
   isDebugMode,
   activeAnnotationId,
-  disableUndoRedo,
+  disableUndo,
+  disableRedo,
   onZoomIn,
   onZoomOut,
   onZoomFit,
@@ -46,7 +48,8 @@ const CanvasToolbar = memo(({
   isPanMode: boolean;
   isDebugMode: boolean;
   activeAnnotationId: string | null;
-  disableUndoRedo: boolean;
+  disableUndo: boolean;
+  disableRedo: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomFit: () => void;
@@ -73,12 +76,12 @@ const CanvasToolbar = memo(({
       >
         Pan
       </ToolbarButton>
-      {(activeAnnotationId || !disableUndoRedo) && (
+      {(activeAnnotationId || !disableUndo || !disableRedo) && (
         <MaskHistoryButtonsContainer>
           <UndoButton
             type="button"
             onClick={onUndo}
-            disabled={disableUndoRedo}
+            disabled={disableUndo}
             title="Undo last mask operation (Ctrl+Z / ⌘Z)"
           >
             Undo
@@ -86,7 +89,7 @@ const CanvasToolbar = memo(({
             <RedoButton
               type="button"
               onClick={onRedo}
-              disabled={disableUndoRedo}
+              disabled={disableRedo}
               title="Redo last undone mask operation (Ctrl+Shift+Z / ⌘Shift+Z)"
             >
               Redo

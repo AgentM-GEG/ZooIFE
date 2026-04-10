@@ -109,7 +109,7 @@ src/
 ├── services/          imageService, sam2Service, panoptesService
 ├── stores/            classificationStore (Zustand)
 ├── types/             panoptes, annotations, tools
-├── utils/image/       compressImageMask (mask compression for export)
+├── utils/image/       maskCompositing, compressImageMask (mask compositing & compression)
 ├── App.tsx
 └── main.tsx
 server/

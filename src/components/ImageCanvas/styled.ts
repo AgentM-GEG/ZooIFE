@@ -150,8 +150,12 @@ export const DebugBanner = styled.div`
 export const DebugImage = styled.img`
   max-width: 100%;
   max-height: 600px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
   border-radius: ${theme.borders.radius.lg};
   border: 3px solid ${theme.colors.error};
+  display: block;
 `;
 
 export const WarningBanner = styled.div<{ $isLeaving?: boolean }>`

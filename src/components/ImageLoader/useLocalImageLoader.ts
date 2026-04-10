@@ -6,6 +6,7 @@ import {
 } from '@/services/imageService';
 import { useClassificationStore } from '@/stores/classificationStore';
 import { LOCAL_SUBJECT_ID_PREFIX, ACCEPTED_IMAGE_TYPES } from './localImageConstants';
+import { loggers } from '@/utils/logger';
 
 /**
  * Custom hook for managing local image file uploads and processing.
@@ -33,7 +34,7 @@ export function useLocalImageLoader() {
         const dims = await getImageDimensions(normalizedUrl);
         setSubject(`${LOCAL_SUBJECT_ID_PREFIX}${file.name}`, normalizedUrl, dims);
       } catch (err) {
-        console.error('Failed to load local image:', err);
+        loggers.app('Failed to load local image:', err);
       }
     },
     [setSubject]

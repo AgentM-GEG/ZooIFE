@@ -23,11 +23,12 @@ export type AnnotationTool = 'point' | 'freehand' | 'brush' | 'sam2' | 'modifier
  * Single point annotation with foreground/background label for SAM2 prompts
  * 
  * @example
- * { type: 'point', x: 150, y: 200, label: 1, id: 'uuid-123' }
+ * { type: 'point', x: 150, y: 200, label: 1, id: 'uuid-123', annotationId: 'rect-id' }
  * 
  * - `label: 1` indicates foreground (object of interest)
  * - `label: 0` indicates background (context/reference)
  * - `id` auto-generated as UUID when added to store
+ * - `annotationId` identifies which Caesar rect this point belongs to (or '-1' for whole image)
  */
 export interface PointAnnotation {
   type: 'point';
@@ -35,6 +36,7 @@ export interface PointAnnotation {
   y: number;
   label: 0 | 1; // 0 = background, 1 = foreground
   id?: string;
+  annotationId?: string; // Which rect these prompts apply to ('-1' = whole image)
 }
 
 /**

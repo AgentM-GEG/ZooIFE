@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import Konva from 'konva';
 import type { AnnotationTool, DrawingAnnotation } from '@/types/annotations';
 import type { BrushProps } from './types';
+import { loggers } from '@/utils/logger';
 
 interface UseCanvasHandlersProps {
   tool: AnnotationTool;
@@ -119,7 +120,9 @@ export function useCanvasHandlers(props: UseCanvasHandlersProps) {
       const { x, y } = pointerToImage(pos);
 
       if (tool === 'point') {
-        addAnnotation({ type: 'point', x, y, label: 1 });
+        addAnnotation({ type: 'point', x, y, label: 1, annotationId: selectedCaesarAnnotation || '-1' });
+        const newPoint = { x, y, label: 1 };
+        loggers.canvas('[handleStageClick] Adding positive point (left-click):', newPoint);
         onPointClick?.(x, y, 1);
       } else if (tool === 'freehand' || tool === 'brush') {
         setDrawingPoints([...drawingPoints, { x, y }]);
@@ -143,7 +146,9 @@ export function useCanvasHandlers(props: UseCanvasHandlersProps) {
       const pos = stageRef.current.getPointerPosition();
       if (!pos) return;
       const { x, y } = pointerToImage(pos);
-      addAnnotation({ type: 'point', x, y, label: 0 });
+      addAnnotation({ type: 'point', x, y, label: 0, annotationId: selectedCaesarAnnotation || '-1' });
+      const newPoint = { x, y, label: 0 };
+      loggers.canvas('[handleContextMenu] Adding negative point (right-click):', newPoint);
       onPointClick?.(x, y, 0);
     },
     [tool, image, addAnnotation, onPointClick, pointerToImage, isPanMode, stageRef, setSuppressNextClick]

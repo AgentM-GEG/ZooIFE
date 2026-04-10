@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Circle, Line } from 'react-konva';
+import { Line } from 'react-konva';
 import type { DrawingAnnotation } from '@/types/annotations';
 
 /**
@@ -21,17 +21,28 @@ const AnnotationRenderer = memo(({ annotation, index, contentScale, debugImageUr
   showPoints: boolean;
 }) => {
   if (annotation.type === 'point' && !debugImageUrl && showPoints) {
+    // Crosshair size in image pixels (scaled inversely with zoom to maintain visual proportion)
+    const crosshairSize = 12 / contentScale;
+    const color = annotation.label === 0 ? '#e94560' : 'lime'; // red for negative, lime for positive
+    const strokeWidth = 2 / contentScale;
+
     return (
-      <Circle
-        key={annotation.id ?? index}
-        x={annotation.x}
-        y={annotation.y}
-        radius={4}
-        fill={annotation.label === 0 ? '#e94560' : 'lime'}
-        stroke="white"
-        strokeWidth={1}
-        listening={false}
-      />
+      <React.Fragment key={annotation.id ?? index}>
+        {/* Horizontal line */}
+        <Line
+          points={[annotation.x - crosshairSize, annotation.y, annotation.x + crosshairSize, annotation.y]}
+          stroke={color}
+          strokeWidth={strokeWidth}
+          listening={false}
+        />
+        {/* Vertical line */}
+        <Line
+          points={[annotation.x, annotation.y - crosshairSize, annotation.x, annotation.y + crosshairSize]}
+          stroke={color}
+          strokeWidth={strokeWidth}
+          listening={false}
+        />
+      </React.Fragment>
     );
   }
   

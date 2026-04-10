@@ -1,4 +1,5 @@
 import { useClassificationStore } from '@/stores/classificationStore';
+import type { HistoryEntry } from '@/stores/classificationStore';
 
 /**
  * Custom hook that manages per-annotation mask history.
@@ -34,7 +35,12 @@ export function useMaskHistory() {
    */
   const handlePushMaskHistory = (imgData: ImageData) => {
     const annotationId = getCurrentAnnotationId();
-    pushPerAnnotationMaskHistory(annotationId, imgData);
+    // Create a modifier_brush history entry from the ImageData
+    const entry: HistoryEntry = {
+      type: 'modifier_brush',
+      imageData: imgData,
+    };
+    pushPerAnnotationMaskHistory(annotationId, entry);
   };
 
   /**
@@ -43,7 +49,8 @@ export function useMaskHistory() {
    */
   const handleUndoMask = (): ImageData | null => {
     const annotationId = getCurrentAnnotationId();
-    return undoPerAnnotationMask(annotationId);
+    const entry = undoPerAnnotationMask(annotationId);
+    return entry?.imageData ?? null;
   };
 
   /**
@@ -52,7 +59,8 @@ export function useMaskHistory() {
    */
   const handleRedoMask = (): ImageData | null => {
     const annotationId = getCurrentAnnotationId();
-    return redoPerAnnotationMask(annotationId);
+    const entry = redoPerAnnotationMask(annotationId);
+    return entry?.imageData ?? null;
   };
 
   /**

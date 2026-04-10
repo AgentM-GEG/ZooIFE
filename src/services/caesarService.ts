@@ -1,6 +1,7 @@
 import { GraphQLClient, gql } from 'graphql-request'
 import { headers, USE_STAGING_APIS } from '@/services/panoptesService'
 import { CaesarAnnotations } from '@/types/annotations';
+import { loggers } from '@/utils/logger';
 
 /**
  * Caesar reduction API endpoints (GraphQL)
@@ -88,7 +89,7 @@ export async function fetchCaesarReductions(
     workflowID: string
 ): Promise<SubjectReduction[]> {
     if (!reducerKey) {
-        console.warn('fetchCaesarReductions: reducerKey is required');
+        loggers.app('fetchCaesarReductions: reducerKey is required');
         return [];
     }
 
@@ -120,7 +121,7 @@ export async function fetchCaesarReductions(
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const errorDetails = error instanceof Error ? error : { error };
-        console.error(`Failed to fetch Caesar reductions for subject ${subjectID}:`, {
+        loggers.app(`Failed to fetch Caesar reductions for subject ${subjectID}:`, {
             message,
             details: errorDetails,
             stack: error instanceof Error ? error.stack : undefined,

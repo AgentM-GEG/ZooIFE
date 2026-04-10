@@ -1,6 +1,7 @@
 import { useClassificationStore } from '@/stores/classificationStore';
 import { PROJECT_ID, WORKFLOW_ID } from '@/services/panoptesService';
 import { Sidebar, SubmitButton } from './styled';
+import { loggers } from '@/utils/logger';
 
 /**
  * Task sidebar component for displaying and answering Zooniverse workflow tasks.
@@ -13,7 +14,7 @@ export function TaskSidebar() {
 
   const handleSubmit = async () => {
     const annotations = await buildPanoptesClassification(PROJECT_ID, WORKFLOW_ID);
-    console.log('Classifications (Panoptes format):', annotations);
+    loggers.app('Classifications (Panoptes format):', annotations);
   };
 
   return (

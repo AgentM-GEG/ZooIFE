@@ -59,20 +59,20 @@ export const BrushEditableImage = forwardRef<
 
     if (hasMask) return;
 
-    const ctx = canvasImage.getContext("2d")!;
+    const ctx = canvasImage.getContext("2d", { willReadFrequently: true })!;
     ctx.clearRect(0, 0, canvasImage.width, canvasImage.height);
   };
 
   useEffect(() => {
     if (!externalMask) {
       // Clear the canvas when there's no external mask (e.g., historyIndex = -1)
-      const ctx = canvasImage.getContext("2d")!;
+      const ctx = canvasImage.getContext("2d", { willReadFrequently: true })!;
       ctx.clearRect(0, 0, canvasImage.width, canvasImage.height);
       imageRef.current?.getLayer()?.batchDraw();
       return;
     }
 
-    const ctx = canvasImage.getContext("2d")!;
+    const ctx = canvasImage.getContext("2d", { willReadFrequently: true })!;
 
     // Convert externalMask to ImageData and get dimensions
     const { data: extData, width: w, height: h } = sourceToImageData(externalMask);
@@ -108,7 +108,7 @@ export const BrushEditableImage = forwardRef<
     canvasImage.width = w;
     canvasImage.height = h;
 
-    const ctx = canvasImage.getContext("2d")!;
+    const ctx = canvasImage.getContext("2d", { willReadFrequently: true })!;
     ctx.clearRect(0, 0, w, h);
 
     imageRef.current?.getLayer()?.batchDraw();
@@ -121,7 +121,7 @@ export const BrushEditableImage = forwardRef<
    * @param _e - Pointer event from Konva
    */
   const drawAtPointer = (_e: any) => {
-    const ctx = canvasImage.getContext("2d")!;
+    const ctx = canvasImage.getContext("2d", { willReadFrequently: true })!;
     const imgNode = imageRef.current;
     if (!imgNode) return;
 
@@ -183,7 +183,7 @@ export const BrushEditableImage = forwardRef<
     },
     pointerUp: () => {
       if (isDrawingRef.current) {
-        const ctx = canvasImage.getContext("2d")!;
+        const ctx = canvasImage.getContext("2d", { willReadFrequently: true })!;
         const snapshot = ctx.getImageData(0, 0, canvasImage.width, canvasImage.height);
         handlePushMaskHistory(snapshot);
         
@@ -196,14 +196,14 @@ export const BrushEditableImage = forwardRef<
       lastPosRef.current = null;
     },
     undo: () => {
-      const ctx = canvasImage.getContext("2d")!;
+      const ctx = canvasImage.getContext("2d", { willReadFrequently: true })!;
       const restored = handleUndoMask();
       if (!restored) return;
       ctx.putImageData(restored, 0, 0);
       imageRef.current?.getLayer()?.batchDraw();
     },
     redo: () => {
-      const ctx = canvasImage.getContext("2d")!;
+      const ctx = canvasImage.getContext("2d", { willReadFrequently: true })!;
       const restored = handleRedoMask();
       if (!restored) return;
       ctx.putImageData(restored, 0, 0);

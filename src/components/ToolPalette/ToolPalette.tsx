@@ -39,6 +39,10 @@ export function ToolPalette({
   showPoints,
   onShowPointsChange,
   onPredModBrushSizeChange,
+  coordinateFix,
+  onCoordinateFixChange,
+  debugCoords,
+  onDebugCoordsChange,
 }: ToolPaletteProps) {
 
   const { annotations, clearAnnotations } =
@@ -85,7 +89,7 @@ export function ToolPalette({
 
       {hasAnnotations && (
         <ClearButton onClick={clearAnnotations}>
-          Clear all
+          Clear SAM points
         </ClearButton>
       )}
 
@@ -109,6 +113,33 @@ export function ToolPalette({
         />
         Show points
       </CheckboxLabel>
+
+      {/* VITE_SHOW_DEBUG_UI shows/hides the Debug Options section for development tools */}
+      {(import.meta.env.VITE_SHOW_DEBUG_UI === 'true' || import.meta.env.VITE_SHOW_DEBUG_UI === '1') && (
+        <>
+          <Label style={{ marginTop: theme.spacing.md }}>Debug Options</Label>
+          <CheckboxLabel>
+            <input
+              type="checkbox"
+              checked={debugCoords}
+              onChange={(e) => onDebugCoordsChange(e.target.checked)}
+            />
+            Debug SAM masks &amp; coordinates
+          </CheckboxLabel>
+
+          <Label style={{ marginTop: theme.spacing.sm }}>Coordinate Fix</Label>
+          <Select
+            value={coordinateFix}
+            onChange={(e) => onCoordinateFixChange(e.target.value as any)}
+          >
+            <option value="none">None</option>
+            <option value="flipX">Flip horizontally</option>
+            <option value="flipY">Flip vertically</option>
+            <option value="flipBoth">Flip both axes</option>
+            <option value="swapXY">Swap X/Y</option>
+          </Select>
+        </>
+      )}
 
       <PredModContainer>
         <ButtonGroup>

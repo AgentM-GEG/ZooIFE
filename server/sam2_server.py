@@ -154,6 +154,7 @@ async def segment(request: SegmentRequest) -> dict[str, Any]:
 
     point_coords = np.array([[p.x, p.y] for p in request.prompts], dtype=np.float32)
     point_labels = np.array([p.label for p in request.prompts], dtype=np.int64)
+    log.info(f"SAM2 request: {len(request.prompts)} points - labels: {point_labels.tolist()}, coords: {point_coords.tolist()}")
 
     try:
         backend, predictor = get_predictor(request.model_id)
@@ -197,24 +198,70 @@ async def segment(request: SegmentRequest) -> dict[str, Any]:
         mask_url = mask_to_data_uri(best_mask)
 
         result: dict[str, Any] = {"image": {"url": mask_url}}
+        
+        # Store mask selection info for analysis
+        iou_scores = [float(score) for score in iou_flat]
+        has_background_prompts = any(p.label == 0 for p in request.prompts)
+        result["mask_selection"] = {
+            "selected_idx": best_idx,
+            "selected_iou": iou_scores[best_idx],
+            "all_iou_scores": iou_scores,
+            "has_background_prompts": has_background_prompts,
+        }
+        
         if request.debug:
-            # Draw large visible marker at received (x,y) to verify coordinate mapping
-            from PIL import Image, ImageDraw
-            img_pil = Image.fromarray(image)
-            draw = ImageDraw.Draw(img_pil)
+            from PIL import Image
             h, w = image.shape[:2]
-            for p in request.prompts:
-                r = max(40, min(h, w) // 15)  # Large radius: ~7% of smaller dimension
-                x0, y0 = max(0, p.x - r), max(0, p.y - r)
-                x1, y1 = min(w, p.x + r), min(h, p.y + r)
-                draw.ellipse([x0, y0, x1, y1], fill="red", outline="white", width=8)
-                draw.line([p.x - r, p.y, p.x + r, p.y], fill="white", width=4)
-                draw.line([p.x, p.y - r, p.x, p.y + r], fill="white", width=4)
-                log.info("Debug: drew marker at (%s, %s) for image %sx%s", p.x, p.y, w, h)
+            
+            # Calculate bbox around all points with padding for zoomed view
+            xs = [p.x for p in request.prompts]
+            ys = [p.y for p in request.prompts]
+            x_min, x_max = min(xs), max(xs)
+            y_min, y_max = min(ys), max(ys)
+            
+            # Add padding (20% of bbox or minimum 50px)
+            x_range = max(1, x_max - x_min)
+            y_range = max(1, y_max - y_min)
+            padding_x = max(50, int(x_range * 0.2))
+            padding_y = max(50, int(y_range * 0.2))
+            
+            # Clamp crop region to image bounds
+            crop_x0 = max(0, int(x_min - padding_x))
+            crop_y0 = max(0, int(y_min - padding_y))
+            crop_x1 = min(w, int(x_max + padding_x))
+            crop_y1 = min(h, int(y_max + padding_y))
+            
+            # Crop image for debug visualization (no point drawing - frontend will do it)
+            cropped_image = image[crop_y0:crop_y1, crop_x0:crop_x1]
+            img_pil = Image.fromarray(cropped_image)
             buf = io.BytesIO()
             img_pil.save(buf, format="PNG")
             b64 = base64.b64encode(buf.getvalue()).decode()
             result["debug_url"] = f"data:image/png;base64,{b64}"
+            
+            # Store crop info so frontend can adjust point coordinates
+            result["debug_crop"] = {
+                "crop_x0": crop_x0,
+                "crop_y0": crop_y0,
+                "crop_w": int(crop_x1 - crop_x0),
+                "crop_h": int(crop_y1 - crop_y0),
+            }
+            
+            # In debug mode, also return all candidate masks (zoomed) and their IoU scores
+            result["debug_masks"] = []
+            for idx, mask in enumerate(masks):
+                if hasattr(mask, "cpu"):
+                    mask = mask.cpu().numpy()
+                # Crop mask to same region
+                cropped_mask = mask[crop_y0:crop_y1, crop_x0:crop_x1]
+                mask_data_uri = mask_to_data_uri(cropped_mask)
+                result["debug_masks"].append({
+                    "idx": idx,
+                    "iou": iou_scores[idx],
+                    "url": mask_data_uri,
+                    "is_selected": idx == best_idx,
+                })
+        
         return result
 
     except RuntimeError as e:

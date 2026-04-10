@@ -4,6 +4,7 @@
  */
 
 import { transformPoints, type CoordinateFix } from '@/utils/coordinates';
+import { loggers } from '@/utils/logger';
 
 export interface PointPrompt {
   x: number;
@@ -14,6 +15,18 @@ export interface PointPrompt {
 export interface Sam2Output {
   image?: { url: string; width?: number; height?: number };
   debug_url?: string;
+  mask_selection?: {
+    selected_idx: number;
+    selected_iou: number;
+    all_iou_scores: number[];
+    has_background_prompts: boolean;
+  };
+  debug_masks?: Array<{
+    idx: number;
+    iou: number;
+    url: string;
+    is_selected: boolean;
+  }>;
 }
 
 export interface Sam2Options {
@@ -53,21 +66,46 @@ export async function segmentWithPoints(
 ): Promise<Sam2Output> {
   const { debug = false, imageSize, coordinateFix = 'none', modelId = 'sam2-hiera-large' } = options;
 
+  loggers.sam2('[SAM2 Service] segmentWithPoints called', {
+    promptCount: prompts.length,
+    prompts,
+    options: { debug, imageSize, coordinateFix, modelId },
+    imageSummary: imageUrl.substring(0, 50) + (imageUrl.length > 50 ? '...' : ''),
+  });
+
   // Transform prompts using coordinate fix utility
   const transformedPrompts = transformPoints(prompts, imageSize, coordinateFix);
+
+  loggers.sam2('[SAM2 Service] Transformed prompts', {
+    transformedPrompts,
+  });
 
   const url = baseUrl ? `${baseUrl}/api/sam2/segment` : '/api/sam2/segment';
 
   try {
+    const requestBody = {
+      image_url: imageUrl,
+      prompts: transformedPrompts,
+      debug,
+      model_id: modelId,
+    };
+
+    loggers.sam2('[SAM2 Service] Sending request to', url, {
+      debug,
+      model_id: modelId,
+      promptCount: transformedPrompts.length,
+      imageSummary: imageUrl.substring(0, 50) + (imageUrl.length > 50 ? '...' : ''),
+    });
+
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image_url: imageUrl,
-        prompts: transformedPrompts,
-        debug,
-        model_id: modelId,
-      }),
+      body: JSON.stringify(requestBody),
+    });
+
+    loggers.sam2('[SAM2 Service] Response received', {
+      status: response.status,
+      statusText: response.statusText,
     });
 
     if (!response.ok) {
@@ -78,11 +116,19 @@ export async function segmentWithPoints(
       } catch {
         errorMessage = `HTTP ${response.status}`;
       }
+      loggers.sam2('[SAM2 Service] Request failed', { status: response.status, errorMessage });
       throw new Error(`SAM2 segmentation failed: ${errorMessage}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    loggers.sam2('[SAM2 Service] Result received', {
+      hasImage: !!result.image?.url,
+      hasDebugUrl: !!result.debug_url,
+    });
+
+    return result;
   } catch (error) {
+    loggers.sam2('[SAM2 Service] Error during segmentation', error);
     if (error instanceof Error) {
       throw error;
     }
