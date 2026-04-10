@@ -10,12 +10,14 @@ export function useMaskHistory() {
     activeAnnotationId,
     perAnnotationMasks,
     pushPerAnnotationMaskHistory,
+    setPerAnnotationMask,
     undoPerAnnotationMask,
     redoPerAnnotationMask,
   } = useClassificationStore((s) => ({
     activeAnnotationId: s.activeAnnotationId,
     perAnnotationMasks: s.perAnnotationMasks,
     pushPerAnnotationMaskHistory: s.pushPerAnnotationMaskHistory,
+    setPerAnnotationMask: s.setPerAnnotationMask,
     undoPerAnnotationMask: s.undoPerAnnotationMask,
     redoPerAnnotationMask: s.redoPerAnnotationMask,
   }));
@@ -68,10 +70,21 @@ export function useMaskHistory() {
     );
   };
 
+  /**
+   * Update the mask display URL for the current annotation.
+   * Called after drawing to show the updated canvas content.
+   * @param maskUrl - Data URI of the mask to display, or null to clear
+   */
+  const handleUpdateMaskDisplay = (maskUrl: string | null) => {
+    const annotationId = getCurrentAnnotationId();
+    setPerAnnotationMask(annotationId, maskUrl);
+  };
+
   return {
     handlePushMaskHistory,
     handleUndoMask,
     handleRedoMask,
+    handleUpdateMaskDisplay,
     getActiveMaskState,
     activeAnnotationId,
     perAnnotationMasks,

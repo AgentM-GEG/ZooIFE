@@ -57,6 +57,8 @@ interface ClassificationState {
   perAnnotationMasks: Record<string, PerAnnotationMaskState>;
   /** Currently selected annotation for editing its mask */
   activeAnnotationId: string | null;
+  /** Global composite mask showing all visible masks from all annotations */
+  globalCompositeMask: string | null;
 
   // ============= Actions: Subject Management =============
   /**
@@ -121,6 +123,12 @@ interface ClassificationState {
   setPerAnnotationMask: (annotationId: string, url: string | null) => void;
 
   /**
+   * Set the global composite mask (shows all visible masks)
+   * @param url Composite mask image URL or null
+   */
+  setGlobalCompositeMask: (url: string | null) => void;
+
+  /**
    * Add per-annotation mask to history
    * @param annotationId Annotation's markId
    * @param imgData ImageData to store
@@ -171,7 +179,7 @@ interface ClassificationState {
 /**
  * Create initial state with dynamically generated timestamp
  */
-const createInitialState = (): Pick<ClassificationState, Exclude<keyof ClassificationState, 'setSubject' | 'addAnnotation' | 'removeAnnotation' | 'undoLastAnnotation' | 'clearAnnotations' | 'setTaskAnswer' | 'setDebugImage' | 'setActiveAnnotation' | 'setPerAnnotationMask' | 'pushPerAnnotationMaskHistory' | 'undoPerAnnotationMask' | 'redoPerAnnotationMask' | 'saveMask' | 'buildPanoptesAnnotations' | 'buildPanoptesClassification' | 'reset'>> => ({
+const createInitialState = (): Pick<ClassificationState, Exclude<keyof ClassificationState, 'setSubject' | 'addAnnotation' | 'removeAnnotation' | 'undoLastAnnotation' | 'clearAnnotations' | 'setTaskAnswer' | 'setDebugImage' | 'setActiveAnnotation' | 'setPerAnnotationMask' | 'setGlobalCompositeMask' | 'pushPerAnnotationMaskHistory' | 'undoPerAnnotationMask' | 'redoPerAnnotationMask' | 'saveMask' | 'buildPanoptesAnnotations' | 'buildPanoptesClassification' | 'reset'>> => ({
   subjectId: null,
   imageUrl: null,
   imageDimensions: null,
@@ -181,6 +189,7 @@ const createInitialState = (): Pick<ClassificationState, Exclude<keyof Classific
   finishedAt: null,
   perAnnotationMasks: {},
   activeAnnotationId: null,
+  globalCompositeMask: null,
   startedAt: new Date().toISOString(),
 });
 
@@ -290,11 +299,17 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
       perAnnotationMasks: {
         ...state.perAnnotationMasks,
         [annotationId]: {
-          ...(state.perAnnotationMasks[annotationId] || { history: [], historyIndex: 0 }),
+          ...(state.perAnnotationMasks[annotationId] || { history: [], historyIndex: -1 }),
           maskUrl: url,
         },
       },
     })),
+
+  /**
+   * Set the global composite mask showing all visible annotations' masks.
+   * @param url - Composite mask image URL or null to clear
+   */
+  setGlobalCompositeMask: (url) => set({ globalCompositeMask: url }),
 
   /**
    * Add mask to undo/redo history for a specific annotation.
@@ -338,12 +353,26 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
     }
     const newIndex = annotationState.historyIndex - 1;
     console.log(`[undoPerAnnotationMask] annotationId=${annotationId}, oldIndex=${annotationState.historyIndex}, newIndex=${newIndex}, historyLength=${annotationState.history.length}`);
+    
+    // Convert ImageData to data URL if we're going to a valid history entry
+    let newMaskUrl: string | null = null;
+    if (newIndex >= 0 && annotationState.history[newIndex]) {
+      const canvas = document.createElement('canvas');
+      const imgData = annotationState.history[newIndex];
+      canvas.width = imgData.width;
+      canvas.height = imgData.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.putImageData(imgData, 0, 0);
+      newMaskUrl = canvas.toDataURL('image/png');
+    }
+    
     set((s) => ({
       perAnnotationMasks: {
         ...s.perAnnotationMasks,
         [annotationId]: {
           ...s.perAnnotationMasks[annotationId],
           historyIndex: newIndex,
+          maskUrl: newMaskUrl,
         },
       },
     }));
@@ -364,12 +393,26 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
     }
     const newIndex = annotationState.historyIndex + 1;
     console.log(`[redoPerAnnotationMask] annotationId=${annotationId}, oldIndex=${annotationState.historyIndex}, newIndex=${newIndex}, historyLength=${annotationState.history.length}`);
+    
+    // Convert ImageData to data URL for the new history entry
+    let newMaskUrl: string | null = null;
+    if (newIndex < annotationState.history.length && annotationState.history[newIndex]) {
+      const canvas = document.createElement('canvas');
+      const imgData = annotationState.history[newIndex];
+      canvas.width = imgData.width;
+      canvas.height = imgData.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.putImageData(imgData, 0, 0);
+      newMaskUrl = canvas.toDataURL('image/png');
+    }
+    
     set((s) => ({
       perAnnotationMasks: {
         ...s.perAnnotationMasks,
         [annotationId]: {
           ...s.perAnnotationMasks[annotationId],
           historyIndex: newIndex,
+          maskUrl: newMaskUrl,
         },
       },
     }));

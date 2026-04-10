@@ -40,6 +40,7 @@ export const BrushEditableImage = forwardRef<
     handlePushMaskHistory,
     handleUndoMask,
     handleRedoMask,
+    handleUpdateMaskDisplay,
   } = useMaskHistory();
 
 
@@ -185,6 +186,10 @@ export const BrushEditableImage = forwardRef<
         const ctx = canvasImage.getContext("2d")!;
         const snapshot = ctx.getImageData(0, 0, canvasImage.width, canvasImage.height);
         handlePushMaskHistory(snapshot);
+        
+        // Update mask display after pushing to history
+        const maskUrl = canvasImage.toDataURL('image/png');
+        handleUpdateMaskDisplay(maskUrl);
       }
 
       isDrawingRef.current = false;

@@ -62,6 +62,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const setActiveAnnotation = useClassificationStore(s => s.setActiveAnnotation);
   const addAnnotation = useClassificationStore(s => s.addAnnotation);
   const perAnnotationMasks = useClassificationStore(s => s.perAnnotationMasks);
+  const globalCompositeMask = useClassificationStore(s => s.globalCompositeMask);
   const saveMask = useClassificationStore(s => s.saveMask);
 
   const caesarReducedAnnotations = useCaesarAnnotationStore(s => s.annotations);
@@ -80,6 +81,9 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const [brushCursorPos, setBrushCursorPos] = useState({ x: 0, y: 0 });
   const [isCursorOverCanvas, setIsCursorOverCanvas] = useState(false);
 
+  // Get current annotation ID for editing
+  const currentAnnotationId = activeAnnotationId || '-1';
+
   // ============ EFFECTS ============
   // Reset banner visibility when warning is triggered again (after user dismisses or on new attempt)
   // unless user has opted out for the session
@@ -91,10 +95,8 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   }, [noRectangleWarning, suppressWarningForSession]);
 
   // ============ EXTRACTED STATE MANAGEMENT ============
-  // Get current annotation's mask URL for canvas rendering
-  const currentAnnotationId = activeAnnotationId || '-1';
-  const currentMaskUrl = perAnnotationMasks[currentAnnotationId]?.maskUrl ?? null;
-  const canvasState = useCanvasState(imageUrl, currentMaskUrl, debugImageUrl);
+  // But pass the global composite as the display mask to show all masks
+  const canvasState = useCanvasState(imageUrl, globalCompositeMask, debugImageUrl);
   const {
     setViewportState,
     stageRef,
@@ -171,36 +173,45 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const isBrushCursorVisible = !isPanMode && !debugImageUrl && isCursorOverCanvas && (tool === 'brush' || tool === 'modifier_brush');
 
   /**
-   * Composite all visible masks (annotations with history and historyIndex > 0)
+   * Composite all visible masks (annotations with history and historyIndex >= 0)
    * into a single mask for display.
-   * Updates the current annotation's maskUrl to show the composite.
+   * Updates the global composite mask to show all visible masks.
+   * 
+   * This function creates a composite of ALL masks that have a valid history state,
+   * then displays that composite as a global overlay independent of which annotation is active.
    */
   const displayCompositeOfVisibleMasks = useCallback(() => {
     const state = useClassificationStore.getState();
     const visibleMasks: ImageData[] = [];
+
+    console.log('[displayCompositeOfVisibleMasks] Computing composite...');
 
     // Collect all masks that have history and are at a valid history point (>= 0)
     for (const [annotationId, maskState] of Object.entries(state.perAnnotationMasks)) {
       if (maskState.history.length > 0 && maskState.historyIndex >= 0) {
         const maskImageData = maskState.history[maskState.historyIndex];
         visibleMasks.push(maskImageData);
-        console.log(`[displayCompositeOfVisibleMasks] Including mask from annotationId=${annotationId}, historyIndex=${maskState.historyIndex}`);
+        console.log(`  - Including mask from ${annotationId}, historyIndex=${maskState.historyIndex}`);
       }
     }
 
+    console.log(`[displayCompositeOfVisibleMasks] Found ${visibleMasks.length} visible masks`);
+
     if (visibleMasks.length === 0) {
-      console.log(`[displayCompositeOfVisibleMasks] No visible masks to composite`);
       // Clear the mask display when no masks are visible
-      const annotationId = state.activeAnnotationId || '-1';
-      state.setPerAnnotationMask(annotationId, null);
+      console.log(`[displayCompositeOfVisibleMasks] No masks - clearing display`);
+      state.setGlobalCompositeMask(null);
       return;
     }
 
     // Composite all visible masks
     const composite = compositeImageDataMasks(visibleMasks);
-    if (!composite) return;
+    if (!composite) {
+      console.error('[displayCompositeOfVisibleMasks] Failed to create composite');
+      return;
+    }
 
-    // Convert composite to data URL and update display
+    // Convert composite to data URL and update global display
     const canvas = document.createElement('canvas');
     canvas.width = composite.width;
     canvas.height = composite.height;
@@ -208,34 +219,41 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     ctx.putImageData(composite, 0, 0);
     const compositeUrl = canvas.toDataURL();
 
-    // Update the current annotation to show the composite
-    const annotationId = state.activeAnnotationId || '-1';
-    state.setPerAnnotationMask(annotationId, compositeUrl);
-    console.log(`[displayCompositeOfVisibleMasks] Updated annotationId=${annotationId} with composite mask`);
+    // Update the global composite mask to show all masks
+    console.log(`[displayCompositeOfVisibleMasks] Setting global composite with ${visibleMasks.length} masks`);
+    state.setGlobalCompositeMask(compositeUrl);
   }, []);
 
   /**
    * Handle undo for mask history - works with per-annotation masks.
-   * Also displays composite of all visible masks after undoing.
    */
   const handleUndoMask = useCallback(() => {
     const annotationId = activeAnnotationId || '-1';
+    console.log(`[handleUndoMask] Undoing for annotationId=${annotationId}`);
     undoPerAnnotationMask(annotationId);
-    // Schedule composite display after state update
-    setTimeout(() => displayCompositeOfVisibleMasks(), 0);
-  }, [activeAnnotationId, undoPerAnnotationMask, displayCompositeOfVisibleMasks]);
+    // The useEffect watching perAnnotationMasks will recompute the composite
+  }, [activeAnnotationId, undoPerAnnotationMask]);
 
   /**
    * Handle redo for mask history - works with per-annotation masks.
-   * Also displays composite of all visible masks after redoing.
    */
   const handleRedoMask = useCallback(() => {
     const annotationId = activeAnnotationId || '-1';
+    console.log(`[handleRedoMask] Redoing for annotationId=${annotationId}`);
     const { redoPerAnnotationMask } = useClassificationStore.getState();
     redoPerAnnotationMask(annotationId);
-    // Schedule composite display after state update
-    setTimeout(() => displayCompositeOfVisibleMasks(), 0);
-  }, [activeAnnotationId, displayCompositeOfVisibleMasks]);
+    // The useEffect watching perAnnotationMasks will recompute the composite
+  }, [activeAnnotationId]);
+
+  /**
+   * Recompute global composite mask whenever any annotation's mask history changes.
+   * This ensures all visible masks are always displayed together, regardless of 
+   * which annotation is active.
+   */
+  useEffect(() => {
+    console.log('[useEffect] perAnnotationMasks changed - triggering composite recompute');
+    displayCompositeOfVisibleMasks();
+  }, [perAnnotationMasks, displayCompositeOfVisibleMasks]);
 
   // ============ EXTRACTED EFFECTS ============
   useAnnotationEffects({
@@ -412,7 +430,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   }
 
   // Check if there's a mask to work with using per-annotation history
-  const currentMaskState = perAnnotationMasks[currentAnnotationId] || { history: [], historyIndex: 0 };
+  const currentMaskState = perAnnotationMasks[currentAnnotationId] || { history: [], historyIndex: -1 };
   const disableUndoRedo = currentMaskState.history.length === 0;
 
   // Get the label of the selected annotation for display

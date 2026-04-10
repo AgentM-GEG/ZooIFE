@@ -203,27 +203,27 @@ export function compositeImageDataMasks(masks: ImageData[]): ImageData | null {
     const firstMask = masks[0];
     const { width, height } = firstMask;
 
-    // Create canvas for compositing
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d')!;
+    // Create composite by ORing all mask pixels together
+    // This combines all masks into one without any overwriting
+    const compositeData = new Uint8ClampedArray(firstMask.data);
 
-    // Clear canvas
-    ctx.clearRect(0, 0, width, height);
-
-    // Overlay each mask on top
-    for (const mask of masks) {
+    for (let i = 1; i < masks.length; i++) {
+        const mask = masks[i];
+        
         if (mask.width !== width || mask.height !== height) {
             console.warn(`[compositeImageDataMasks] Mask dimension mismatch: expected ${width}x${height}, got ${mask.width}x${mask.height}`);
             continue;
         }
-        ctx.putImageData(mask, 0, 0);
+
+        // OR each pixel value from this mask with the composite
+        // This preserves all mask data - if either mask has a pixel, it appears in composite
+        for (let j = 0; j < mask.data.length; j++) {
+            compositeData[j] = compositeData[j] | mask.data[j];
+        }
     }
 
-    // Get composite result
-    const composite = ctx.getImageData(0, 0, width, height);
-    console.log(`[compositeImageDataMasks] Composited ${masks.length} masks, result=${width}x${height}`);
+    const composite = new ImageData(compositeData, width, height);
+    console.log(`[compositeImageDataMasks] Composited ${masks.length} masks via bitwise OR, result=${width}x${height}`);
     
     return composite;
 }

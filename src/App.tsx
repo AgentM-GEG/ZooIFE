@@ -7,6 +7,7 @@ import { ToolPalette } from './components/ToolPalette/ToolPalette';
 import { TaskSidebar } from './components/TaskSidebar/TaskSidebar';
 import { segmentWithPoints } from './services/sam2Service';
 import { useClassificationStore } from './stores/classificationStore';
+import { compositeImageDataMasks } from '@/utils/image/compressImageMask';
 import type { AnnotationTool } from './types/annotations';
 import type { BrushEditableImageHandle } from '@/types/tools';
 import {
@@ -52,6 +53,52 @@ function dataUriToImageData(dataUri: string): Promise<ImageData> {
     img.onerror = () => reject(new Error('Failed to load image from data URI'));
     img.src = dataUri;
   });
+}
+
+/**
+ * Convert ImageData to data URI PNG.
+ * Opposite of dataUriToImageData.
+ * @param imageData - ImageData to convert
+ * @returns PNG data URI string
+ */
+function imageDataToDataUri(imageData: ImageData): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = imageData.width;
+  canvas.height = imageData.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Failed to get canvas context');
+  ctx.putImageData(imageData, 0, 0);
+  return canvas.toDataURL('image/png');
+}
+
+/**
+ * Blend a new SAM result with the current mask to preserve modifier strokes.
+ * If there's already a mask with modifier strokes, composite the new SAM result with it.
+ * Otherwise, just return the new SAM result.
+ * 
+ * @param newSamImageData - ImageData from new SAM segmentation
+ * @param annotationId - ID of the annotation being edited
+ * @returns Blended ImageData (composite of current mask + new SAM result)
+ */
+function blendSamResultWithCurrentMask(newSamImageData: ImageData, annotationId: string): ImageData {
+  const state = useClassificationStore.getState();
+  const maskState = state.perAnnotationMasks[annotationId];
+  
+  // If no existing mask history, just return the new SAM result
+  if (!maskState || maskState.history.length === 0 || maskState.historyIndex < 0) {
+    return newSamImageData;
+  }
+  
+  // Get the current mask from history (at current historyIndex)
+  const currentMaskImageData = maskState.history[maskState.historyIndex];
+  if (!currentMaskImageData) {
+    return newSamImageData;
+  }
+  
+  // Composite: new SAM result + current mask (preserves modifier strokes)
+  const composite = compositeImageDataMasks([currentMaskImageData, newSamImageData]);
+  console.log(`[blendSamResultWithCurrentMask] Blended new SAM result with current mask (historyIndex=${maskState.historyIndex})`);
+  return composite || newSamImageData;
 }
 
 /**
@@ -122,8 +169,12 @@ function App() {
           // Convert SAM mask to ImageData and add to history
           const maskUrl = result.image.url;
           dataUriToImageData(maskUrl).then((imageData) => {
-            pushPerAnnotationMaskHistory(currentAnnotationId, imageData);
-            setPerAnnotationMask(currentAnnotationId, maskUrl);
+            // Blend new SAM result with current mask to preserve modifier strokes
+            const blendedImageData = blendSamResultWithCurrentMask(imageData, currentAnnotationId);
+            pushPerAnnotationMaskHistory(currentAnnotationId, blendedImageData);
+            // Display the blended result (not just the raw SAM output)
+            const blendedMaskUrl = imageDataToDataUri(blendedImageData);
+            setPerAnnotationMask(currentAnnotationId, blendedMaskUrl);
           }).catch((err) => {
             console.warn('Failed to convert SAM mask to ImageData:', err);
             setPerAnnotationMask(currentAnnotationId, maskUrl);
@@ -180,8 +231,12 @@ function App() {
               // Convert SAM mask to ImageData and add to history
               const maskUrl = result.image.url;
               dataUriToImageData(maskUrl).then((imageData) => {
-                pushPerAnnotationMaskHistory(currentAnnotationId, imageData);
-                setPerAnnotationMask(currentAnnotationId, maskUrl);
+                // Blend new SAM result with current mask to preserve modifier strokes
+                const blendedImageData = blendSamResultWithCurrentMask(imageData, currentAnnotationId);
+                pushPerAnnotationMaskHistory(currentAnnotationId, blendedImageData);
+                // Display the blended result (not just the raw SAM output)
+                const blendedMaskUrl = imageDataToDataUri(blendedImageData);
+                setPerAnnotationMask(currentAnnotationId, blendedMaskUrl);
               }).catch((err) => {
                 console.warn('Failed to convert SAM mask to ImageData:', err);
                 setPerAnnotationMask(currentAnnotationId, maskUrl);
@@ -194,8 +249,12 @@ function App() {
             // Convert SAM mask to ImageData and add to history
             const maskUrl = result.image.url;
             dataUriToImageData(maskUrl).then((imageData) => {
-              pushPerAnnotationMaskHistory(currentAnnotationId, imageData);
-              setPerAnnotationMask(currentAnnotationId, maskUrl);
+              // Blend new SAM result with current mask to preserve modifier strokes
+              const blendedImageData = blendSamResultWithCurrentMask(imageData, currentAnnotationId);
+              pushPerAnnotationMaskHistory(currentAnnotationId, blendedImageData);
+              // Display the blended result (not just the raw SAM output)
+              const blendedMaskUrl = imageDataToDataUri(blendedImageData);
+              setPerAnnotationMask(currentAnnotationId, blendedMaskUrl);
             }).catch((err) => {
               console.warn('Failed to convert SAM mask to ImageData:', err);
               setPerAnnotationMask(currentAnnotationId, maskUrl);
