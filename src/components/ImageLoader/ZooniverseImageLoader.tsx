@@ -18,7 +18,7 @@ export function ZooniverseImageLoader() {
   const accessToken = token?.access_token;
   const caesarClient = useCaesarClient(accessToken, CAESAR_REDUCTION_OPTS);
   const processCaesarReductions = useCaesarReductions(caesarClient, WORKFLOW_ID, accessToken);
-  const { loadNextSubject } = useSubjectLoader(accessToken, processCaesarReductions);
+  const { loadNextSubject, isLoading } = useSubjectLoader(accessToken, processCaesarReductions);
 
   // Only render content if authenticated
   if (!accessToken) {
@@ -27,8 +27,8 @@ export function ZooniverseImageLoader() {
 
   return (
     <Container>
-      <Button onClick={() => loadNextSubject()}>
-        Next subject
+      <Button onClick={() => loadNextSubject()} disabled={isLoading}>
+        {isLoading ? 'Loading...' : 'Next subject'}
       </Button>
     </Container>
   );

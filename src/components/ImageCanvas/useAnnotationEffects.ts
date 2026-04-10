@@ -15,7 +15,6 @@ interface UseAnnotationEffectsProps {
   stageRef: React.RefObject<Konva.Stage>;
   setIsPanMode: (value: boolean) => void;
   setNoRectangleWarning: (value: boolean) => void;
-  setWarningFadingOut: (value: boolean) => void;
 }
 
 /**
@@ -42,7 +41,6 @@ export function useAnnotationEffects(props: UseAnnotationEffectsProps) {
     stageRef,
     setIsPanMode,
     setNoRectangleWarning,
-    setWarningFadingOut,
   } = props;
 
   /**
@@ -78,15 +76,14 @@ export function useAnnotationEffects(props: UseAnnotationEffectsProps) {
   }, [onUndo]);
 
   /**
-   * Hide warning banner when a Caesar annotation is selected.
+   * Clear warning banner silently when a Caesar annotation is selected.
+   * Note: The warning is now cleared immediately in handleCaesarAnnotationClick,
+   * so this mostly handles edge cases where an annotation might be selected by other means.
    */
   useEffect(() => {
     if (selectedCaesarAnnotation) {
-      setWarningFadingOut(true);
-      setTimeout(() => {
-        setNoRectangleWarning(false);
-        setWarningFadingOut(false);
-      }, 100);
+      // Just clear it silently without fade effect
+      setNoRectangleWarning(false);
     }
-  }, [selectedCaesarAnnotation, setNoRectangleWarning, setWarningFadingOut]);
+  }, [selectedCaesarAnnotation, setNoRectangleWarning]);
 }

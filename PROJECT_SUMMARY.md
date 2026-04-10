@@ -47,7 +47,8 @@
 | `components/Login/Login.tsx` | Login / logout buttons using `useAuth`. |
 | `components/ImageLoader/ImageLoader.tsx` | Local file picker → `setSubject` (still useful for offline dev; **not** used in `App` currently). |
 | `components/ImageLoader/ZooniverseImageLoader.tsx` | **Next subject** button; `getQueuedSubjects`, `loadImageAsDataUrl` on remote URL, normalize + dimensions. Workflow ID from `VITE_ZOONIVERSE_WORKFLOW_ID` (default `29070`); optional `VITE_ZOONIVERSE_SUBJECT_SET_ID` for grouped workflows or explicit set selection. |
-| `components/ImageCanvas/ImageCanvas.tsx` | Konva stage: zoom/pan, tools, SAM/debug/mask layers, pointer routing to mask editor. |
+| `components/ImageCanvas/ImageCanvas.tsx` | Konva stage: zoom/pan, tools, SAM/debug/mask layers, pointer routing to mask editor. Manages canvas cursor state and passes `selectedCaesarAnnotation` to overlay for dynamic cursor feedback. |
+| `components/CaesarAnnotationOverlay/` | Caesar ML annotations overlay with interactive rectangles. Dynamic SVG cursors: magnifying glass **+** (zoom in) for unselected, **−** (zoom out) for selected. Hover tooltips with annotation labels. Selection state determines visual feedback and click behavior. |
 | `components/ImageMask/BrushEditableImage.tsx` | Offscreen canvas for mask pixels; mask history via store; imperative handle for pointer events. |
 | `components/ToolPalette/ToolPalette.tsx` | Point / freehand / brush, SAM model select, coordinate fix & debug, **Modify prediction** UI when `currentMaskUrl` is set. |
 | `components/TaskSidebar/TaskSidebar.tsx` | Static sample tasks; submit calls `buildPanoptesAnnotations()` and logs (does not `await` the async builder). |

@@ -6,9 +6,7 @@ import {
   MaskHistoryButtonsContainer,
   UndoButton,
   RedoButton,
-  SaveButton,
   BackButton,
-  MarkingMessage,
 } from './styled';
 
 /**
@@ -26,7 +24,6 @@ import {
  * @param onTogglePan - Callback for pan mode toggle
  * @param onUndo - Callback for undo button
  * @param onRedo - Callback for redo button
- * @param onSave - Callback for save mask button
  * @param onBack - Callback for back button
  * @returns Toolbar element with zoom controls and annotation action buttons, or null if debug mode
  */
@@ -36,7 +33,6 @@ const CanvasToolbar = memo(({
   isDebugMode,
   activeAnnotationId,
   disableUndoRedo,
-  selectedAnnotationLabel,
   onZoomIn,
   onZoomOut,
   onZoomFit,
@@ -44,7 +40,6 @@ const CanvasToolbar = memo(({
   onTogglePan,
   onUndo,
   onRedo,
-  onSave,
   onBack,
 }: {
   zoom: number;
@@ -52,7 +47,6 @@ const CanvasToolbar = memo(({
   isDebugMode: boolean;
   activeAnnotationId: string | null;
   disableUndoRedo: boolean;
-  selectedAnnotationLabel?: string;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomFit: () => void;
@@ -60,7 +54,6 @@ const CanvasToolbar = memo(({
   onTogglePan: () => void;
   onUndo: () => void;
   onRedo: () => void;
-  onSave: () => void;
   onBack: () => void;
 }) => {
   if (isDebugMode) return null;
@@ -81,11 +74,6 @@ const CanvasToolbar = memo(({
         Pan
       </ToolbarButton>
       {(activeAnnotationId || !disableUndoRedo) && (
-        <MarkingMessage>
-          {selectedAnnotationLabel ? `Marking a ${selectedAnnotationLabel}` : 'Marking a new object'}
-        </MarkingMessage>
-      )}
-      {(activeAnnotationId || !disableUndoRedo) && (
         <MaskHistoryButtonsContainer>
           <UndoButton
             type="button"
@@ -103,13 +91,6 @@ const CanvasToolbar = memo(({
             >
               Redo
             </RedoButton>
-            <SaveButton
-              type="button"
-              onClick={onSave}
-              title="Save mask for this annotation"
-            >
-              Save
-            </SaveButton>
             <BackButton
               type="button"
               onClick={onBack}

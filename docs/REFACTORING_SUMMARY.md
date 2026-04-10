@@ -397,3 +397,28 @@ const loadNextSubject = useCallback(async () => {
 ## Conclusion
 
 This refactoring improved both the services layer architecture and the component patterns. The root cause of the hooks violation was calling hooks conditionally (before guard clauses) and inside loops, violating React's fundamental rules. By moving hooks to unconditional positions and extracting child components, the application now handles multi-subject workflows correctly while maintaining type safety and security.
+
+## Post-Refactoring Enhancements: Caesar Annotation UI/UX
+
+### Caesar Annotation Cursors (April 2026)
+
+**Feature**: Dynamic SVG-based cursors for Caesar annotation rectangles providing visual feedback about zoom behavior.
+
+**Implementation Details**:
+- **Unselected annotation**: Magnifying glass with **+** symbol (zoom in)
+- **Selected annotation**: Magnifying glass with **−** symbol (zoom out)
+- **Cursor composition**: SVG pointer arrow (upper-left) + magnifying glass lens + zoom symbol
+- **Hotspot**: (0, 0) at pointer tip to indicate exact click position
+- **Behavior**: Maintained during mousemove for smooth UX within hit buffer zone
+
+**Files Modified**:
+- `src/components/CaesarAnnotationOverlay/constants.ts` — Added `getAnnotationCursor()` function and SVG cursor data URIs
+- `src/components/CaesarAnnotationOverlay/useCaesarAnnotationTooltip.ts` — Enhanced to accept `isSelected` parameter and set dynamic cursors in both `handleMouseEnter` and `handleMouseMove`
+- `src/components/CaesarAnnotationOverlay/CaesarAnnotationOverlay.tsx` — Pass selection state to tooltip hook
+- `src/components/ImageCanvas/ImageCanvas.tsx` — Pass `selectedCaesarAnnotation` to overlay, change rectangle hover cursor from `'not-allowed'` to `'auto'` to allow custom cursor display
+
+**Benefits**:
+- Visual feedback on annotation state without text tooltips
+- Clear indication of zoom direction before clicking
+- Improved discoverability of annotation selection feature
+- Professional UI polish

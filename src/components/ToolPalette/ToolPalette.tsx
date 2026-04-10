@@ -6,6 +6,10 @@ import {
   Label,
   Button,
   ClearButton,
+  UndoButton,
+  RedoButton,
+  HiddenToolButton,
+  HiddenBrushSizeContainer,
   Select,
   CheckboxLabel,
   FlexContainer,
@@ -49,30 +53,35 @@ export function ToolPalette({
     <Container>
       <Label>Tools</Label>
       <ButtonGroup>
-        {TOOLS.map((t) => (
-          <Button
-            key={t.id}
-            $active={tool === t.id}
-            onClick={() => onToolChange(t.id)}
-          >
-            {t.label}
-          </Button>
-        ))}
+        {TOOLS.map((t) => {
+          const ToolButtonComponent = (t.id === 'freehand' || t.id === 'brush') ? HiddenToolButton : Button;
+          return (
+            <ToolButtonComponent
+              key={t.id}
+              $active={tool === t.id}
+              onClick={() => onToolChange(t.id)}
+            >
+              {t.label}
+            </ToolButtonComponent>
+          );
+        })}
       </ButtonGroup>
 
-      <FlexContainer>
-        <Label style={{ margin: 0 }}>Brush size</Label>
-        <RangeSlider
-          type="range"
-          min="1"
-          max="10"
-          defaultValue="5"
-          id="brush_size_slider"
-          onChange={(event) => {
-            onBrushSizeChange(parseFloat(event.target.value))
-          }}
-        />
-      </FlexContainer>
+      <HiddenBrushSizeContainer>
+        <FlexContainer>
+          <Label style={{ margin: 0 }}>Brush size</Label>
+          <RangeSlider
+            type="range"
+            min="1"
+            max="10"
+            defaultValue="5"
+            id="brush_size_slider"
+            onChange={(event) => {
+              onBrushSizeChange(parseFloat(event.target.value))
+            }}
+          />
+        </FlexContainer>
+      </HiddenBrushSizeContainer>
 
       {hasAnnotations && (
         <ClearButton onClick={clearAnnotations}>
@@ -105,22 +114,22 @@ export function ToolPalette({
         <ButtonGroup>
           <Button
             $active={tool === "modifier_brush"}
-            onClick={() => onToolChange("modifier_brush")}
+            onClick={() => onToolChange(tool === "modifier_brush" ? "point" : "modifier_brush")}
           >
             Modify prediction
           </Button>
-          <Button
+          <UndoButton
             disabled={true}
             onClick={() => brushProps.predModBrushRef?.current?.undo()}
           >
             Undo
-          </Button>
-          <Button
+          </UndoButton>
+          <RedoButton
             disabled={true}
             onClick={() => brushProps.predModBrushRef?.current?.redo()}
           >
             Redo
-          </Button>
+          </RedoButton>
         </ButtonGroup>
 
         <FlexContainer>

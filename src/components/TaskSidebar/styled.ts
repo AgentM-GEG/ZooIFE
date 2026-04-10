@@ -119,6 +119,7 @@ export const SubmitButton = styled.button`
   font-weight: ${theme.typography.fontWeight.medium};
   cursor: pointer;
   margin-top: auto;
+  width: fit-content;
   transition: all ${theme.transitions.base};
 
   &:hover {

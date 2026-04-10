@@ -19,14 +19,16 @@ The component integrates with Zooniverse's Caesar ML system to show model-genera
 
 ```
 CaesarAnnotationOverlay (main component)
+├── Hover State: hoveredRectId via useState
 ├── Rect component (per annotation) × N
 │   ├── stroke color (from annotation)
 │   ├── strokeWidth (1px, 2px if selected)
+│   ├── opacity (1 if selected/hovered/no selection, 0.5 if unselected and exists)
 │   ├── hit detection (5px padding)
 │   └── Event handlers:
-│       ├── onMouseEnter → show tooltip, pointer cursor
+│       ├── onMouseEnter → show tooltip, pointer cursor, set hoveredRectId
 │       ├── onMouseMove → update tooltip position
-│       ├── onMouseLeave → hide tooltip, restore cursor
+│       ├── onMouseLeave → hide tooltip, restore cursor, clear hoveredRectId
 │       └── onClick → call onAnnotationClick callback
 ```
 
@@ -108,12 +110,19 @@ const rect = calculateRectangleGeometry(100, 100, 50, 50);
 
 ### getTooltipPosition(stageX, stageY, containerRect)
 
-Converts stage coordinates to absolute screen coordinates for tooltip positioning:
+Converts stage coordinates to absolute screen coordinates for tooltip positioning. Anchors tooltip's upper-left corner to the lower-right area of the magnifying glass cursor with a negative offset to account for the cursor's actual visible size.
 
 ```typescript
+// Cursor is 32x32px with hotspot at (0,0)
+// Returns position at cursor corner minus 5px offset
 const screenPos = getTooltipPosition(10, 20, containerRect);
-// { x: containerLeft + 10, y: containerTop + 20 }
+// { x: containerLeft + 10 + 32 - 5, y: containerTop + 20 + 32 - 5 }
 ```
+
+**Design Notes:**
+- Uses absolute screen coordinates (not dependent on canvas zoom/pan)
+- Offset of -5px accounts for the fact that the actual visible magnifying glass cursor content is smaller than the 32x32 SVG viewBox
+- Tooltip appears offset from cursor, not overlapping it
 
 ## Custom Hook: useCaesarAnnotationTooltip
 
@@ -211,18 +220,39 @@ function App() {
 
 ## Interactions
 
+### Opacity and Visibility
+
+**Opacity Logic** (per rectangle):
+```
+if no annotation is selected:
+  opacity = 1  // All rects fully visible
+else if rect is selected:
+  opacity = 1  // Selected rect always visible
+else if rect is hovered:
+  opacity = 1  // Hovered rect always visible  
+else:
+  opacity = 0.5  // Unselected, non-hovered rects faded
+```
+
+**Implementation:** Uses `hoveredRectId` state in overlay component to track which rect the mouse is over. When opacity increases (e.g., deselecting a rect that was focusing others), rects fade in smoothly over 0.1 seconds using Konva's `to()` animation. Opacity decreases immediately without animation.
+
 ### Hover
-- Mouse enters box → Show tooltip with markLabel, change cursor to pointer
-- Tooltip follows mouse pointer
-- Mouse leaves box → Hide tooltip, restore original cursor
+- Mouse enters box → Show tooltip with markLabel, change cursor to pointer, set hoveredRectId
+- Rect immediately becomes opacity=1 (if it was faded)
+- Tooltip follows mouse pointer in screen coordinates
+- Mouse leaves box → Hide tooltip, restore original cursor, clear hoveredRectId
+- Rect opacity returns to previous state (1 or 0.5 based on selection)
 
 ### Selection
 - Click box → Trigger onAnnotationClick callback with geometry and ID
 - Selected box has double-thickness stroke (2px if base is 1px)
+- All other rects fade to opacity 0.5
+- Other rects fade back in over 0.1 seconds when deselected
 
 ### Visual Feedback
 - Box renders with color from markColour (typically from Caesar/workflow config)
 - Selected box highlighted with thicker border
+- Unselected boxes fade when something is selected (visual focus)
 - Hover area extends 5px beyond visible stroke (easier to click)
 
 ## Performance Characteristics

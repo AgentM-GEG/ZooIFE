@@ -39,6 +39,34 @@ export const ClearButton = styled(ButtonActive)`
 `;
 
 /**
+ * Undo button — hidden
+ */
+export const UndoButton = styled(ButtonActive)`
+  display: none;
+`;
+
+/**
+ * Redo button — hidden
+ */
+export const RedoButton = styled(ButtonActive)`
+  display: none;
+`;
+
+/**
+ * Hidden tool buttons (freehand and brush)
+ */
+export const HiddenToolButton = styled(ButtonActive)`
+  display: none;
+`;
+
+/**
+ * Hidden brush size container
+ */
+export const HiddenBrushSizeContainer = styled.div`
+  display: none;
+`;
+
+/**
  * Checkbox wrapper with flex layout.
  * Aligns checkbox and label horizontally with proper spacing.
  */

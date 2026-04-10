@@ -46,6 +46,10 @@ export interface CaesarAnnotationOverlayProps {
   toolCursor?: string;
   /** Tooltip state setter */
   setToolTip: Dispatch<SetStateAction<TooltipState>>;
+  /** Callback when mouse enters a rectangle */
+  onMouseEnterRect?: () => void;
+  /** Callback when mouse leaves a rectangle */
+  onMouseLeaveRect?: () => void;
 }
 
 /**

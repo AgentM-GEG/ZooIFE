@@ -11,6 +11,7 @@ interface UseCanvasHandlersProps {
   suppressNextClick: boolean;
   setSuppressNextClick: (value: boolean) => void;
   selectedCaesarAnnotation: string | null;
+  setNoRectangleWarning: (value: boolean) => void;
   drawingPoints: Array<{ x: number; y: number }>;
   setDrawingPoints: (points: Array<{ x: number; y: number }>) => void;
   zoom: number;
@@ -23,7 +24,6 @@ interface UseCanvasHandlersProps {
   isInteractingRef: React.MutableRefObject<boolean>;
   addAnnotation: (annotation: DrawingAnnotation) => void;
   onPointClick?: (x: number, y: number, label: 0 | 1) => void;
-  setNoRectangleWarning: (value: boolean) => void;
   setViewportState: (state: { zoom: number; pan: { x: number; y: number } }) => void;
   animateTo: (zoom: number, pan: { x: number; y: number }) => void;
 }
@@ -49,6 +49,7 @@ export function useCanvasHandlers(props: UseCanvasHandlersProps) {
     suppressNextClick,
     setSuppressNextClick,
     selectedCaesarAnnotation,
+    setNoRectangleWarning,
     drawingPoints,
     setDrawingPoints,
     zoom,
@@ -61,7 +62,6 @@ export function useCanvasHandlers(props: UseCanvasHandlersProps) {
     isInteractingRef,
     addAnnotation,
     onPointClick,
-    setNoRectangleWarning,
     setViewportState,
     animateTo,
   } = props;
@@ -86,6 +86,7 @@ export function useCanvasHandlers(props: UseCanvasHandlersProps) {
 
   /**
    * Handle stage click for adding point annotations or starting freehand drawing.
+   * Shows warning if using point tool without a rect selected, but not if clicking on a rect.
    * @param e - Konva mouse event
    */
   const handleStageClick = useCallback(
@@ -103,12 +104,18 @@ export function useCanvasHandlers(props: UseCanvasHandlersProps) {
         return;
       if (!stageRef.current || !image) return;
 
-      if (tool === 'point' && !selectedCaesarAnnotation) {
+      const pos = stageRef.current.getPointerPosition();
+      if (!pos) return;
+      
+      // Use stage intersection to reliably detect what's under the cursor
+      const targetNode = stageRef.current.getIntersection(pos);
+      const isClickingOnRect = targetNode?.getClassName?.() === 'Rect';
+      
+      // Show warning for point tool if no rect selected and not clicking on a rect
+      if (tool === 'point' && !selectedCaesarAnnotation && !isClickingOnRect) {
         setNoRectangleWarning(true);
       }
 
-      const pos = stageRef.current.getPointerPosition();
-      if (!pos) return;
       const { x, y } = pointerToImage(pos);
 
       if (tool === 'point') {
@@ -118,7 +125,7 @@ export function useCanvasHandlers(props: UseCanvasHandlersProps) {
         setDrawingPoints([...drawingPoints, { x, y }]);
       }
     },
-    [tool, image, addAnnotation, onPointClick, pointerToImage, isPanMode, suppressNextClick, selectedCaesarAnnotation, drawingPoints, setDrawingPoints, stageRef, setNoRectangleWarning]
+    [tool, image, addAnnotation, onPointClick, pointerToImage, isPanMode, suppressNextClick, selectedCaesarAnnotation, setNoRectangleWarning, drawingPoints, setDrawingPoints, stageRef]
   );
 
   /**

@@ -453,6 +453,7 @@ export const AppMain = styled.main`
   padding: ${theme.spacing.xl};
   align-items: flex-start;
   flex: 1;
+  min-width: 1400px;
   overflow: hidden;
 `;
 
@@ -472,9 +473,9 @@ export const AppLeftAside = styled.aside`
  */
 export const CanvasSection = styled.section`
   flex: 1;
-  min-width: 0;
-  overflow: auto;
-  max-height: calc(100vh - 120px);
+  min-width: 700px;
+  overflow: visible;
+  min-height: 70vh;
   background-color: ${theme.colors.background.surface};
   border-radius: ${theme.borders.radius.lg};
   box-shadow: ${theme.shadows.sm};

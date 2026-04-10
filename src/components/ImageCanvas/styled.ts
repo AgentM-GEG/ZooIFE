@@ -26,12 +26,16 @@ export const Container = styled.div`
   display: flex;
   flex-direction: column;
   width: 100%;
+  min-width: 700px;
+  min-height: 70vh;
   overflow: visible;
 `;
 
 export const CanvasWrapper = styled.div`
   width: 100%;
-  height: 75vh;
+  height: auto;
+  min-height: calc(70vh - 60px);
+  max-height: calc(70vh - 60px);
   position: relative;
   overflow: hidden;
   background: ${theme.colors.background.surface};
@@ -42,7 +46,7 @@ export const CanvasWrapper = styled.div`
 export const Toolbar = styled.div`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.sm};
+  gap: calc(${theme.spacing.xs});
   margin-bottom: ${theme.spacing.md};
 `;
 
@@ -124,7 +128,7 @@ export const ToolbarLabel = styled.span`
 
 export const Placeholder = styled.div`
   width: 100%;
-  height: 85vh;
+  height: calc(70vh - 60px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -178,20 +182,29 @@ export const MaskHistoryButtonsContainer = styled.div`
   position: relative;
   display: flex;
   margin-left: auto;
-  gap: ${theme.spacing.sm};
+  gap: calc(${theme.spacing.sm} / 2);
   z-index: 20;
   transition: top 0.1s ease-out, right 0.1s ease-out;
 `;
 
-export const MarkingMessage = styled.div`
-  flex: 1;
+export const MarkingBanner = styled.div`
+  background: ${theme.colors.secondary};
+  color: ${theme.colors.text.inverse};
+  border: 1px solid ${theme.colors.border};
+  padding: 12px 16px;
+  border-radius: ${theme.borders.radius.base};
+  font-size: ${theme.typography.size.sm};
+  font-weight: ${theme.typography.fontWeight.medium};
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: ${theme.colors.primary};
-  font-family: ${theme.typography.fontFamily};
-  font-size: ${theme.typography.size.sm};
-  font-weight: ${theme.typography.fontWeight.bold};
+  gap: ${theme.spacing.sm};
+  position: absolute;
+  top: ${theme.spacing.lg};
+  left: ${theme.spacing.lg};
+  max-width: 400px;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: ${fadeIn} 0.1s ease-in-out;
 `;
 
 export const SaveButton = styled.button`

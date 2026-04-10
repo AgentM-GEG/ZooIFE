@@ -17,6 +17,7 @@ import {
   Container,
   CanvasWrapper,
   WarningBanner,
+  MarkingBanner,
   DebugBanner,
   DebugImage,
   DismissButton,
@@ -63,7 +64,6 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const addAnnotation = useClassificationStore(s => s.addAnnotation);
   const perAnnotationMasks = useClassificationStore(s => s.perAnnotationMasks);
   const globalCompositeMask = useClassificationStore(s => s.globalCompositeMask);
-  const saveMask = useClassificationStore(s => s.saveMask);
 
   const caesarReducedAnnotations = useCaesarAnnotationStore(s => s.annotations);
   const selectedCaesarAnnotation = useCaesarAnnotationStore(s => s.selectedAnnotationId);
@@ -80,6 +80,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const [tooltipState, setTooltipState] = useState({ visible: false, text: '', x: 0, y: 0 });
   const [brushCursorPos, setBrushCursorPos] = useState({ x: 0, y: 0 });
   const [isCursorOverCanvas, setIsCursorOverCanvas] = useState(false);
+  const [isHoveringOverRect, setIsHoveringOverRect] = useState(false);
 
   // Get current annotation ID for editing
   const currentAnnotationId = activeAnnotationId || '-1';
@@ -124,6 +125,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     suppressNextClick,
     setSuppressNextClick,
     selectedCaesarAnnotation,
+    setNoRectangleWarning,
     drawingPoints,
     setDrawingPoints,
     zoom,
@@ -136,7 +138,6 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     isInteractingRef,
     addAnnotation,
     onPointClick,
-    setNoRectangleWarning,
     setViewportState,
     animateTo,
   });
@@ -157,20 +158,23 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
 
   /**
    * Compute tool cursor string based on tool and mode.
-   * Note: Brush cursor visualization is handled by BrushCursor component overlay,
-   * not by CSS cursors, so all tools use 'crosshair' here.
+   * When hovering over a rectangle boundary, let the CaesarAnnotationOverlay handle
+   * the cursor (it will show the custom magnifying glass cursor).
    */
-  const toolCursor: string = isPanMode
-    ? 'grab'
-    : tool === 'point' || tool === 'freehand' || tool === 'brush' || tool === 'modifier_brush'
-      ? 'crosshair'
-      : 'default';
+  const toolCursor: string = isHoveringOverRect && !isPanMode
+    ? 'auto'
+    : isPanMode
+      ? 'grab'
+      : tool === 'point' || tool === 'freehand' || tool === 'brush' || tool === 'modifier_brush'
+        ? 'crosshair'
+        : 'default';
 
   /**
    * Determine if brush cursor should be visible.
-   * Only show for brush tools when not in pan mode, debug mode, and cursor is over canvas.
+   * Only show for brush tools when not in pan mode, debug mode, cursor is over canvas,
+   * and not hovering over a rectangle boundary.
    */
-  const isBrushCursorVisible = !isPanMode && !debugImageUrl && isCursorOverCanvas && (tool === 'brush' || tool === 'modifier_brush');
+  const isBrushCursorVisible = !isPanMode && !debugImageUrl && isCursorOverCanvas && !isHoveringOverRect && (tool === 'brush' || tool === 'modifier_brush');
 
   /**
    * Composite all visible masks (annotations with history and historyIndex >= 0)
@@ -268,7 +272,6 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     stageRef,
     setIsPanMode,
     setNoRectangleWarning,
-    setWarningFadingOut,
   });
 
   // ============ ADDITIONAL CALLBACKS ============
@@ -305,13 +308,26 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
 
   /**
    * Handle modifier brush pointer down - delegates to brush ref handler.
+   * Shows warning only if no rect selected and not clicking on a rect.
    */
   const handleDown = useCallback((e: KonvaEventObject<PointerEvent>) => {
-    if (!selectedCaesarAnnotation) {
+    // Use stage intersection to reliably detect what's under the cursor
+    const stage = stageRef.current;
+    if (!stage) {
+      brushProps.predModBrushRef?.current?.pointerDown(e);
+      return;
+    }
+    
+    const pos = stage.getPointerPosition();
+    const targetNode = pos ? stage.getIntersection(pos) : null;
+    const isClickingOnRect = targetNode?.getClassName?.() === 'Rect';
+    
+    // Show warning if no rect selected and not clicking on a rect
+    if (!selectedCaesarAnnotation && !isClickingOnRect) {
       setNoRectangleWarning(true);
     }
     brushProps.predModBrushRef?.current?.pointerDown(e);
-  }, [selectedCaesarAnnotation, brushProps.predModBrushRef]);
+  }, [selectedCaesarAnnotation, brushProps.predModBrushRef, stageRef]);
 
   /**
    * Handle modifier brush pointer move - delegates to brush ref handler.
@@ -329,10 +345,14 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
 
   /**
    * Handle Caesar overlay annotation click - toggle selection and zoom to annotation.
+   * Immediately clears any warning that might have been set by pointerDown event.
    * @param annotation - Rectangle annotation {x, y, width, height}
    * @param annotationId - ID of the clicked annotation
    */
   const handleCaesarAnnotationClick = useCallback((annotation: { x: number; y: number; width: number; height: number }, annotationId: string) => {
+    // Immediately clear warning when annotation is clicked (prevents flashing)
+    setNoRectangleWarning(false);
+    
     if (selectedCaesarAnnotation === annotationId) {
       zoomFitAnimated();
       setSelectedCaesarAnnotation(null);
@@ -343,7 +363,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     setSelectedCaesarAnnotation(annotationId);
     setActiveAnnotation(annotationId);
     zoomToAnnotation(annotation);
-  }, [selectedCaesarAnnotation, zoomFitAnimated, setSelectedCaesarAnnotation, setActiveAnnotation, zoomToAnnotation]);
+  }, [selectedCaesarAnnotation, zoomFitAnimated, setSelectedCaesarAnnotation, setActiveAnnotation, zoomToAnnotation, setNoRectangleWarning]);
 
   /**
    * Detect when cursor enters/leaves the canvas wrapper.
@@ -440,12 +460,6 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
         .find(a => a.markId === selectedCaesarAnnotation)?.markLabel as string | undefined)
     : undefined;
 
-  const handleSave = () => {
-    saveMask(activeAnnotationId || "-1");
-    zoomFitAnimated();
-    setSelectedCaesarAnnotation(null);
-  };
-
   const handleBack = () => {
     setActiveAnnotation(null);
     zoomFitAnimated();
@@ -475,7 +489,6 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
         isDebugMode={!!debugImageUrl}
         activeAnnotationId={activeAnnotationId}
         disableUndoRedo={disableUndoRedo}
-        selectedAnnotationLabel={selectedAnnotationLabel || undefined}
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
         onZoomFit={zoomFit}
@@ -483,7 +496,6 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
         onTogglePan={() => setIsPanMode(p => !p)}
         onUndo={handleUndoMask}
         onRedo={handleRedoMask}
-        onSave={handleSave}
         onBack={handleBack}
       />
       {debugImageUrl && (
@@ -536,7 +548,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
                       <BrushEditableImage
                         image={image}
                         externalMask={maskImage}
-                        enableBrush={tool === "modifier_brush"}
+                        enableBrush={tool === "modifier_brush" && !isHoveringOverRect}
                         brushRadius={brushProps.predModBrushSize}
                         brushMode={brushProps.predModBrushMode}
                         width={image?.naturalWidth ?? 0}
@@ -548,10 +560,13 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
                     {caesarReducedAnnotations && (
                       <CaesarAnnotationOverlay
                         annotations={caesarReducedAnnotations}
+                        selectedId={selectedCaesarAnnotation || undefined}
                         toolCursor={toolCursor}
                         strokeWidth={2 / contentScale}
                         setToolTip={setTooltipState}
                         onAnnotationClick={handleCaesarAnnotationClick}
+                        onMouseEnterRect={() => setIsHoveringOverRect(true)}
+                        onMouseLeaveRect={() => setIsHoveringOverRect(false)}
                       />
                     )}
                     {debugImage && (
@@ -585,6 +600,11 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
                   </Group>
                 </Layer>
               </Stage>
+            {(activeAnnotationId || !disableUndoRedo) && (
+              <MarkingBanner>
+                {selectedAnnotationLabel ? `Marking a ${selectedAnnotationLabel}` : 'Marking a new object'}
+              </MarkingBanner>
+            )}
             {(noRectangleWarning || warningFadingOut) && showWarningBanner && !suppressWarningForSession && (
               <WarningBanner $isLeaving={warningFadingOut}>
                 ⚠️ You have not selected a bounding box so we assume you are annotating an artifact or contaminant that was completely missed by the machine learning model.
@@ -625,7 +645,8 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
             padding: "4px 8px",
             borderRadius: "4px",
             pointerEvents: "none",
-            transform: "translate(-50%, -100%)"
+            whiteSpace: "nowrap",
+            zIndex: 1000,
           }}
         >
           {tooltipState.text}

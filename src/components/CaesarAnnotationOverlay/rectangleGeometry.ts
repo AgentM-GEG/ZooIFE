@@ -28,19 +28,27 @@ export function calculateRectangleGeometry(
 
 /**
  * Get tooltip position relative to browser window.
- * Takes Konva stage pointer position and converts to absolute screen coordinates.
- * @param stagePointerX - X position in Konva stage coordinate system
- * @param stagePointerY - Y position in Konva stage coordinate system
+ * Positions the tooltip's upper-left corner at the lower-right corner of the magnifying glass cursor.
+ * The magnifying glass cursor is 32x32px with hotspot at (0, 0).
+ * Adds a small screen-space offset from the cursor corner.
+ * @param stagePointerX - X position in Konva stage coordinate system (cursor hotspot)
+ * @param stagePointerY - Y position in Konva stage coordinate system (cursor hotspot)
  * @param containerRect - Bounding rectangle of canvas container
- * @returns Absolute screen coordinates for tooltip
+ * @returns Absolute screen coordinates for tooltip upper-left corner
  */
 export function getTooltipPosition(
   stagePointerX: number,
   stagePointerY: number,
   containerRect: DOMRect
 ): { x: number; y: number } {
+  // Magnifying glass cursor is 32x32px, hotspot at (0, 0)
+  // Position tooltip at lower-right corner of cursor + small offset
+  const cursorSize = 32;
+  const offsetX = -5; // pixels from cursor corner (negative to pull closer)
+  const offsetY = -5; // pixels from cursor corner (negative to pull closer)
+  
   return {
-    x: containerRect.left + stagePointerX,
-    y: containerRect.top + stagePointerY,
+    x: containerRect.left + stagePointerX + cursorSize + offsetX,
+    y: containerRect.top + stagePointerY + cursorSize + offsetY,
   };
 }

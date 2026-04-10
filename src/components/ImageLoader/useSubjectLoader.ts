@@ -18,6 +18,7 @@ import type { Subject } from '@/types/panoptes';
 export function useSubjectLoader(accessToken: string | undefined, onSubjectProcessed?: (subjectId: string) => Promise<void>) {
   // Use state only for triggering re-renders, use ref for actual queue data
   const [queueSize, setQueueSize] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
   const setSubject = useClassificationStore((s) => s.setSubject);
   
   // Store the subjects queue in a ref (doesn't trigger re-renders when it changes)
@@ -58,42 +59,49 @@ export function useSubjectLoader(accessToken: string | undefined, onSubjectProce
    * Load next subject from queue.
    * Fetches subjects on first call, then uses queued subjects from ref.
    * Automatically processes subject and updates queue ref.
+   * Prevents concurrent calls with loading state.
    */
   const loadNextSubject = useCallback(async () => {
-    if (!accessToken) return;
+    if (!accessToken || isLoading) return;
 
-    // If no subjects loaded yet, fetch them FIRST
-    if (!hasInitializedRef.current || !subjectsQueueRef.current || subjectsQueueRef.current.length === 0) {
-      try {
-        const newSubjects = await getQueuedSubjects(WORKFLOW_ID, accessToken, QUEUE_OPTS);
-        subjectsQueueRef.current = newSubjects;
-        hasInitializedRef.current = true;
-      } catch (error) {
-        console.error('Failed to fetch queued subjects:', error);
+    setIsLoading(true);
+    try {
+      // If no subjects loaded yet, fetch them FIRST
+      if (!hasInitializedRef.current || !subjectsQueueRef.current || subjectsQueueRef.current.length === 0) {
+        try {
+          const newSubjects = await getQueuedSubjects(WORKFLOW_ID, accessToken, QUEUE_OPTS);
+          subjectsQueueRef.current = newSubjects;
+          hasInitializedRef.current = true;
+        } catch (error) {
+          console.error('Failed to fetch queued subjects:', error);
+          return;
+        }
+      }
+
+      // Get current subject from ref queue
+      const queue = subjectsQueueRef.current;
+      if (!queue || queue.length === 0) {
+        console.warn('No subjects available in queue');
         return;
       }
+
+      // Dequeue first subject
+      const [current, ...remaining] = queue;
+      subjectsQueueRef.current = remaining;
+      
+      // Update state to trigger re-render with new queue size
+      // This is only for display purposes, actual queue is in ref
+      setQueueSize(remaining.length);
+
+      await processSubject(current);
+    } finally {
+      setIsLoading(false);
     }
-
-    // Get current subject from ref queue
-    const queue = subjectsQueueRef.current;
-    if (!queue || queue.length === 0) {
-      console.warn('No subjects available in queue');
-      return;
-    }
-
-    // Dequeue first subject
-    const [current, ...remaining] = queue;
-    subjectsQueueRef.current = remaining;
-    
-    // Update state to trigger re-render with new queue size
-    // This is only for display purposes, actual queue is in ref
-    setQueueSize(remaining.length);
-
-    await processSubject(current);
-  }, [accessToken, processSubject]);
+  }, [accessToken, isLoading, processSubject]);
 
   return {
     queueSize,
+    isLoading,
     loadNextSubject,
   };
 }

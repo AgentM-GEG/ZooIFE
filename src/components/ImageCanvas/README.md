@@ -133,7 +133,14 @@ Custom hook managing canvas effects and state synchronization.
 3. **Keyboard Shortcuts** - Undo shortcut (Ctrl+Z / ⌘Z)
 4. **Mask Swapping** - Updates displayed mask when active annotation changes
 5. **Per-Annotation Persistence** - Saves mask changes to per-annotation storage
-6. **Warning Banner** - Hides/shows warning when Caesar annotations selected
+6. **Warning Banner Cleanup** - Clears warning when Caesar annotation is selected
+
+**Warning Banner Behavior:**
+The warning banner alerts users when they attempt to use certain tools without first selecting a Caesar annotation rect:
+- **Triggers:** When user clicks on empty canvas with modifier_brush or point tool active AND no Caesar rect is selected
+- **Clears:** When a Caesar rect is selected (via click), the warning is immediately cleared
+- **No warning when:** Clicking directly on a Caesar annotation rect (uses `getIntersection()` to detect Rect nodes)
+- **Flash prevention:** Warning is cleared synchronously in `handleCaesarAnnotationClick`, preventing visual flashing
 
 **Cursor Behavior:**
 - Hides CSS cursor when brush cursor overlay is visible (avoids visual clutter)
@@ -168,7 +175,7 @@ Memoized component that renders individual annotations as Konva shapes.
 ---
 
 #### `CanvasToolbar.tsx` (Memoized Toolbar)
-Memoized component rendering zoom/pan controls and undo/save buttons.
+Memoized component rendering zoom/pan controls and undo/redo buttons.
 
 **Features:**
 - Zoom in/out/fit/100% buttons
@@ -178,7 +185,9 @@ Memoized component rendering zoom/pan controls and undo/save buttons.
   - Redo steps forward through mask history by incrementing `historyIndex`
   - After each operation, displays composite of all visible masks (historyIndex >= 0)
   - Mask at historyIndex = -1 (no masks) is cleared completely
-- Save/Back buttons for mask management
+- Back button for returning to full image view
+
+**Note:** Save functionality is not included because masks are automatically saved to the store whenever they change. This was removed to streamline the UI.
 
 **Props:**
 ```typescript
@@ -191,7 +200,6 @@ Memoized component rendering zoom/pan controls and undo/save buttons.
   onTogglePan: () => void;
   onUndo: () => void;
   onRedo: () => void;
-  onSave: () => void;
   onBack: () => void;
 }
 ```

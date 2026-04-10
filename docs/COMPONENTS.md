@@ -220,7 +220,7 @@ Located in `src/components/CaesarAnnotationOverlay/`
 
 ### CaesarAnnotationOverlay.tsx
 
-Component for rendering Caesar ML annotations as interactive rectangles on image canvas.
+Component for rendering Caesar ML annotations as interactive rectangles on image canvas with hover tooltips and dynamic zoom cursors.
 
 #### Critical Refactoring: Extract Child Component
 
@@ -257,44 +257,89 @@ annotations.map((annotation) => (
   - `annotations: CaesarAnnotation[]` — Caesar ML annotations
   - `strokeWidth?: number` — Stroke width for rectangles
   - `onAnnotationClick?: (geometry, annotationId) => void` — Click handler
-  - `selectedId?: string` — Currently selected annotation ID
-  - `toolCursor?: string` — Cursor to restore on hover
+  - `selectedId?: string` — Currently selected annotation ID (determines cursor type)
+  - `toolCursor?: string` — Cursor to restore on leave
   - `setToolTip: (state: TooltipState) => void` — State setter for tooltip
-- **Behavior**: Filters rectangles and maps to child components
+  - `onMouseEnterRect?: () => void` — Callback when entering any rectangle
+  - `onMouseLeaveRect?: () => void` — Callback when leaving any rectangle
+- **Behavior**:
+  - Filters rectangles and maps to child components
+  - Passes `selectedId` to children for cursor selection logic
 - **Type Safety**: Uses TypeScript type guard to ensure only rectangles passed to children
 
 ##### `CaesarAnnotationRect` (Child)
 
-- **Props**: Same as above, but `annotation` already typed as rectangle
+- **Props**: Same as parent, but `annotation` already typed as rectangle
 - **Behavior**:
   - Calculates rectangle geometry (x, y, width, height from center-based Caesar format)
-  - Creates tooltip handlers via `useCaesarAnnotationTooltip`
-  - Renders Konva Rect with mouse/click handlers
-  - Highlights when selected
+  - Determines selection state: `isSelected = selectedId === annotation.markId`
+  - Creates tooltip handlers via `useCaesarAnnotationTooltip(setToolTip, toolCursor, markLabel, isSelected)`
+  - Renders Konva Rect with:
+    - Stroke color from Caesar data
+    - Thicker border when selected (`SELECTED_STROKE_MULTIPLIER`)
+    - Mouse/click handlers that update tooltip and selection state
+  - **Cursor behavior**:
+    - Unselected rect: Shows magnifying glass with **+** (zoom in)
+    - Selected rect: Shows magnifying glass with **−** (zoom out)
+    - Cursor maintained across mousemove for better UX
 
 ### useCaesarAnnotationTooltip.ts
 
-Custom hook for managing annotation hover tooltips.
+Custom hook for managing annotation hover tooltips and cursor changes.
 
 #### Functions
 
-##### `useCaesarAnnotationTooltip(setToolTip, toolCursor, markLabel)`
+##### `useCaesarAnnotationTooltip(setToolTip, toolCursor, markLabel, isSelected)`
 
 - **Parameters**:
   - `setToolTip`: State setter for tooltip visibility/position
   - `toolCursor`: Default cursor (to restore on leave)
   - `markLabel`: Text to display in tooltip
+  - `isSelected`: Whether this annotation is currently selected (boolean, optional)
 - **Returns**: Object with handlers:
-  - `handleMouseEnter(e)` — Show tooltip, change cursor
-  - `handleMouseMove(e)` — Update tooltip position
+  - `handleMouseEnter(e)` — Show tooltip, set custom magnifying glass cursor
+  - `handleMouseMove(e)` — Update tooltip position and maintain cursor
   - `handleMouseLeave(e)` — Hide tooltip, restore cursor
 
-#### Tooltip Behavior
+#### Tooltip and Cursor Behavior
 
+**Tooltip:**
 - **Position**: Calculated relative to canvas container
 - **Visibility**: Only shown if `markLabel` exists
-- **Cursor**: Changes to `pointer` on hover, restores on leave
-- **Offset**: Tooltip positioned near mouse to avoid covering annotation
+- **Text**: Shows the annotation label only (no icons)
+- **Offset**: Positioned near mouse to avoid covering annotation
+
+**Cursor (Dynamic):**
+- **When unselected** (`!isSelected`): Shows **magnifying glass with +** (zoom in cursor)
+  - SVG-based custom cursor with pointer arrow pointing to upper-left
+  - Hotspot at (0,0) indicates exact click position
+- **When selected** (`isSelected`): Shows **magnifying glass with −** (zoom out cursor)
+  - Same pointer design, but with minus symbol instead of plus
+- **On leave**: Restores default cursor from `toolCursor` param
+
+#### Implementation Details
+
+The cursor is maintained across both `handleMouseEnter` and `handleMouseMove` events, ensuring the magnifying glass cursor remains visible as the user moves their mouse within the annotation's hit buffer zone (not just over the exact line). This provides better UX feedback about clickable regions.
+
+```typescript
+const handleMouseEnter = useCallback((e) => {
+  // ... tooltip setup
+  if (container) {
+    container.style.cursor = getAnnotationCursor(isSelected);
+  }
+}, [markLabel, isSelected, setToolTip]);
+
+const handleMouseMove = useCallback((e) => {
+  // ... tooltip position update
+  // Keep cursor consistent as user moves within hit buffer zone
+  container.style.cursor = getAnnotationCursor(isSelected);
+}, [markLabel, isSelected, setToolTip]);
+```
+
+**Cursor Generation:**
+The `getAnnotationCursor(isSelected: boolean)` function returns an SVG-based data URI:
+- **Zoom In (isSelected=false)**: SVG magnifying glass with + symbol, hotspot (0,0)
+- **Zoom Out (isSelected=true)**: SVG magnifying glass with − symbol, hotspot (0,0)
 
 ## Hooks Pattern Lessons
 
@@ -402,6 +447,62 @@ ImageCanvas
 ### Brush Cursor Tracking
 
 The brush cursor (visual circle showing brush radius) is implemented with smooth 60fps tracking using `requestAnimationFrame` for synchronization with the display refresh cycle.
+
+### Cursor Management
+
+The canvas maintains multiple cursor states based on context:
+
+- **Default**: `default` or tool-specific cursor (crosshair, grab)
+- **Over Caesar annotation (unselected)**: Custom SVG magnifying glass with **+** symbol
+- **Over Caesar annotation (selected)**: Custom SVG magnifying glass with **−** symbol
+
+The `toolCursor` prop is set to `'auto'` when hovering over rectangles (instead of `'not-allowed'`), allowing the `CaesarAnnotationOverlay` and its tooltip hook to take full control of the cursor.
+
+## Caesar Annotation Overlay: Cursor Utilities
+
+Located in `src/components/CaesarAnnotationOverlay/constants.ts`
+
+### Cursor Constants and Functions
+
+#### `getAnnotationCursor(isZoomingOut: boolean): string`
+
+Returns a CSS cursor string with SVG data URI and hotspot coordinates.
+
+**Parameters:**
+- `isZoomingOut`: `true` shows magnifying glass with − (zoom out), `false` shows magnifying glass with + (zoom in)
+
+**Returns:**
+- CSS cursor string: `url("data:image/svg+xml,...")  0 0, auto`
+- Format: `url(svgDataUri) hotspotX hotspotY, fallback`
+- Hotspot (0,0) is the tip of the pointer arrow in the upper-left corner
+
+#### SVG Cursor Design
+
+Both cursors follow the same design:
+
+1. **Pointer Arrow**: Triangle pointing upper-left (0,0) to (7,2) to (2,7)
+   - Black fill
+   - Positioned at canvas origin to indicate exact click position
+   - Hotspot set to (0,0) at arrow tip
+
+2. **Magnifying Glass**: Circle (cx=10, cy=10, r=8) with diagonal handle
+   - Black stroke, 2px width
+   - Lens: `<circle cx='10' cy='10' r='8'/>`
+   - Handle: `<line x1='16' y1='16' x2='24' y2='24'/>`
+
+3. **Zoom Symbol** (inside lens):
+   - **Zoom In (+)**: Vertical line (10,6 to 10,14) + Horizontal line (6,10 to 14,10)
+   - **Zoom Out (−)**: Horizontal line only (6,10 to 14,10)
+   - Black stroke, 1.5px width, rounded line caps
+
+#### Browser Compatibility
+
+SVG-based cursors are supported in all modern browsers (Chrome, Firefox, Safari, Edge). The URL-encoded format avoids base64 overhead and ensures proper parsing across browser engines.
+
+**If cursor doesn't display:**
+- Fallback to `auto` cursor automatically
+- Ensures usability even if custom cursors fail
+- Browser DevTools can verify data URI is valid via Network tab
 
 **Performance Optimization** (Uses `requestAnimationFrame`):
 - Previous approach: Updated brush cursor position on every `mousemove` event (potentially 100+ times per second), which caused React state batching delays and visual lag
