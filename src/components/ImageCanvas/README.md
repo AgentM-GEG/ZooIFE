@@ -331,13 +331,13 @@ displayCompositeOfVisibleMasks() called via setTimeout
     ↓
 Collects all annotations with historyIndex >= 0
     ↓
-compositeImageDataMasks() [from maskCompositing.ts] overlays all visible masks
+compositeImageDataMasks() [from maskCompositing.ts] overlays all visible masks using canvas context 'lighter' mode
     ↓
 setPerAnnotationMask() updates display
     ↓
 BrushEditableImage.externalMask effect updates canvas
     ↓
-Canvas shows composite of all active annotation masks
+Canvas shows composite of all active annotation masks (consistent 45% opacity, no stacking)
     ↓
 (Optional) User Saves
     ↓

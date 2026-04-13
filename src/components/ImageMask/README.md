@@ -80,7 +80,7 @@ type BrushMode = "add" | "subtract";
 ```
 
 Determines how brush strokes are applied:
-- **"add"**: Paints with `addColor` using `source-over` compositing
+- **"add"**: Paints with `addColor` using `lighter` (additive) compositing to prevent opacity stacking and ensure consistent opacity
 - **"subtract"**: Erases using `destination-out` compositing
 
 ### BrushEditableImageHandle
@@ -139,7 +139,7 @@ Located in `constants.ts`:
 - `STROKE_ALPHA`: 0.45 (alpha ratio for drawn pixels)
 - `LINE_WIDTH_MULTIPLIER`: 4 (lineWidth = 4 * brushRadius / contentScale)
 - `ERASE_COMPOSITE`: "destination-out"
-- `ADD_COMPOSITE`: "source-over"
+- `ADD_COMPOSITE`: "lighter" (additive blending to prevent opacity stacking across overlapping strokes)
 - `LINE_CAP`: "round"
 - `LINE_JOIN`: "round"
 

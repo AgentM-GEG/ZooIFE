@@ -14,6 +14,7 @@ import { loggers } from '@/utils/logger';
 /**
  * Composite multiple ImageData masks by overlaying them on top of each other.
  * Later masks in the array are drawn on top of earlier ones.
+ * Uses canvas context compositing to properly blend semi-transparent masks.
  * 
  * @param masks - Array of ImageData masks to composite (must all have same dimensions)
  * @returns Composite ImageData with all masks overlaid, or null if empty array
@@ -25,11 +26,16 @@ export function compositeImageDataMasks(masks: ImageData[]): ImageData | null {
     const firstMask = masks[0];
     const { width, height } = firstMask;
 
-    // Create composite by ORing all mask pixels together
-    // This combines all masks into one without any overwriting
-    const compositeData = new Uint8ClampedArray(firstMask.data);
+    // Use canvas context to composite masks with proper alpha blending
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
 
-    for (let i = 1; i < masks.length; i++) {
+    // Draw each mask on top of previous ones using 'lighter' composite mode
+    // This produces consistent opacity and prevents opacity stacking
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < masks.length; i++) {
         const mask = masks[i];
         
         if (mask.width !== width || mask.height !== height) {
@@ -37,15 +43,18 @@ export function compositeImageDataMasks(masks: ImageData[]): ImageData | null {
             continue;
         }
 
-        // OR each pixel value from this mask with the composite
-        // This preserves all mask data - if either mask has a pixel, it appears in composite
-        for (let j = 0; j < mask.data.length; j++) {
-            compositeData[j] = compositeData[j] | mask.data[j];
-        }
+        // Create temporary image for this mask and draw it
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = mask.width;
+        tempCanvas.height = mask.height;
+        const tempCtx = tempCanvas.getContext('2d')!;
+        tempCtx.putImageData(mask, 0, 0);
+        
+        ctx.drawImage(tempCanvas, 0, 0);
     }
 
-    const composite = new ImageData(compositeData, width, height);
-    loggers.masks(`[compositeImageDataMasks] Composited ${masks.length} masks via bitwise OR, result=${width}x${height}`);
+    const composite = ctx.getImageData(0, 0, width, height);
+    loggers.masks(`[compositeImageDataMasks] Composited ${masks.length} masks via canvas context, result=${width}x${height}`);
     
     return composite;
 }

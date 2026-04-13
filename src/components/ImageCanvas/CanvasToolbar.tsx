@@ -6,7 +6,8 @@ import {
   MaskHistoryButtonsContainer,
   UndoButton,
   RedoButton,
-  BackButton,
+  IdentifyButton,
+  SaveButton,
 } from './styled';
 
 /**
@@ -18,6 +19,8 @@ import {
  * @param activeAnnotationId - ID of currently active annotation (shows action buttons when set)
  * @param disableUndo - Whether undo button should be disabled
  * @param disableRedo - Whether redo button should be disabled
+ * @param hasWholeImageMask - Whether the whole-image (-1) mask has content (enable identify button)
+ * @param isUserRectSelected - Whether a user-created rect is currently selected (enable save button)
  * @param onZoomIn - Callback for zoom in button
  * @param onZoomOut - Callback for zoom out button
  * @param onZoomFit - Callback for fit-to-view button
@@ -25,7 +28,8 @@ import {
  * @param onTogglePan - Callback for pan mode toggle
  * @param onUndo - Callback for undo button
  * @param onRedo - Callback for redo button
- * @param onBack - Callback for back button
+ * @param onIdentifyNewObject - Callback for identify new object button (enabled when hasWholeImageMask is true)
+ * @param onSaveUserRect - Callback for save user rect button (enabled when isUserRectSelected is true)
  * @returns Toolbar element with zoom controls and annotation action buttons, or null if debug mode
  */
 const CanvasToolbar = memo(({
@@ -35,6 +39,8 @@ const CanvasToolbar = memo(({
   activeAnnotationId,
   disableUndo,
   disableRedo,
+  hasWholeImageMask = false,
+  isUserRectSelected = false,
   onZoomIn,
   onZoomOut,
   onZoomFit,
@@ -42,7 +48,8 @@ const CanvasToolbar = memo(({
   onTogglePan,
   onUndo,
   onRedo,
-  onBack,
+  onIdentifyNewObject,
+  onSaveUserRect,
 }: {
   zoom: number;
   isPanMode: boolean;
@@ -50,6 +57,8 @@ const CanvasToolbar = memo(({
   activeAnnotationId: string | null;
   disableUndo: boolean;
   disableRedo: boolean;
+  hasWholeImageMask?: boolean;
+  isUserRectSelected?: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomFit: () => void;
@@ -57,7 +66,8 @@ const CanvasToolbar = memo(({
   onTogglePan: () => void;
   onUndo: () => void;
   onRedo: () => void;
-  onBack: () => void;
+  onIdentifyNewObject?: () => void;
+  onSaveUserRect?: () => void;
 }) => {
   if (isDebugMode) return null;
 
@@ -76,8 +86,26 @@ const CanvasToolbar = memo(({
       >
         Pan
       </ToolbarButton>
-      {(activeAnnotationId || !disableUndo || !disableRedo) && (
+      {(activeAnnotationId || !disableUndo || !disableRedo || (onIdentifyNewObject && hasWholeImageMask)) && (
         <MaskHistoryButtonsContainer>
+          {onIdentifyNewObject && hasWholeImageMask && (
+            <IdentifyButton
+              type="button"
+              onClick={onIdentifyNewObject}
+              title="Create a new bounding box from the mask"
+            >
+              Identify new object
+            </IdentifyButton>
+          )}
+          {onSaveUserRect && isUserRectSelected && (
+            <SaveButton
+              type="button"
+              onClick={onSaveUserRect}
+              title="Save the mask changes and update the bounding box"
+            >
+              Save changes
+            </SaveButton>
+          )}
           <UndoButton
             type="button"
             onClick={onUndo}
@@ -94,13 +122,6 @@ const CanvasToolbar = memo(({
             >
               Redo
             </RedoButton>
-            <BackButton
-              type="button"
-              onClick={onBack}
-              title="Return to full image view"
-            >
-              Back
-            </BackButton>
           </MaskHistoryButtonsContainer>
       )}
     </Toolbar>

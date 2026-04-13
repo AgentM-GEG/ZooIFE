@@ -195,4 +195,39 @@ export type CaesarAnnotation = {
  */
 export type CaesarAnnotations = {
   data : CaesarAnnotation[];
-}
+};
+
+/**
+ * User-created annotation (analogous to CaesarAnnotation)
+ * 
+ * Represents a single user-created suggestion/annotation. These are created via the
+ * "Identify new object" button and can be edited with mask refinements. Stored in the
+ * classification store and tracked with negative IDs (-2, -3, etc.).
+ * 
+ * Currently only supports rectangle tool type:
+ * - `rectangle` — User-defined bounding box with optional mask edits
+ * 
+ * @example Rectangle annotation
+ * {
+ *   toolType: "rectangle",
+ *   x: 200,
+ *   y: 150,
+ *   width: 100,
+ *   height: 80,
+ *   rectId: "-2",
+ *   markLabel: "Volunteer-defined object"
+ * }
+ * 
+ * @see classificationStore.userRects for storage
+ * @see handleIdentifyNewObject for creation flow
+ * @see UserRectsOverlay for rendering
+ */
+export type UserAnnotation = {
+  toolType: "rectangle";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rectId: string; // Negative ID: "-2", "-3", etc.
+  markLabel: string; // Label shown in tooltip (default: "Volunteer-defined object")
+};

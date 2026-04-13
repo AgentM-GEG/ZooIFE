@@ -50,6 +50,8 @@ export interface CaesarAnnotationOverlayProps {
   onMouseEnterRect?: () => void;
   /** Callback when mouse leaves a rectangle */
   onMouseLeaveRect?: () => void;
+  /** Whether cursor is hovering over a user-created rect (for dimming) */
+  isUserRectHovered?: boolean;
 }
 
 /**

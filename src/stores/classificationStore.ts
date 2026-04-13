@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { DrawingAnnotation } from '@/types/annotations';
 import type { Classification, ClassificationMetadata, Annotation as PanoptesAnnotation } from '@/types/panoptes';
+import type { AnnotationRect } from '@/components/CaesarAnnotationOverlay/types';
 import { compressSegmentationMask } from '@/utils/image/compressImageMask';
 import { getSimpleComposite } from '@/utils/image/maskCompositing';
 import { PROJECT_ID, WORKFLOW_ID } from '@/services/panoptesService';
@@ -34,6 +35,13 @@ interface PerAnnotationMaskState {
   maskUrl: string | null;
   history: HistoryEntry[];
   historyIndex: number;
+}
+
+/**
+ * State for a user-created rectangle annotation
+ */
+interface UserRectState extends AnnotationRect {
+  markLabel: string; // Label shown in tooltip
 }
 
 /**
@@ -100,6 +108,14 @@ interface ClassificationState {
   activeAnnotationId: string | null;
   /** Global composite mask showing all visible masks from all annotations */
   globalCompositeMask: string | null;
+  /** Composite mask showing all visible masks EXCEPT the active annotation (for reference layer) */
+  compositeExcludingActiveMask: string | null;
+
+  // ============= User-Created Rects =============
+  /** User-created bounding boxes with negative IDs (-2, -3, etc.) */
+  userRects: Record<string, UserRectState>;
+  /** Counter for next user rect ID (incremented for each new rect, stored as negative) */
+  nextUserRectId: number;
 
   // ============= Actions: Subject Management =============
   /**
@@ -130,9 +146,12 @@ interface ClassificationState {
   undoLastAnnotation: () => DrawingAnnotation | undefined;
 
   /**
-   * Clear all annotations
+   * Clear annotations by type and/or for a specific rect.
+   * @param rectId - Optional annotation ID (markId from Caesar rect) to target specific rect. If '-1', targets whole image.
+   * @param types - Optional annotation type(s) to clear ('point', 'sam2_mask', 'brush', 'polyline'). If not specified, clears all types.
+   * If no arguments provided, clears all annotations.
    */
-  clearAnnotations: () => void;
+  clearAnnotations: (rectId?: string, types?: string | string[]) => void;
 
   // ============= Actions: Task Answers =============
   /**
@@ -184,6 +203,12 @@ interface ClassificationState {
   setGlobalCompositeMask: (url: string | null) => void;
 
   /**
+   * Set the composite mask excluding the active annotation (reference layer)
+   * @param url Composite mask image URL or null
+   */
+  setCompositeExcludingActiveMask: (url: string | null) => void;
+
+  /**
    * Add per-annotation mask to history
    * @param annotationId Annotation's markId
    * @param entry HistoryEntry to store (includes type and data)
@@ -210,6 +235,38 @@ interface ClassificationState {
    */
   saveMask: (annotationId: string) => void;
 
+  /**
+   * Clear the entire mask history for a specific annotation
+   * @param annotationId Annotation's markId
+   */
+  clearPerAnnotationMaskHistory: (annotationId: string) => void;
+
+  // ============= Actions: User-Created Rects =============
+  /**
+   * Add a user-created bounding box
+   * @param rect AnnotationRect with x, y, width, height
+   * @returns The assigned rect ID (string, e.g., '-2', '-3')
+   */
+  addUserRect: (rect: AnnotationRect) => string;
+
+  /**
+   * Update a user-created rect (e.g., with new bounds after mask editing)
+   * @param rectId User rect ID (e.g., '-2', '-3')
+   * @param rect Updated AnnotationRect with x, y, width, height
+   */
+  updateUserRect: (rectId: string, rect: AnnotationRect) => void;
+
+  /**
+   * Remove a user-created rect by ID
+   * @param rectId User rect ID (e.g., '-2', '-3')
+   */
+  removeUserRect: (rectId: string) => void;
+
+  /**
+   * Clear all user-created rects
+   */
+  clearUserRects: () => void;
+
   // ============= Actions: Building Submissions =============
   /**
    * Build Panoptes-compatible annotations array from current state
@@ -234,7 +291,7 @@ interface ClassificationState {
 /**
  * Create initial state with dynamically generated timestamp
  */
-const createInitialState = (): Pick<ClassificationState, Exclude<keyof ClassificationState, 'setSubject' | 'addAnnotation' | 'removeAnnotation' | 'undoLastAnnotation' | 'clearAnnotations' | 'setTaskAnswer' | 'setDebugImage' | 'setDebugMasks' | 'setActiveAnnotation' | 'setPerAnnotationMask' | 'setGlobalCompositeMask' | 'pushPerAnnotationMaskHistory' | 'undoPerAnnotationMask' | 'redoPerAnnotationMask' | 'saveMask' | 'buildPanoptesAnnotations' | 'buildPanoptesClassification' | 'reset'>> => ({
+const createInitialState = (): Pick<ClassificationState, Exclude<keyof ClassificationState, 'setSubject' | 'addAnnotation' | 'removeAnnotation' | 'undoLastAnnotation' | 'clearAnnotations' | 'setTaskAnswer' | 'setDebugImage' | 'setDebugMasks' | 'setActiveAnnotation' | 'setPerAnnotationMask' | 'setGlobalCompositeMask' | 'setCompositeExcludingActiveMask' | 'pushPerAnnotationMaskHistory' | 'undoPerAnnotationMask' | 'redoPerAnnotationMask' | 'saveMask' | 'clearPerAnnotationMaskHistory' | 'addUserRect' | 'updateUserRect' | 'removeUserRect' | 'clearUserRects' | 'buildPanoptesAnnotations' | 'buildPanoptesClassification' | 'reset'>> => ({
   subjectId: null,
   imageUrl: null,
   imageDimensions: null,
@@ -249,6 +306,9 @@ const createInitialState = (): Pick<ClassificationState, Exclude<keyof Classific
   perAnnotationMasks: {},
   activeAnnotationId: null,
   globalCompositeMask: null,
+  compositeExcludingActiveMask: null,
+  userRects: {},
+  nextUserRectId: -2,
   startedAt: new Date().toISOString(),
 });
 
@@ -324,10 +384,42 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
   },
 
   /**
-   * Clear all annotations.
+   * Clear annotations by type and/or for a specific rect.
+   * @param rectId - Optional annotation ID (markId from Caesar rect) to target specific rect. If '-1', targets whole image.
+   * @param types - Optional annotation type(s) to clear ('point', 'sam2_mask', 'brush', 'polyline'). If not specified, clears all types.
+   * If no arguments provided, clears all annotations.
    */
-  clearAnnotations: () =>
-    set({ annotations: [], debugImageUrl: null }),
+  clearAnnotations: (rectId?: string, types?: string | string[]) =>
+    set((state) => {
+      // If no arguments, clear everything (original behavior)
+      if (rectId === undefined && types === undefined) {
+        return { annotations: [], debugImageUrl: null };
+      }
+
+      // Normalize types to array
+      const typesToClear = types ? (Array.isArray(types) ? types : [types]) : null;
+
+      // Filter annotations
+      const filtered = state.annotations.filter((annotation) => {
+        // Check type filter
+        if (typesToClear && !typesToClear.includes(annotation.type)) {
+          return true; // Keep annotations not matching type filter
+        }
+
+        // Check rect filter
+        if (rectId !== undefined) {
+          const annRectId = (annotation as any).annotationId ?? '-1';
+          if (annRectId !== rectId) {
+            return true; // Keep annotations for other rects
+          }
+        }
+
+        // Remove this annotation (doesn't match filters)
+        return false;
+      });
+
+      return { annotations: filtered };
+    }),
 
   /**
    * Set answer for a task.
@@ -380,6 +472,13 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
    * @param url - Composite mask image URL or null to clear
    */
   setGlobalCompositeMask: (url) => set({ globalCompositeMask: url }),
+
+  /**
+   * Set the composite mask showing all visible masks EXCEPT the active annotation.
+   * Used for the reference layer during editing.
+   * @param url - Composite mask image URL or null to clear
+   */
+  setCompositeExcludingActiveMask: (url) => set({ compositeExcludingActiveMask: url }),
 
   /**
    * Add mask to undo/redo history for a specific annotation.
@@ -500,7 +599,91 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
   saveMask: (_annotationId) =>
     set({ activeAnnotationId: null }),
 
+  /**
+   * Clear the entire mask history for an annotation and reset its mask URL.
+   * Used when clearing temporary masks (e.g., -1 mask after transferring to user rect).
+   * @param annotationId - The annotation's markId
+   */
+  clearPerAnnotationMaskHistory: (annotationId) =>
+    set((state) => {
+      loggers.store(`[clearPerAnnotationMaskHistory] Clearing all history for ${annotationId}`);
+      return {
+        perAnnotationMasks: {
+          ...state.perAnnotationMasks,
+          [annotationId]: {
+            maskUrl: null,
+            history: [],
+            historyIndex: -1,
+          },
+        },
+      };
+    }),
 
+  // ============= User-Created Rects =============
+  /**
+   * Add a user-created bounding box with a negative ID
+   * @param rect AnnotationRect with x, y, width, height
+   * @returns The assigned rect ID (string, e.g., '-2', '-3')
+   */
+  addUserRect: (rect) => {
+    const state = get();
+    const rectId = String(state.nextUserRectId);
+    
+    set((s) => ({
+      userRects: {
+        ...s.userRects,
+        [rectId]: {
+          ...rect,
+          markLabel: 'Volunteer-defined object',
+        },
+      },
+      nextUserRectId: s.nextUserRectId - 1,
+    }));
+    
+    loggers.store(`[addUserRect] Created rect ${rectId}: x=${rect.x}, y=${rect.y}, width=${rect.width}, height=${rect.height}`);
+    return rectId;
+  },
+
+  /**
+   * Update a user-created rect (e.g., with new bounds after mask editing)
+   * @param rectId User rect ID (e.g., '-2', '-3')
+   * @param rect Updated AnnotationRect with x, y, width, height
+   */
+  updateUserRect: (rectId, rect) => {
+    set((s) => {
+      const existingRect = s.userRects[rectId];
+      return {
+        userRects: {
+          ...s.userRects,
+          [rectId]: {
+            ...existingRect,
+            ...rect,
+          },
+        },
+      };
+    });
+    loggers.store(`[updateUserRect] Updated rect ${rectId}: x=${rect.x}, y=${rect.y}, width=${rect.width}, height=${rect.height}`);
+  },
+
+  /**
+   * Remove a user-created rect by ID
+   * @param rectId User rect ID (e.g., '-2', '-3')
+   */
+  removeUserRect: (rectId) => {
+    set((s) => {
+      const { [rectId]: _, ...remaining } = s.userRects;
+      return { userRects: remaining };
+    });
+    loggers.store(`[removeUserRect] Removed rect ${rectId}`);
+  },
+
+  /**
+   * Clear all user-created rects and reset ID counter
+   */
+  clearUserRects: () => {
+    set({ userRects: {}, nextUserRectId: -2 });
+    loggers.store('[clearUserRects] Cleared all user rects');
+  },
 
   buildPanoptesAnnotations: async () => {
     const { annotations, taskAnswers, perAnnotationMasks } = get();

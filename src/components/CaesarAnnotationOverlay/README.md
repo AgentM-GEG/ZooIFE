@@ -234,20 +234,25 @@ else:
   opacity = 0.5  // Unselected, non-hovered rects faded
 ```
 
-**Implementation:** Uses `hoveredRectId` state in overlay component to track which rect the mouse is over. When opacity increases (e.g., deselecting a rect that was focusing others), rects fade in smoothly over 0.1 seconds using Konva's `to()` animation. Opacity decreases immediately without animation.
+**Animation:** Uses Konva's `to()` animation with direction-dependent timing to reduce flickering:
+- **Fade out (dimming)**: 100ms — Quick fade when rect is dimmed on hover
+- **Fade in (revealing)**: 200ms — Slow smooth fade when rect becomes visible again
+
+This prevents rapid flickering when moving the mouse between rects, while keeping responsive visual feedback when hovering.
 
 ### Hover
 - Mouse enters box → Show tooltip with markLabel, change cursor to pointer, set hoveredRectId
 - Rect immediately becomes opacity=1 (if it was faded)
+- Other rects fade to opacity 0.5 over 100ms
 - Tooltip follows mouse pointer in screen coordinates
 - Mouse leaves box → Hide tooltip, restore original cursor, clear hoveredRectId
-- Rect opacity returns to previous state (1 or 0.5 based on selection)
+- Other rects fade back to opacity 1 over 800ms (smooth, reduces flicker)
 
 ### Selection
 - Click box → Trigger onAnnotationClick callback with geometry and ID
 - Selected box has double-thickness stroke (2px if base is 1px)
-- All other rects fade to opacity 0.5
-- Other rects fade back in over 0.1 seconds when deselected
+- All other rects fade to opacity 0.5 over 100ms
+- Other rects fade back in over 800ms when deselected
 
 ### Visual Feedback
 - Box renders with color from markColour (typically from Caesar/workflow config)

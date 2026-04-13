@@ -45,9 +45,10 @@ export function ToolPalette({
   onDebugCoordsChange,
 }: ToolPaletteProps) {
 
-  const { annotations, clearAnnotations } =
+  const { annotations, activeAnnotationId, clearAnnotations } =
     useClassificationStore(s => ({
       annotations: s.annotations,
+      activeAnnotationId: s.activeAnnotationId,
       clearAnnotations: s.clearAnnotations,
     }));
 
@@ -88,7 +89,7 @@ export function ToolPalette({
       </HiddenBrushSizeContainer>
 
       {hasAnnotations && (
-        <ClearButton onClick={clearAnnotations}>
+        <ClearButton onClick={() => clearAnnotations(activeAnnotationId ?? undefined, 'point')}>
           Clear SAM points
         </ClearButton>
       )}
@@ -111,7 +112,7 @@ export function ToolPalette({
           checked={showPoints}
           onChange={(e) => onShowPointsChange(e.target.checked)}
         />
-        Show points
+        Show SAM points
       </CheckboxLabel>
 
       {/* VITE_SHOW_DEBUG_UI shows/hides the Debug Options section for development tools */}

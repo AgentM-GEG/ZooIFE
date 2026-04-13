@@ -24,6 +24,7 @@ function CaesarAnnotationRect({
   setToolTip,
   onMouseEnterRect,
   onMouseLeaveRect,
+  isUserRectHovered,
 }: {
   annotation: Extract<CaesarAnnotation, { toolType: 'rectangle' }>;
   strokeWidth: number;
@@ -34,6 +35,7 @@ function CaesarAnnotationRect({
   setToolTip: (state: any) => void;
   onMouseEnterRect?: (annotationId: string) => void;
   onMouseLeaveRect?: () => void;
+  isUserRectHovered?: boolean;
 }) {
   const geometry = calculateRectangleGeometry(
     annotation.x_center,
@@ -50,10 +52,14 @@ function CaesarAnnotationRect({
   
   // Opacity logic:
   // - No selection + something hovered + not this rect: fade to 0.5
+  // - Hovering over user rect: fade to 0.5
   // - No selection (+ nothing hovered OR this is hovered) OR selected/hovered: visible (opacity=1)
   // - Selection exists + not selected/hovered: faded (opacity=0.5)
   let targetOpacity: number;
-  if (selectedId === undefined && hoveredRectId !== undefined && !isHovered) {
+  if (isUserRectHovered) {
+    // Dim when hovering over user rects
+    targetOpacity = 0.5;
+  } else if (selectedId === undefined && hoveredRectId !== undefined && !isHovered) {
     // No selection, something is hovered, but not this rect
     targetOpacity = 0.5;
   } else if (selectedId === undefined || isSelected || isHovered) {
@@ -64,17 +70,26 @@ function CaesarAnnotationRect({
     targetOpacity = 0.5;
   }
 
-  // Animate opacity changes (both fade in and fade out) over 0.1 seconds
+  // Animate opacity changes with different durations for smoother transitions
+  // Quick fade-out (0.1s) when rect is being dimmed, slower fade-in (0.8s) when becoming visible
+  // Much slower fade-in reduces flickering when moving hover between rects
   useEffect(() => {
-    if (rectRef.current && prevOpacityRef.current !== null) {
+    if (rectRef.current) {
       const prevOpacity = prevOpacityRef.current;
-      if (targetOpacity !== prevOpacity) {
-        // Animate opacity change over 0.1 seconds
-        (rectRef.current as any).to({ opacity: targetOpacity, duration: 0.1 });
+      const rect = (rectRef.current as any);
+      
+      // On first mount, set opacity directly without animation
+      if (prevOpacity === null) {
+        rect.opacity(targetOpacity);
+      } else if (targetOpacity !== prevOpacity) {
+        // For subsequent updates, animate the change
+        const isFadingIn = targetOpacity > prevOpacity;
+        const duration = isFadingIn ? 0.2 : 0.1; // 200ms fade-in, 100ms fade-out
+        rect.to({ opacity: targetOpacity, duration });
       }
     }
     prevOpacityRef.current = targetOpacity;
-  }, [targetOpacity]);
+  }, [targetOpacity, isUserRectHovered]);
 
   // Hook call is now at top level of a component (safe)
   const tooltipHandlers = useCaesarAnnotationTooltip(
@@ -94,7 +109,6 @@ function CaesarAnnotationRect({
       height={geometry.height}
       stroke={annotation.markColour as string}
       strokeWidth={isSelected ? strokeWidth * SELECTED_STROKE_MULTIPLIER : strokeWidth}
-      opacity={targetOpacity}
       listening={true}
       hitStrokeWidth={strokeWidth * ANNOTATION_HIT_STROKE_MULTIPLIER}
       fillEnabled={false}
@@ -129,6 +143,7 @@ export function CaesarAnnotationOverlay({
   setToolTip,
   onMouseEnterRect,
   onMouseLeaveRect,
+  isUserRectHovered = false,
 }: CaesarAnnotationOverlayProps) {
   const [hoveredRectId, setHoveredRectId] = useState<string | undefined>();
 
@@ -148,6 +163,7 @@ export function CaesarAnnotationOverlay({
             hoveredRectId={hoveredRectId}
             toolCursor={toolCursor}
             setToolTip={setToolTip}
+            isUserRectHovered={isUserRectHovered}
             onMouseEnterRect={(annotationId) => {
               setHoveredRectId(annotationId);
               onMouseEnterRect?.();

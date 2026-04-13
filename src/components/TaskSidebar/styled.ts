@@ -107,6 +107,7 @@ export const TextArea = styled.textarea`
 /**
  * Submit button for completing classification.
  * Primary color styling with hover and press effects.
+ * Centered within the sidebar with auto margin on top.
  */
 export const SubmitButton = styled.button`
   padding: ${theme.spacing.md} ${theme.spacing.lg};
@@ -119,11 +120,43 @@ export const SubmitButton = styled.button`
   font-weight: ${theme.typography.fontWeight.medium};
   cursor: pointer;
   margin-top: auto;
+  margin-left: auto;
+  margin-right: auto;
   width: fit-content;
   transition: all ${theme.transitions.base};
 
   &:hover {
     opacity: 0.9;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
+/**
+ * Debug download button for exporting classification JSON.
+ * Secondary styling with muted appearance.
+ * Centered and visible only in debug mode.
+ */
+export const DebugDownloadButton = styled.button`
+  padding: ${theme.spacing.sm} ${theme.spacing.md};
+  background: ${theme.colors.neutral.light};
+  border: 1px solid ${theme.colors.border};
+  border-radius: ${theme.borders.radius.base};
+  color: ${theme.colors.text.secondary};
+  font-family: ${theme.typography.fontFamily};
+  font-size: ${theme.typography.size.xs};
+  font-weight: ${theme.typography.fontWeight.regular};
+  cursor: pointer;
+  margin-left: auto;
+  margin-right: auto;
+  width: fit-content;
+  transition: all ${theme.transitions.base};
+
+  &:hover {
+    background: ${theme.colors.neutral.medium};
+    color: ${theme.colors.text.primary};
   }
 
   &:active {

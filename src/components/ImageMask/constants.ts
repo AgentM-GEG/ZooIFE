@@ -24,8 +24,8 @@ export const DRAWING_CONFIG = {
   LINE_WIDTH_MULTIPLIER: 4,
   /** Composite operation for erase mode strokes */
   ERASE_COMPOSITE: 'destination-out' as const,
-  /** Composite operation for add mode strokes */
-  ADD_COMPOSITE: 'source-over' as const,
+  /** Composite operation for add mode strokes - uses 'lighter' (additive) to avoid opacity stacking */
+  ADD_COMPOSITE: 'lighter' as const,
   /** Stroke color for erase mode (unused, composite op does the work) */
   ERASE_STROKE_COLOR: 'rgba(0,0,0,1)',
   /** Line cap style for smooth stroke ends */

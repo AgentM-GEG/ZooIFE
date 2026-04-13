@@ -58,7 +58,7 @@
 | `services/panoptesService.ts` | `getQueuedSubjects` (supports optional `subject_set_id` + backward-compatible `staging` boolean or options object), `getWorkflow`, `createClassification` (prod/staging base URLs). |
 | `services/sam2Service.ts` | SAM2 API client (proxied by Vite). |
 | `services/imageService.ts` | File/URL → data URL, EXIF-safe normalization, dimensions, `getSubjectImageUrl` helper. |
-| `utils/image/maskCompositing.ts` | Compositing logic: combine multiple masks with bitwise OR, filter by history type. |
+| `utils/image/maskCompositing.ts` | Compositing logic: canvas context blending with 'lighter' mode combines multiple masks, preventing opacity stacking. Used for display and export composites. |
 | `utils/image/compressImageMask.ts` | Mask extraction from blue channel → bit-pack → RLE → `CompressedMask` + JSON serialization. |
 | `types/panoptes.ts`, `types/annotations.ts`, `types/tools.ts` | Panoptes and drawing models; `BrushProps` / tool unions including `modifier_brush`. |
 

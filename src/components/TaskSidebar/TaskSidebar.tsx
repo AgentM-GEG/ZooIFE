@@ -1,20 +1,52 @@
 import { useClassificationStore } from '@/stores/classificationStore';
 import { PROJECT_ID, WORKFLOW_ID } from '@/services/panoptesService';
-import { Sidebar, SubmitButton } from './styled';
+import { Sidebar, SubmitButton, DebugDownloadButton } from './styled';
 import { loggers } from '@/utils/logger';
 
 /**
  * Task sidebar component for displaying and answering Zooniverse workflow tasks.
  * Shows classification questions and input fields, and provides submit button.
+ * In debug mode, also shows a button to download the classification JSON.
  */
 export function TaskSidebar() {
-  const { buildPanoptesClassification } = useClassificationStore(s => ({
+  const { buildPanoptesClassification, subjectId } = useClassificationStore(s => ({
     buildPanoptesClassification: s.buildPanoptesClassification,
+    subjectId: s.subjectId,
   }));
+
+  const isDebugMode = import.meta.env.VITE_SHOW_DEBUG_UI === 'true' || import.meta.env.VITE_SHOW_DEBUG_UI === true;
 
   const handleSubmit = async () => {
     const annotations = await buildPanoptesClassification(PROJECT_ID, WORKFLOW_ID);
     loggers.app('Classifications (Panoptes format):', annotations);
+  };
+
+  const handleDebugDownload = async () => {
+    try {
+      const classification = await buildPanoptesClassification(PROJECT_ID, WORKFLOW_ID);
+      
+      // Create JSON blob
+      const jsonString = JSON.stringify(classification, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `classification-${subjectId || 'debug'}-${Date.now()}.json`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      URL.revokeObjectURL(url);
+      
+      loggers.app('Classification JSON downloaded');
+    } catch (error) {
+      loggers.app('Error downloading classification:', error);
+    }
   };
 
   return (
@@ -73,6 +105,11 @@ export function TaskSidebar() {
       <SubmitButton onClick={handleSubmit}>
         Submit Classification
       </SubmitButton>
+      {isDebugMode && (
+        <DebugDownloadButton onClick={handleDebugDownload}>
+          ⬇ Download Classification JSON
+        </DebugDownloadButton>
+      )}
     </Sidebar>
   );
 }

@@ -3,10 +3,13 @@ import { Stage, Layer, Group, Image, Line } from 'react-konva';
 import type { KonvaEventObject } from "konva/lib/Node"
 import { useClassificationStore } from '@/stores/classificationStore';
 import { BrushEditableImage } from '@/components/ImageMask/BrushEditableImage';
+import { DRAWING_CONFIG } from '@/components/ImageMask/constants';
 import { CaesarAnnotationOverlay } from '@/components/CaesarAnnotationOverlay/CaesarAnnotationOverlay';
+import { UserRectsOverlay } from '@/components/UserRectsOverlay';
 import { useCaesarAnnotationStore } from '@/stores/caesarReductionStore';
 import { useAuth } from '@/auth/AuthContext';
 import { compositeImageDataMasks } from '@/utils/image/maskCompositing';
+import { computeMaskBounds, hasMaskPixels } from '@/utils/image/maskBounds';
 
 // Extracted components and hooks
 import AnnotationRenderer from './AnnotationRenderer';
@@ -35,21 +38,31 @@ import { theme } from '@/theme/zooniverseTheme';
  *
  * A high-performance canvas component for image annotation with SAM (Segment Anything Model) integration.
  * Supports multiple annotation tools (points, freehand drawing, brush editing), pan/zoom controls,
- * Caesar overlay annotations, and mask editing.
+ * Caesar overlay annotations, mask editing, and user-created bounding boxes.
  *
  * Layer Architecture:
  * 1. Base image layer (subject image)
- * 2. Global composite reference layer (0.9 opacity) - semi-transparent overlay showing all visible masks
- *    (opacity 0.9 to distinguish from active rect marks; pixels already have alpha channel)
- * 3. Brush-editable layer - per-annotation mask that can be edited with brush strokes
- * 4. Annotation overlay (points, lines, Caesar marks)
+ * 2. Reference composite layer (0.45 opacity, 'lighter' composite mode) - shows all visible masks EXCEPT the active rect
+ *    (enables real-time visual feedback: subtract strokes reveal the masks beneath)
+ * 3. Brush-editable layer - the active annotation's per-annotation mask (opaque on top)
+ * 4. Annotation overlay (points, lines, Caesar marks, user-created rects)
  * 5. Debug layers (when enabled)
  *
  * Mask Management:
  * - Each annotation stores separate per-annotation masks with full editing history (SAM + brush strokes)
- * - Global composite mask computed on-the-fly from all visible per-annotation masks
- * - Composite reference layer displays cumulative masks for context while editing a specific annotation
- * - Saves export only the per-annotation mask (not contaminated by other rects' masks)
+ * - Reference composite computed from all visible masks MINUS the active annotation
+ * - Compositing uses canvas context 'lighter' mode to prevent opacity stacking and ensure consistent opacity
+ * - Active annotation's editable mask rendered on top (fully opaque)
+ * - When subtracting from active mask, underlying reference composite becomes visible
+ * - Exports save only the per-annotation mask (never contaminated by other rects)
+ * - Brush strokes use 'lighter' composite mode with 0.45 alpha for consistent appearance
+ *
+ * User-Created Rects:
+ * - Created from -1 mask bounds when "Identify new object" button is clicked
+ * - Have negative IDs (-2, -3, -4...) to distinguish from Caesar rects
+ * - Store separate mask history including transferred SAM masks and brush refinements
+ * - Can be edited in place with modifier brush before being saved
+ * - Remain selected (visually highlighted) when created and after saving
  *
  * Major optimizations:
  * - Separate Zustand store selectors to minimize re-renders
@@ -85,6 +98,8 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const addAnnotation = useClassificationStore(s => s.addAnnotation);
   const perAnnotationMasks = useClassificationStore(s => s.perAnnotationMasks);
   const globalCompositeMask = useClassificationStore(s => s.globalCompositeMask);
+  const compositeExcludingActiveMask = useClassificationStore(s => s.compositeExcludingActiveMask);
+  const userRects = useClassificationStore(s => s.userRects);
   const setDebugImage = useClassificationStore(s => s.setDebugImage);
 
   const caesarReducedAnnotations = useCaesarAnnotationStore(s => s.annotations);
@@ -102,8 +117,12 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const [tooltipState, setTooltipState] = useState({ visible: false, text: '', x: 0, y: 0 });
   const [brushCursorPos, setBrushCursorPos] = useState({ x: 0, y: 0 });
   const [isCursorOverCanvas, setIsCursorOverCanvas] = useState(false);
+  const [hasWholeImageMaskPixels, setHasWholeImageMaskPixels] = useState(false);
   const [isHoveringOverRect, setIsHoveringOverRect] = useState(false);
   const [compositeImageElement, setCompositeImageElement] = useState<HTMLImageElement | null>(null);
+  const [compositeExcludingActiveImageElement, setCompositeExcludingActiveImageElement] = useState<HTMLImageElement | null>(null);
+  const [selectedUserRectId, setSelectedUserRectId] = useState<string | undefined>();
+  const [isHoveringOverUserRect, setIsHoveringOverUserRect] = useState(false);
 
   // Get current annotation ID for editing
   const currentAnnotationId = activeAnnotationId || '-1';
@@ -134,8 +153,40 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     imageElement.src = globalCompositeMask;
   }, [globalCompositeMask]);
 
+  // Convert composite excluding active mask data URI to HTMLImageElement for Konva rendering
+  useEffect(() => {
+    if (!compositeExcludingActiveMask) {
+      setCompositeExcludingActiveImageElement(null);
+      return;
+    }
+
+    const imageElement = document.createElement('img');
+    imageElement.onload = () => setCompositeExcludingActiveImageElement(imageElement);
+    imageElement.onerror = () => {
+      loggers.canvas('[useEffect] Failed to load composite excluding active mask image');
+      setCompositeExcludingActiveImageElement(null);
+    };
+    imageElement.src = compositeExcludingActiveMask;
+  }, [compositeExcludingActiveMask]);
+
+  // Convert composite excluding active mask data URI to HTMLImageElement for Konva rendering
+  useEffect(() => {
+    if (!compositeExcludingActiveMask) {
+      setCompositeExcludingActiveImageElement(null);
+      return;
+    }
+
+    const imageElement = document.createElement('img');
+    imageElement.onload = () => setCompositeExcludingActiveImageElement(imageElement);
+    imageElement.onerror = () => {
+      loggers.canvas('[useEffect] Failed to load composite excluding active mask image');
+      setCompositeExcludingActiveImageElement(null);
+    };
+    imageElement.src = compositeExcludingActiveMask;
+  }, [compositeExcludingActiveMask]);
+
   // ============ EXTRACTED STATE MANAGEMENT ============
-  // Use per-annotation mask for editing, global composite for display reference
+  // Use per-annotation mask for editing, composite (excluding active) for reference layer
   // Default to "-1" rect if no annotation is explicitly selected
   const effectiveAnnotationId = activeAnnotationId || '-1';
   const perAnnotationMaskUrl = perAnnotationMasks[effectiveAnnotationId]
@@ -170,6 +221,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     suppressNextClick,
     setSuppressNextClick,
     selectedCaesarAnnotation,
+    activeAnnotationId,
     setNoRectangleWarning,
     drawingPoints,
     setDrawingPoints,
@@ -203,10 +255,10 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
 
   /**
    * Compute tool cursor string based on tool and mode.
-   * When hovering over a rectangle boundary, let the CaesarAnnotationOverlay handle
-   * the cursor (it will show the custom magnifying glass cursor).
+   * When hovering over a rectangle boundary (Caesar or user), use default cursor
+   * to let the rectangle overlay handle cursor feedback (magnifying glass, resize, etc).
    */
-  const toolCursor: string = isHoveringOverRect && !isPanMode
+  const toolCursor: string = (isHoveringOverRect || isHoveringOverUserRect) && !isPanMode
     ? 'auto'
     : isPanMode
       ? 'grab'
@@ -217,9 +269,65 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   /**
    * Determine if brush cursor should be visible.
    * Only show for brush tools when not in pan mode, debug mode, cursor is over canvas,
-   * and not hovering over a rectangle boundary.
+   * and not hovering over a rectangle boundary (Caesar or user).
    */
-  const isBrushCursorVisible = !isPanMode && !debugImageUrl && isCursorOverCanvas && !isHoveringOverRect && (tool === 'brush' || tool === 'modifier_brush');
+  const isBrushCursorVisible = !isPanMode && !debugImageUrl && isCursorOverCanvas && !isHoveringOverRect && !isHoveringOverUserRect && (tool === 'brush' || tool === 'modifier_brush');
+
+
+  /**
+   * Composite all visible masks EXCEPT the active annotation.
+   * Used for the reference layer showing context while editing.
+   * 
+   * Selector pattern: Whenever the active annotation changes or masks update,
+   * recompute this to show all other rects' masks. This provides visual context
+   * and enables real-time feedback when subtracting (reveals underlying masks).
+   */
+  const displayCompositeExcludingActive = useCallback(() => {
+    const state = useClassificationStore.getState();
+    const visibleMasks: ImageData[] = [];
+    const activeId = state.activeAnnotationId || '-1';
+
+    loggers.canvas('[displayCompositeExcludingActive] Computing composite excluding ' + activeId);
+
+    // Collect all masks EXCEPT the active one
+    for (const [annotationId, maskState] of Object.entries(state.perAnnotationMasks)) {
+      if (annotationId === activeId) {
+        loggers.canvas(`  - Skipping active annotation ${activeId}`);
+        continue;
+      }
+      if (maskState.history.length > 0 && maskState.historyIndex >= 0) {
+        const entry = maskState.history[maskState.historyIndex];
+        visibleMasks.push(entry.imageData);
+        loggers.canvas(`  - Including mask from ${annotationId}, historyIndex=${maskState.historyIndex}`);
+      }
+    }
+
+    loggers.canvas(`[displayCompositeExcludingActive] Found ${visibleMasks.length} visible masks (excluding active)`);
+
+    if (visibleMasks.length === 0) {
+      loggers.canvas(`[displayCompositeExcludingActive] No masks - clearing display`);
+      useClassificationStore.setState({ compositeExcludingActiveMask: null });
+      return;
+    }
+
+    // Composite all visible masks except active
+    const composite = compositeImageDataMasks(visibleMasks);
+    if (!composite) {
+      loggers.canvas('[displayCompositeExcludingActive] Failed to create composite');
+      return;
+    }
+
+    // Convert composite to data URL and update state
+    const canvas = document.createElement('canvas');
+    canvas.width = composite.width;
+    canvas.height = composite.height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.putImageData(composite, 0, 0);
+    const compositeUrl = canvas.toDataURL();
+
+    loggers.canvas(`[displayCompositeExcludingActive] Setting composite with ${visibleMasks.length} masks`);
+    useClassificationStore.setState({ compositeExcludingActiveMask: compositeUrl });
+  }, []);
 
   /**
    * Composite all visible masks (annotations with history and historyIndex >= 0)
@@ -294,6 +402,80 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     // The useEffect watching perAnnotationMasks will recompute the composite
   }, [activeAnnotationId]);
 
+
+
+  /**
+   * Handle "Save" button click for user rects.
+   * Computes the new bounding box from the composite of the mask history and updates the rect.
+   * The UserRectsOverlay will animate the rect to the new position/size over 0.2s.
+   */
+  const handleSaveUserRect = useCallback(async () => {
+    const state = useClassificationStore.getState();
+    const rectId = activeAnnotationId;
+    
+    if (!rectId || !rectId.startsWith('-')) {
+      loggers.canvas('[handleSaveUserRect] Invalid rect ID: ' + rectId);
+      return;
+    }
+
+    const maskState = state.perAnnotationMasks[rectId];
+    
+    if (!maskState || maskState.history.length === 0 || maskState.historyIndex < 0) {
+      loggers.canvas('[handleSaveUserRect] No mask history available for ' + rectId);
+      return;
+    }
+
+    try {
+      loggers.canvas('[handleSaveUserRect] Computing composite from mask history for ' + rectId);
+      
+      // Composite all mask history entries (from beginning to historyIndex)
+      const historyToComposite = maskState.history.slice(0, maskState.historyIndex + 1);
+      const imageDataList = historyToComposite.map(entry => entry.imageData);
+      
+      if (imageDataList.length === 0) {
+        loggers.canvas('[handleSaveUserRect] No valid mask history entries');
+        return;
+      }
+
+      // Create composite from all history entries
+      const composite = compositeImageDataMasks(imageDataList);
+      if (!composite) {
+        loggers.canvas('[handleSaveUserRect] Failed to create composite');
+        return;
+      }
+
+      // Convert composite to data URL
+      const canvas = document.createElement('canvas');
+      canvas.width = composite.width;
+      canvas.height = composite.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.putImageData(composite, 0, 0);
+      const compositeUrl = canvas.toDataURL();
+
+      loggers.canvas('[handleSaveUserRect] Computing new bounds from composite for ' + rectId);
+      const newBounds = await computeMaskBounds(compositeUrl);
+      
+      if (!newBounds) {
+        loggers.canvas('[handleSaveUserRect] Could not extract bounds from composite');
+        return;
+      }
+
+      // Update the user rect with new bounds (animation happens in UserRectsOverlay)
+      state.updateUserRect(rectId, newBounds);
+      loggers.canvas(`[handleSaveUserRect] Updated rect ${rectId}: ${JSON.stringify(newBounds)}`);
+
+      // Keep the rect selected after saving so it remains highlighted
+      setSelectedUserRectId(rectId);
+      loggers.canvas(`[handleSaveUserRect] Kept rect ${rectId} selected after saving`);
+
+      // Clear the mask to return to default state for next editing
+      state.clearAnnotations(rectId, 'sam2_mask');
+      loggers.canvas('[handleSaveUserRect] Cleared mask for ' + rectId);
+    } catch (err) {
+      loggers.canvas(`[handleSaveUserRect] Error: ${err}`);
+    }
+  }, [activeAnnotationId]);
+
   /**
    * Recompute global composite mask whenever any annotation's mask history changes.
    * This ensures all visible masks are always displayed together, regardless of 
@@ -303,6 +485,28 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     loggers.canvas('[useEffect] perAnnotationMasks changed - triggering composite recompute');
     displayCompositeOfVisibleMasks();
   }, [perAnnotationMasks, displayCompositeOfVisibleMasks]);
+
+  /**
+   * Recompute composite excluding active annotation whenever the active annotation changes
+   * or when per-annotation masks change. This provides the reference layer context.
+   */
+  useEffect(() => {
+    loggers.canvas(`[useEffect] activeAnnotationId or masks changed - recomputing excluding-active composite`);
+    displayCompositeExcludingActive();
+  }, [activeAnnotationId, perAnnotationMasks, displayCompositeExcludingActive]);
+
+  /**
+   * Check if the whole-image (-1) mask has any pixels to determine button visibility
+   */
+  useEffect(() => {
+    const checkMaskPixels = async () => {
+      const maskUrl = perAnnotationMasks['-1']?.maskUrl;
+      const hasPixels = await hasMaskPixels(maskUrl ?? null);
+      setHasWholeImageMaskPixels(hasPixels);
+    };
+    
+    checkMaskPixels();
+  }, [perAnnotationMasks['-1']?.maskUrl]);
 
   // ============ EXTRACTED EFFECTS ============
   useAnnotationEffects({
@@ -367,12 +571,12 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     const targetNode = pos ? stage.getIntersection(pos) : null;
     const isClickingOnRect = targetNode?.getClassName?.() === 'Rect';
     
-    // Show warning if no rect selected and not clicking on a rect
-    if (!selectedCaesarAnnotation && !isClickingOnRect) {
+    // Show warning if no annotation selected (neither Caesar nor user rect) and not clicking on a rect
+    if (!activeAnnotationId && !selectedCaesarAnnotation && !isClickingOnRect) {
       setNoRectangleWarning(true);
     }
     brushProps.predModBrushRef?.current?.pointerDown(e);
-  }, [selectedCaesarAnnotation, brushProps.predModBrushRef, stageRef]);
+  }, [activeAnnotationId, selectedCaesarAnnotation, brushProps.predModBrushRef, stageRef]);
 
   /**
    * Handle modifier brush pointer move - delegates to brush ref handler.
@@ -409,6 +613,120 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     setActiveAnnotation(annotationId);
     zoomToAnnotation(annotation);
   }, [selectedCaesarAnnotation, zoomFitAnimated, setSelectedCaesarAnnotation, setActiveAnnotation, zoomToAnnotation, setNoRectangleWarning]);
+
+  /**
+   * Handle user rect clicks - same interaction as Caesar rects.
+   * Click to select and zoom, click again to deselect and fit to view.
+   */
+  const handleUserRectClick = useCallback((rect: { x: number; y: number; width: number; height: number }, rectId: string) => {
+    // Immediately clear warning when rect is clicked
+    setNoRectangleWarning(false);
+
+    if (selectedUserRectId === rectId) {
+      // Already selected - deselect and fit to view
+      zoomFitAnimated();
+      setSelectedUserRectId(undefined);
+      setActiveAnnotation(null);
+      return;
+    }
+
+    // Select this rect and zoom to it
+    setSelectedUserRectId(rectId);
+    setActiveAnnotation(rectId);
+    zoomToAnnotation(rect);
+  }, [selectedUserRectId, zoomFitAnimated, setActiveAnnotation, zoomToAnnotation, setNoRectangleWarning]);
+
+  /**
+   * Handle "Identify new object" button click.
+   * Creates a new user-created bounding box from the -1 mask's bounds,
+   * then initializes its mask history and clears the -1 mask.
+   */
+  const handleIdentifyNewObject = useCallback(async () => {
+    const state = useClassificationStore.getState();
+    const maskState = state.perAnnotationMasks['-1'];
+    
+    if (!maskState || maskState.historyIndex < 0) {
+      loggers.canvas('[handleIdentifyNewObject] No mask available for -1');
+      return;
+    }
+
+    try {
+      // Get the current mask
+      const currentMaskEntry = maskState.history[maskState.historyIndex];
+      const maskUrl = maskState.maskUrl;
+      
+      if (!maskUrl || !currentMaskEntry) {
+        loggers.canvas('[handleIdentifyNewObject] No valid mask for -1');
+        return;
+      }
+
+      loggers.canvas('[handleIdentifyNewObject] Computing bounds from -1 mask');
+      const bounds = await computeMaskBounds(maskUrl);
+      
+      if (!bounds) {
+        loggers.canvas('[handleIdentifyNewObject] Could not extract bounds from mask');
+        return;
+      }
+
+      // Add the user rect
+      const rectId = state.addUserRect(bounds);
+      loggers.canvas(`[handleIdentifyNewObject] Created user rect ${rectId}: ${JSON.stringify(bounds)}`);
+
+      // Initialize mask history for the new rect by copying the -1 mask history
+      // Copy the entire history up to historyIndex so rect has the same history as -1
+      const historyToCopy = maskState.history.slice(0, maskState.historyIndex + 1);
+      
+      // Initialize the rect's mask with the current mask entry
+      state.setPerAnnotationMask(rectId, maskUrl);
+      
+      // Copy the history entries
+      for (const entry of historyToCopy) {
+        state.pushPerAnnotationMaskHistory(rectId, entry);
+      }
+      
+      loggers.canvas(`[handleIdentifyNewObject] Initialized mask history for ${rectId} with ${historyToCopy.length} entries`);
+
+      // Clear the -1 mask completely (annotations, history, and URL)
+      state.clearAnnotations('-1', 'sam2_mask');
+      state.clearPerAnnotationMaskHistory('-1');
+      loggers.canvas('[handleIdentifyNewObject] Cleared -1 mask history and mask URL');
+
+      // Transfer any SAM points from -1 to the new rect
+      const pointsToTransfer = state.annotations.filter(
+        (a) => a.type === 'point' && ((a as any).annotationId ?? '-1') === '-1'
+      );
+      
+      if (pointsToTransfer.length > 0) {
+        // Remove the -1 points
+        state.clearAnnotations('-1', 'point');
+        
+        // Re-add them with the new rect ID
+        for (const point of pointsToTransfer) {
+          const { id, ...pointData } = point;
+          state.addAnnotation({
+            ...pointData,
+            annotationId: rectId,
+          });
+        }
+        
+        loggers.canvas(`[handleIdentifyNewObject] Transferred ${pointsToTransfer.length} SAM points from -1 to ${rectId}`);
+      }
+
+      // Set the new rect as active so subsequent mask edits go to this rect
+      setActiveAnnotation(rectId);
+      loggers.canvas(`[handleIdentifyNewObject] Set new user rect ${rectId} as active annotation`);
+
+      // Select the new rect visually so stroke is highlighted and tooltip shows selection state
+      setSelectedUserRectId(rectId);
+      loggers.canvas(`[handleIdentifyNewObject] Selected user rect ${rectId} for visual highlight`);
+
+      // Zoom to the newly created rect
+      zoomToAnnotation(bounds);
+      loggers.canvas(`[handleIdentifyNewObject] Zoomed to new rect at bounds: ${JSON.stringify(bounds)}`);
+    } catch (err) {
+      loggers.canvas(`[handleIdentifyNewObject] Error: ${err}`);
+    }
+  }, [setActiveAnnotation, setSelectedUserRectId, zoomToAnnotation]);
 
   /**
    * Detect when cursor enters/leaves the canvas wrapper.
@@ -500,17 +818,14 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const disableRedo = currentMaskState.historyIndex >= currentMaskState.history.length - 1; // Can't redo at the end
 
   // Get the label of the selected annotation for display
-  const selectedAnnotationLabel: string | undefined = selectedCaesarAnnotation && caesarReducedAnnotations
-    ? (caesarReducedAnnotations
-        .filter((a): a is Extract<typeof a, { toolType: 'rectangle' }> => a.toolType === 'rectangle')
-        .find(a => a.markId === selectedCaesarAnnotation)?.markLabel as string | undefined)
-    : undefined;
-
-  const handleBack = () => {
-    setActiveAnnotation(null);
-    zoomFitAnimated();
-    setSelectedCaesarAnnotation(null);
-  };
+  const selectedAnnotationLabel: string | undefined =
+    activeAnnotationId && userRects[activeAnnotationId]
+      ? userRects[activeAnnotationId].markLabel
+      : (selectedCaesarAnnotation && caesarReducedAnnotations
+        ? (caesarReducedAnnotations
+          .filter((a): a is Extract<typeof a, { toolType: 'rectangle' }> => a.toolType === 'rectangle')
+          .find(a => a.markId === selectedCaesarAnnotation)?.markLabel as string | undefined)
+        : undefined);
 
   const handleDismissWarning = () => {
     setWarningFadingOut(true);
@@ -536,6 +851,8 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
         activeAnnotationId={activeAnnotationId}
         disableUndo={disableUndo}
         disableRedo={disableRedo}
+        hasWholeImageMask={hasWholeImageMaskPixels}
+        isUserRectSelected={activeAnnotationId ? activeAnnotationId.startsWith('-') && activeAnnotationId !== '-1' : false}
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
         onZoomFit={zoomFit}
@@ -543,7 +860,8 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
         onTogglePan={() => setIsPanMode(p => !p)}
         onUndo={handleUndoMask}
         onRedo={handleRedoMask}
-        onBack={handleBack}
+        onIdentifyNewObject={handleIdentifyNewObject}
+        onSaveUserRect={handleSaveUserRect}
       />
       {debugImageUrl && (
         <>
@@ -595,14 +913,15 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
                         listening={isPanMode}
                       />
                     )}
-                    {compositeImageElement && (
-                      // Global composite reference layer: shows all visible masks for context
-                      // Opacity set to 0.9 to distinguish from active rect marks (mask pixels already have alpha)
+                    {compositeExcludingActiveImageElement && (
+                      // Reference composite layer: shows all visible masks EXCEPT the active annotation
+                      // This provides context while editing, and allows subtract strokes to reveal underlying masks
+                      // Opacity matches modifier mask stroke opacity for visual consistency
                       <Image
-                        image={compositeImageElement}
+                        image={compositeExcludingActiveImageElement}
                         width={image?.naturalWidth ?? 0}
                         height={image?.naturalHeight ?? 0}
-                        opacity={0.9}
+                        opacity={DRAWING_CONFIG.STROKE_ALPHA}
                         listening={false}
                       />
                     )}
@@ -610,7 +929,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
                       <BrushEditableImage
                         image={image}
                         externalMask={maskImage}
-                        enableBrush={tool === "modifier_brush" && !isHoveringOverRect}
+                        enableBrush={tool === "modifier_brush" && !isHoveringOverRect && !isHoveringOverUserRect}
                         brushRadius={brushProps.predModBrushSize}
                         brushMode={brushProps.predModBrushMode}
                         width={image?.naturalWidth ?? 0}
@@ -629,8 +948,19 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
                         onAnnotationClick={handleCaesarAnnotationClick}
                         onMouseEnterRect={() => setIsHoveringOverRect(true)}
                         onMouseLeaveRect={() => setIsHoveringOverRect(false)}
+                        isUserRectHovered={isHoveringOverUserRect}
                       />
                     )}
+                    <UserRectsOverlay
+                      onRectClick={handleUserRectClick}
+                      selectedRectId={selectedUserRectId}
+                      toolCursor={toolCursor}
+                      onMouseEnter={() => setIsHoveringOverUserRect(true)}
+                      onMouseLeave={() => setIsHoveringOverUserRect(false)}
+                      isHoveringOverCaesarRect={isHoveringOverRect}
+                      setToolTip={setTooltipState}
+                      contentScale={contentScale}
+                    />
                     {debugImage && (
                       <Image
                         image={debugImage}

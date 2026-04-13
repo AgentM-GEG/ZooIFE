@@ -119,6 +119,29 @@ export const RedoButton = styled(ToolbarButton)`
   }
 `;
 
+export const IdentifyButton = styled(ToolbarButton)`
+  padding: 8px 16px;
+  background: ${theme.colors.primary};
+  color: ${theme.colors.secondary};
+  border: none;
+  border-radius: ${theme.borders.radius.base};
+  font-family: ${theme.typography.fontFamily};
+  font-size: ${theme.typography.size.sm};
+  font-weight: ${theme.typography.fontWeight.medium};
+  cursor: pointer;
+  transition: all ${theme.transitions.base};
+
+  &:hover {
+    background: ${theme.colors.border};
+    opacity: 0.8;
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+`;
+
 export const ToolbarLabel = styled.span`
   font-size: ${theme.typography.size.sm};
   color: ${theme.colors.text.secondary};
@@ -224,8 +247,8 @@ export const SaveButton = styled.button`
   transition: all ${theme.transitions.base};
 
   &:hover {
-    background: ${theme.colors.primary};
-    opacity: 0.9;
+    background: ${theme.colors.border};
+    opacity: 0.8;
     transform: translateY(-1px);
   }
 
