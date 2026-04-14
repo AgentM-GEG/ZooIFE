@@ -110,71 +110,29 @@ export function compositeHistoryUpToIndex(history: HistoryEntry[], upToIndex: nu
   // Clamp upToIndex to valid range
   const maxIndex = Math.min(upToIndex, history.length - 1);
 
-  // Step 1: Find the most recent SAM prediction at or before maxIndex
-  let latestSamIndex = -1;
-  for (let i = maxIndex; i >= 0; i--) {
-    if (history[i].type === 'sam') {
-      latestSamIndex = i;
-      break;
-    }
+  loggers.masks(`[compositeHistoryUpToIndex] upToIndex=${upToIndex}, maxIndex=${maxIndex}, historyLength=${history.length}`);
+
+  // Collect ALL entries (both SAM and modifier_brush) up to maxIndex
+  const entriesToComposite = history.slice(0, maxIndex + 1);
+  
+  if (entriesToComposite.length === 0) {
+    return null;
   }
 
-  loggers.masks(`[compositeHistoryUpToIndex] upToIndex=${upToIndex}, maxIndex=${maxIndex}, latestSamIndex=${latestSamIndex}`);
-
-  // If no SAM found, composite all modifier strokes
-  if (latestSamIndex === -1) {
-    const modifierStrokes = history
-      .slice(0, maxIndex + 1)
-      .filter(e => e.type === 'modifier_brush')
-      .map(e => e.imageData);
-    
-    if (modifierStrokes.length === 0) {
-      return null;
-    }
-
-    loggers.masks(`[compositeHistoryUpToIndex] No SAM found, compositing ${modifierStrokes.length} modifier strokes`);
-    return compositeImageDataMasks(modifierStrokes);
-  }
-
-  // Step 2: Composite all modifier brush strokes BEFORE the latest SAM
-  const presamModifiers = history
-    .slice(0, latestSamIndex)
-    .filter(e => e.type === 'modifier_brush')
+  // Extract all ImageData from entries in order
+  const allMasks = entriesToComposite
+    .filter(e => e.imageData)
     .map(e => e.imageData);
 
-  let baseComposite: ImageData | null = null;
-  if (presamModifiers.length > 0) {
-    baseComposite = compositeImageDataMasks(presamModifiers);
-    loggers.masks(`[compositeHistoryUpToIndex] Composited ${presamModifiers.length} pre-SAM modifiers`);
+  if (allMasks.length === 0) {
+    return null;
   }
 
-  // Step 3: Composite the SAM prediction with pre-SAM modifiers
-  const latestSam = history[latestSamIndex];
-  let samComposite: ImageData;
+  loggers.masks(`[compositeHistoryUpToIndex] Compositing ${allMasks.length} total entries (${entriesToComposite.filter(e => e.type === 'sam').length} SAM + ${entriesToComposite.filter(e => e.type === 'modifier_brush').length} brush)`);
 
-  if (baseComposite && latestSam.imageData) {
-    samComposite = compositeImageDataMasks([baseComposite, latestSam.imageData]) || latestSam.imageData;
-    loggers.masks(`[compositeHistoryUpToIndex] Composited pre-SAM modifiers with SAM prediction`);
-  } else if (latestSam.imageData) {
-    samComposite = latestSam.imageData;
-    loggers.masks(`[compositeHistoryUpToIndex] Using SAM prediction as base (no pre-SAM modifiers)`);
-  } else {
-    return baseComposite;
-  }
-
-  // Step 4: Apply all MODIFIER BRUSH strokes after the latest SAM
-  const postsamModifiers = history
-    .slice(latestSamIndex + 1, maxIndex + 1)
-    .filter(e => e.type === 'modifier_brush')
-    .map(e => e.imageData);
-
-  let finalComposite = samComposite;
-  if (postsamModifiers.length > 0) {
-    finalComposite = compositeImageDataMasks([samComposite, ...postsamModifiers]) || samComposite;
-    loggers.masks(`[compositeHistoryUpToIndex] Applied ${postsamModifiers.length} post-SAM modifiers`);
-  }
-
-  return finalComposite;
+  // Composite all masks together in order
+  const composite = compositeImageDataMasks(allMasks);
+  return composite;
 }
 
 /**

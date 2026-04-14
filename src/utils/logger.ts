@@ -78,4 +78,5 @@ export const loggers = {
   debug: createLogger('app:debug'),
   masks: createLogger('app:masks'),
   annotationRenderer: createLogger('app:annotationRenderer'),
+  history: createLogger('app:history'),
 };

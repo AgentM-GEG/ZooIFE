@@ -163,7 +163,8 @@ export interface Annotation {
  *   finished_at: "2024-01-15T10:45:30Z",
  *   user_agent: "Mozilla/5.0...",
  *   user_language: "en",
- *   workflow_version: "50"
+ *   workflow_version: "50",
+ *   classifier_version: "IFE-0.1.0"
  * }
  */
 export interface ClassificationMetadata {
@@ -172,6 +173,7 @@ export interface ClassificationMetadata {
   user_agent: string;
   user_language: string;
   workflow_version: string;
+  classifier_version: string;
 }
 
 /**

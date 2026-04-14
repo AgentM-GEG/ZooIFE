@@ -1,5 +1,7 @@
 # Mask Mixing and Accumulation Bug Fix
 
+> Archived development note: this document captures a historical bug-fix snapshot and may not reflect the latest implementation. For current behavior, see `docs/MASK_HISTORY_SYSTEM.md` and `docs/STORES.md`.
+
 **Date**: April 10, 2026  
 **Status**: FIXED  
 **Impact**: Critical - Resolved cumulative mask buildup and type mixing issues

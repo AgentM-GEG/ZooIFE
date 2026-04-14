@@ -145,7 +145,7 @@ The canvas uses a sophisticated multi-layer approach to support per-annotation m
 
 **Key Design Decisions:**
 
-- **Per-Annotation Masks:** Each annotation (rect or whole-image "-1") maintains its own mask history with full undo/redo support. Masks are stored in `classificationStore` with `{ maskUrl, history[], historyIndex }`.
+- **Per-Annotation Masks:** Each annotation (rect or whole-image "-1") maintains its own mask history with full undo/redo support. Masks are stored in `classificationStore` with `{ maskUrl, history[], historyIndex, samPointHistory? }`, where `samPointHistory` tracks active SAM prompt points per history step for overlay sync.
 
 - **Composite Reference (Excluding Active):** A semi-transparent overlay computed from all visible per-annotation masks **except the currently active one**. This is the key to enabling real-time visual feedback when using the subtract tool:
   - When you select a rect to edit, the reference layer updates to show everything **except** that rect

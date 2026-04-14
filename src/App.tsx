@@ -282,7 +282,7 @@ function App() {
                 const compositedMaskUrl = imageDataToDataUri(displayComposite);
                 
                 // Now push to history and update UI
-                pushPerAnnotationMaskHistory(currentAnnotationId, samEntry);
+                pushPerAnnotationMaskHistory(currentAnnotationId, samEntry, points);
                 setPerAnnotationMask(currentAnnotationId, compositedMaskUrl);
               }).catch((err) => {
                 loggers.app('Failed to convert SAM mask to ImageData: %O', err);
@@ -319,7 +319,7 @@ function App() {
               const compositedMaskUrl = imageDataToDataUri(displayComposite);
               
               // Now push to history and update UI
-              pushPerAnnotationMaskHistory(currentAnnotationId, samEntry);
+              pushPerAnnotationMaskHistory(currentAnnotationId, samEntry, points);
               setPerAnnotationMask(currentAnnotationId, compositedMaskUrl);
             }).catch((err) => {
               loggers.app('Failed to convert SAM mask to ImageData:', err);

@@ -42,7 +42,7 @@ export function getTooltipPosition(
   containerRect: DOMRect
 ): { x: number; y: number } {
   // Magnifying glass cursor is 32x32px, hotspot at (0, 0)
-  // Position tooltip at lower-right corner of cursor + small offset
+  // Position tooltip at lower-right corner of cursor - small offset
   const cursorSize = 32;
   const offsetX = -5; // pixels from cursor corner (negative to pull closer)
   const offsetY = -5; // pixels from cursor corner (negative to pull closer)

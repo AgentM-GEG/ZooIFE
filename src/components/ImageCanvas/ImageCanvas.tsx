@@ -8,7 +8,7 @@ import { CaesarAnnotationOverlay } from '@/components/CaesarAnnotationOverlay/Ca
 import { UserRectsOverlay } from '@/components/UserRectsOverlay';
 import { useCaesarAnnotationStore } from '@/stores/caesarReductionStore';
 import { useAuth } from '@/auth/AuthContext';
-import { compositeImageDataMasks } from '@/utils/image/maskCompositing';
+import { compositeImageDataMasks, compositeHistoryUpToIndex } from '@/utils/image/maskCompositing';
 import { computeMaskBounds, hasMaskPixels } from '@/utils/image/maskBounds';
 
 // Extracted components and hooks
@@ -296,9 +296,12 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
         continue;
       }
       if (maskState.history.length > 0 && maskState.historyIndex >= 0) {
-        const entry = maskState.history[maskState.historyIndex];
-        visibleMasks.push(entry.imageData);
-        loggers.canvas(`  - Including mask from ${annotationId}, historyIndex=${maskState.historyIndex}`);
+        // Composite all history entries up to historyIndex for this annotation
+        const historyComposite = compositeHistoryUpToIndex(maskState.history, maskState.historyIndex);
+        if (historyComposite) {
+          visibleMasks.push(historyComposite);
+          loggers.canvas(`  - Including composite from ${annotationId}, historyIndex=${maskState.historyIndex} (${maskState.history.length} total entries)`);
+        }
       }
     }
 
@@ -336,6 +339,10 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
    * 
    * This function creates a composite of ALL masks that have a valid history state,
    * then displays that composite as a global overlay independent of which annotation is active.
+   * 
+   * IMPORTANT: For each annotation, we composite ALL history entries up to historyIndex,
+   * not just the single entry at historyIndex. This ensures that multiple SAM predictions
+   * or brush strokes on the same annotation are all visible.
    */
   const displayCompositeOfVisibleMasks = useCallback(() => {
     const state = useClassificationStore.getState();
@@ -346,9 +353,13 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     // Collect all masks that have history and are at a valid history point (>= 0)
     for (const [annotationId, maskState] of Object.entries(state.perAnnotationMasks)) {
       if (maskState.history.length > 0 && maskState.historyIndex >= 0) {
-        const entry = maskState.history[maskState.historyIndex];
-        visibleMasks.push(entry.imageData);
-        loggers.canvas(`  - Including mask from ${annotationId}, historyIndex=${maskState.historyIndex}`);
+        // CRITICAL FIX: Composite all history entries up to historyIndex, not just the entry at historyIndex
+        // This ensures multiple SAM predictions or brush strokes on the same annotation are all visible
+        const historyComposite = compositeHistoryUpToIndex(maskState.history, maskState.historyIndex);
+        if (historyComposite) {
+          visibleMasks.push(historyComposite);
+          loggers.canvas(`  - Including composite from ${annotationId}, historyIndex=${maskState.historyIndex} (${maskState.history.length} total entries)`);
+        }
       }
     }
 
@@ -993,7 +1004,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
                 </Layer>
               </Stage>
             {(activeAnnotationId || !disableUndo || !disableRedo) && (
-              <MarkingBanner>
+              <MarkingBanner $isEditingMinusOne={currentAnnotationId === '-1'}>
                 {selectedAnnotationLabel ? `Marking a ${selectedAnnotationLabel}` : 'Marking a new object'}
               </MarkingBanner>
             )}

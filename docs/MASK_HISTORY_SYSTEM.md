@@ -2,7 +2,7 @@
 
 ## Overview
 
-The ZooIFE application implements a **per-annotation mask history system** that allows users to draw, edit, and undo/redo brush strokes independently for each annotation (rectangle). This document describes how the system works and the key design decisions.
+The ZooIFE application implements a **per-annotation mask history system** that allows users to draw, edit, and undo/redo brush strokes independently for each annotation (rectangle). It also tracks SAM prompt points per history state so point overlays stay in sync when navigating history. This document describes how the system works and the key design decisions.
 
 ---
 
@@ -18,10 +18,22 @@ interface HistoryEntry {
   imageData: ImageData;  // Raw atomic mask (SAM prediction or brush stroke)
 }
 
+interface SamPoint {
+  x: number;
+  y: number;
+  label: 0 | 1;
+}
+
+interface SamPointHistory {
+  allSamPoints: SamPoint[];
+  activePointsPerHistoryIndex: number[][];
+}
+
 interface PerAnnotationMaskState {
   maskUrl: string | null;          // Current mask display URL (data URI)
   history: HistoryEntry[];         // Array of historical mask entries
   historyIndex: number;            // Index into history array (-1 = no mask)
+  samPointHistory?: SamPointHistory;
 }
 
 // Store maps annotation IDs to their mask state
@@ -40,10 +52,12 @@ Each entry in the history array has a `type` field that indicates its origin:
 | `'sam'` | SAM model | AI segmentation prediction (includes raw prediction data) |
 | `'modifier_brush'` | User | Brush stroke refinement (adds or removes pixels) |
 
-**Compositing Rule**: When calculating the composite mask, the system preserves all brush strokes around SAM predictions. Specifically:
-- Pre-SAM modifier strokes + SAM prediction + post-SAM modifier strokes = final mask
+**Compositing Rule**: When calculating the composite mask for display or export, the system composites **ALL entries** (both SAM predictions and modifier brush strokes) up to the current `historyIndex` in order. This ensures:
+- **Multiple SAM predictions are preserved**: When you place multiple SAM points in sequence, all of their masks are composited together
+- **User refinements are preserved**: Brush strokes before, after, or between SAM predictions are all included
+- **Undo/redo works correctly**: Moving `historyIndex` backward/forward shows the composite of all entries up to that point
 
-This ensures user refinements are never lost when new SAM predictions are made.
+The composite is calculated fresh at display time using `getSimpleComposite()` (bitwise OR union), never stored pre-composited in history.
 
 ### History Index States
 
@@ -119,7 +133,7 @@ History entries are created in two scenarios:
 **When**: User completes a brush stroke
 
 ```typescript
-pushPerAnnotationMaskHistory: (annotationId, imgData) => {
+pushPerAnnotationMaskHistory: (annotationId, entry, samPoints?) => {
   // If annotation doesn't exist, initialize it
   const annotationState = state.perAnnotationMasks[annotationId] || {
     maskUrl: null,
@@ -139,7 +153,7 @@ pushPerAnnotationMaskHistory: (annotationId, imgData) => {
       ...state.perAnnotationMasks,
       [annotationId]: {
         ...annotationState,
-        history: [...truncated, imgData],  // Append new stroke
+        history: [...truncated, entry],    // Append new entry
         historyIndex: newHistoryIndex,      // Increment index to point to it
       },
     },
@@ -163,8 +177,9 @@ async function handlePointClick(x, y, label) {
     const maskUrl = result.image.url;
     const imageData = await dataUriToImageData(maskUrl);
     
-    // Add SAM mask as single history entry
-    pushPerAnnotationMaskHistory(currentAnnotationId, imageData);
+    // Add SAM mask as single history entry + active SAM points
+    const samEntry = { type: 'sam', imageData };
+    pushPerAnnotationMaskHistory(currentAnnotationId, samEntry, points);
     
     // Display the mask
     setPerAnnotationMask(currentAnnotationId, maskUrl);
@@ -182,25 +197,39 @@ async function handlePointClick(x, y, label) {
 undoPerAnnotationMask: (annotationId) => {
   const state = get();
   const annotationState = state.perAnnotationMasks[annotationId];
-  
-  // Prevent undo below -1 (empty state)
+
   if (!annotationState || annotationState.historyIndex < 0) {
     return null;
   }
-  
-  const newIndex = annotationState.historyIndex - 1;  // Decrement
-  
+
+  const newIndex = annotationState.historyIndex - 1;
+
+  // Recompute display mask from history[0..newIndex] via bitwise OR union
+  let newMaskUrl: string | null = null;
+  if (newIndex >= 0) {
+    const composite = getSimpleComposite(annotationState.history, newIndex);
+    if (composite) {
+      // serialize to png data url for display
+      // (omitted here for brevity)
+    }
+  }
+
   set((s) => ({
     perAnnotationMasks: {
       ...s.perAnnotationMasks,
       [annotationId]: {
         ...s.perAnnotationMasks[annotationId],
         historyIndex: newIndex,
+        maskUrl: newMaskUrl,
       },
     },
   }));
-  
-  // Return the state we're moving to (for display)
+
+  // Sync visible point annotations to the new history index
+  if (annotationState.samPointHistory && newIndex >= 0) {
+    get().syncAnnotationsToHistoryIndex(annotationId);
+  }
+
   return newIndex >= 0 ? annotationState.history[newIndex] : null;
 }
 ```
@@ -215,28 +244,55 @@ undoPerAnnotationMask: (annotationId) => {
 redoPerAnnotationMask: (annotationId) => {
   const state = get();
   const annotationState = state.perAnnotationMasks[annotationId];
-  
-  // Prevent redo beyond end of history
+
   if (!annotationState || annotationState.historyIndex >= annotationState.history.length - 1) {
     return null;
   }
-  
-  const newIndex = annotationState.historyIndex + 1;  // Increment
-  
+
+  const newIndex = annotationState.historyIndex + 1;
+
+  let newMaskUrl: string | null = null;
+  if (newIndex < annotationState.history.length) {
+    const composite = getSimpleComposite(annotationState.history, newIndex);
+    if (composite) {
+      // serialize to png data url for display
+      // (omitted here for brevity)
+    }
+  }
+
   set((s) => ({
     perAnnotationMasks: {
       ...s.perAnnotationMasks,
       [annotationId]: {
         ...s.perAnnotationMasks[annotationId],
         historyIndex: newIndex,
+        maskUrl: newMaskUrl,
       },
     },
   }));
-  
-  // Return the state we're moving to
+
+  if (annotationState.samPointHistory) {
+    get().syncAnnotationsToHistoryIndex(annotationId);
+  }
+
   return annotationState.history[newIndex];
 }
 ```
+
+### 4. SAM Point History and Overlay Sync
+
+SAM points are tracked independently from mask pixels via `samPointHistory`:
+
+- `allSamPoints` is an accumulative pool of unique points.
+- `activePointsPerHistoryIndex[i]` stores which point indices are active at history index `i`.
+- `clearSamPoints(annotationId)` clears currently drawn point annotations only (history is preserved).
+- `syncAnnotationsToHistoryIndex(annotationId)` rebuilds point overlays from `samPointHistory` after undo/redo.
+
+This makes clear/undo/redo behavior consistent:
+
+- Clearing points does not destroy recoverable history.
+- Undo/redo restores the exact point set that was active at that history step.
+- Branching from an older history point is supported because point pool indices remain stable.
 
 ---
 
@@ -395,7 +451,7 @@ User clicks point to trigger SAM:
   1. handlePointClick() calls segmentWithPoints()
   2. SAM generates mask (internal iterations, but counts as ONE history entry)
   3. dataUriToImageData() converts PNG data URI to ImageData
-  4. pushPerAnnotationMaskHistory("A", imageData)
+  4. pushPerAnnotationMaskHistory("A", samEntry, points)
      - A.historyIndex: -1 → 0
      - A.history = [SAM_ImageData]
   5. displayCompositeOfVisibleMasks()
@@ -404,7 +460,7 @@ User clicks point to trigger SAM:
 
 User draws RED brush stroke on A:
   1. pointerUp() pushes to history
-  2. pushPerAnnotationMaskHistory("A", RED_ImageData)
+  2. pushPerAnnotationMaskHistory("A", redBrushEntry)
      - A.historyIndex: 0 → 1
      - A.history = [SAM_ImageData, RED_ImageData]
   3. displayCompositeOfVisibleMasks()
@@ -454,6 +510,43 @@ User clicks UNDO:
   - Display: OLD_SAM (A) + GREEN (B) composite
 ```
 
+### Example 3: Multiple SAM Predictions (Bug Fix)
+
+**This scenario demonstrates the fix for the undo/redo bug where earlier SAM masks were being lost.**
+
+```
+User places SAM point 1 on rect A:
+  - A.history = [SAM1]
+  - A.historyIndex = 0
+  - Display shows: SAM1 ✓
+
+User places SAM point 2 on rect A:
+  - A.history = [SAM1, SAM2]
+  - A.historyIndex = 1
+  - getSimpleComposite(history, 1) composites SAM1 + SAM2 via bitwise OR
+  - Display shows: SAM1 + SAM2 (composite) ✓
+
+User places SAM point 3 on rect A:
+  - A.history = [SAM1, SAM2, SAM3]
+  - A.historyIndex = 2
+  - getSimpleComposite(history, 2) composites SAM1 + SAM2 + SAM3 via bitwise OR
+  - Display shows: SAM1 + SAM2 + SAM3 (composite) ✓
+
+User clicks UNDO:
+  - A.historyIndex: 2 → 1
+  - getSimpleComposite(history, 1) composites SAM1 + SAM2 via bitwise OR
+  - Display shows: SAM1 + SAM2 (both retained!) ✓
+  - SAM3 removed as expected
+
+User clicks UNDO again:
+  - A.historyIndex: 1 → 0
+  - getSimpleComposite(history, 0) returns SAM1
+  - Display shows: SAM1 ✓
+  - SAM2 removed as expected
+```
+
+**Key insight**: The composite is calculated from ALL entries up to `historyIndex`, ensuring all SAM predictions remain visible during undo/redo operations.
+
 ---
 
 ## Testing Checklist
@@ -474,3 +567,5 @@ When making changes to the mask history system, verify:
 - [ ] **Undo/redo works correctly when mixing SAM masks + brush strokes**
 - [ ] **SAM mask data URI successfully converts to ImageData**
 - [ ] **Composite displays correctly when combining SAM masks and brush strokes**
+- [ ] **Undo/redo keeps SAM point overlays in sync via `syncAnnotationsToHistoryIndex`**
+- [ ] **Clearing SAM points is reversible by undo/redo (history preserved)**

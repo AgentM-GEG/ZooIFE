@@ -20,12 +20,20 @@ Bundles SAM prompts, predictions, and refinements for each classified region.
 
 ```typescript
 interface RectAnnotationsValue {
-  annotationId: string;              // Caesar rect ID or '-1'
+  annotationId: string;              // Caesar rect ID, '-1', or user rect ID ('-2', '-3', ...)
   samPoints: Array<{
     x: number;
     y: number;
     label: 0 | 1;                    // 0=background, 1=foreground
   }>;
+  samPointHistory: {
+    allSamPoints: Array<{
+      x: number;
+      y: number;
+      label: 0 | 1;
+    }>;
+    activePointsPerHistoryIndex: number[][];
+  };
   latestSamMask: CompressedMask | null;   // Most recent SAM prediction
   compositeMask: CompressedMask | null;   // Current composite (SAM + edits)
 }[]
@@ -39,6 +47,7 @@ interface RectAnnotationsValue {
 - **Values:**
   - Caesar rect markId (e.g., `'mark_12345'`)
   - `'-1'` for whole-image or unmarked objects
+  - Values `< -1` (e.g., `'-2'`, `'-3'`) for user-defined rectangles created in the UI
 - **Required:** Yes
 
 #### samPoints
@@ -49,6 +58,15 @@ interface RectAnnotationsValue {
   - `1` = Foreground/positive prompt
 - **pointId:** Index tracking order of placement (0-indexed within rect)
 - **Empty array allowed** if no points placed
+- **Required:** Yes
+
+#### samPointHistory
+- **Type:** `{ allSamPoints: SamPoint[]; activePointsPerHistoryIndex: number[][] }`
+- **Purpose:** Full undo/redo SAM point history for this rect
+- **allSamPoints:** Pool of unique SAM points seen in this rect over time
+- **activePointsPerHistoryIndex:** For each mask history index, list of indices into `allSamPoints` that were active
+- **Fallback behavior:** If no stored history exists yet, export synthesizes a minimal history from current `samPoints`
+- **Use case:** Reconstruct prompt timeline and replay point-state transitions
 - **Required:** Yes
 
 #### latestSamMask
@@ -118,6 +136,14 @@ Indicates the origin and nature of the mask:
         { "x": 150, "y": 150, "label": 0 },
         { "x": 180, "y": 280, "label": 1 }
       ],
+      "samPointHistory": {
+        "allSamPoints": [
+          { "x": 200, "y": 300, "label": 1 },
+          { "x": 150, "y": 150, "label": 0 },
+          { "x": 180, "y": 280, "label": 1 }
+        ],
+        "activePointsPerHistoryIndex": [[0], [0, 1], [0, 1, 2]]
+      },
       "latestSamMask": {
         "width": 800,
         "height": 600,
@@ -138,6 +164,26 @@ Indicates the origin and nature of the mask:
       "samPoints": [
         { "x": 400, "y": 200, "label": 1 }
       ],
+      "samPointHistory": {
+        "allSamPoints": [
+          { "x": 400, "y": 200, "label": 1 }
+        ],
+        "activePointsPerHistoryIndex": [[0]]
+      },
+      "latestSamMask": null,
+      "compositeMask": null
+    },
+    {
+      "annotationId": "-2",
+      "samPoints": [
+        { "x": 500, "y": 210, "label": 1 }
+      ],
+      "samPointHistory": {
+        "allSamPoints": [
+          { "x": 500, "y": 210, "label": 1 }
+        ],
+        "activePointsPerHistoryIndex": [[0]]
+      },
       "latestSamMask": null,
       "compositeMask": null
     }
@@ -148,6 +194,7 @@ Indicates the origin and nature of the mask:
 **What this means:**
 - User refined mask for rect `abc123` with 3 SAM points, generated a prediction, then edited with brush
 - User placed 1 point for unmarked object but hasn't generated a SAM prediction yet
+- User also created a custom rectangle (`annotationId = -2`) and added one foreground point
 
 ## Drawing Annotations
 
@@ -236,6 +283,12 @@ User responses to sidebar classification questions.
           "samPoints": [
             { "x": 200, "y": 300, "label": 1 }
           ],
+          "samPointHistory": {
+            "allSamPoints": [
+              { "x": 200, "y": 300, "label": 1 }
+            ],
+            "activePointsPerHistoryIndex": [[0]]
+          },
           "latestSamMask": { /* CompressedMask */ },
           "compositeMask": { /* CompressedMask */ }
         }
@@ -366,8 +419,14 @@ A: Zero-indexed order within the rect showing which point was placed first. Usef
 **Q: Can a rect have `latestSamMask` but no `samPoints`?**
 A: No, samPoints must exist for a mask to be generated. If no mask, samPoints should be empty.
 
-**Q: What does annotationId = '-1' mean?**
+**Q: What does `annotationId = '-1'` mean?**
 A: Unmarked object annotations (whole image classification without selecting a specific Caesar rect).
+
+**Q: What do `annotationId` values less than `-1` mean?**
+A: They are user-defined rectangles created in the UI. Example: `-2`, `-3`, `-4`.
+
+**Q: Why export both `samPoints` and `samPointHistory`?**
+A: `samPoints` is the currently visible point list, while `samPointHistory` preserves undo/redo timeline state (`allSamPoints` pool plus active indices per history step).
 
 **Q: Why are there both drawing annotations AND rect annotations?**
 A: Drawing annotations preserve raw interaction history; rect annotations provide the processed, final data structure for analysis.

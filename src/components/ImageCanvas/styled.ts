@@ -214,10 +214,10 @@ export const MaskHistoryButtonsContainer = styled.div`
   transition: top 0.1s ease-out, right 0.1s ease-out;
 `;
 
-export const MarkingBanner = styled.div`
+export const MarkingBanner = styled.div<{ $isEditingMinusOne?: boolean }>`
   background: ${theme.colors.secondary};
-  color: ${theme.colors.text.inverse};
-  border: 1px solid ${theme.colors.border};
+  color: ${(props) => props.$isEditingMinusOne ? theme.colors.error : theme.colors.text.inverse};
+  border: 1px solid ${(props) => props.$isEditingMinusOne ? theme.colors.error : theme.colors.border};
   padding: 12px 16px;
   border-radius: ${theme.borders.radius.base};
   font-size: ${theme.typography.size.sm};

@@ -1,0 +1,135 @@
+{
+  "metadata": {
+    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+    "started_at": "2026-04-14T13:05:55.506Z",
+    "finished_at": "2026-04-14T13:08:26.855Z",
+    "user_language": "en-GB",
+    "workflow_version": "1.0",
+    "classifier_version": "IFE-0.1.0"
+  },
+  "annotations": [
+    {
+      "task": "rect-annotations",
+      "value": [
+        {
+          "annotationId": "1021",
+          "samPoints": [
+            {
+              "x": 1592.2859497436739,
+              "y": 888.4611847103529,
+              "label": 1,
+              "pointId": 0
+            }
+          ],
+          "samPointHistory": {
+            "allSamPoints": [
+              {
+                "x": 1623.1052191207652,
+                "y": 915.0572679024631,
+                "label": 1
+              },
+              {
+                "x": 1589.5666024456953,
+                "y": 890.576782236998,
+                "label": 1
+              },
+              {
+                "x": 1592.2859497436739,
+                "y": 888.4611847103529,
+                "label": 1
+              },
+              {
+                "x": 1576.2720156555774,
+                "y": 850.9848856669253,
+                "label": 1
+              }
+            ],
+            "activePointsPerHistoryIndex": [
+              [
+                0
+              ],
+              [
+                2
+              ],
+              [
+                3
+              ]
+            ]
+          },
+          "latestSamMask": {
+            "width": 2040,
+            "height": 2040,
+            "encoding": "gzip-base64",
+            "maskType": "sam",
+            "rle": "H4sIAAAAAAAAE+3PsQmAUBCD4cQFHME13E6ncx7LBx5GhNdaiiA/XxEOkuKiAADwW5s8eS3Zjve6r7iVhrgdsoe4HrK3Sl76dvT59T8AAADvm3UBbv4ZjCwQAAA="
+          },
+          "compositeMask": {
+            "width": 2040,
+            "height": 2040,
+            "encoding": "gzip-base64",
+            "maskType": "composite",
+            "rle": "H4sIAAAAAAAAE+3QTQqDQAyG4e+dWXTZI3gID1hP1/O4FIyTMqC4KtRVQT4eSAjkB5JKMzOz23qLgSkEJHP0KllCJVlWQUniS967Qrz22Sftl5u1X2m9vyTTKh5nDlGPuPXNrYn495fMzMzMrhr1AefNfJRQEAAA"
+          }
+        },
+        {
+          "annotationId": "-2",
+          "samPoints": [
+            {
+              "x": 1333.4564472658433,
+              "y": 314.0918020347867,
+              "label": 1,
+              "pointId": 0
+            },
+            {
+              "x": 1408.311428889632,
+              "y": 285.81754029766074,
+              "label": 1,
+              "pointId": 1
+            }
+          ],
+          "samPointHistory": {
+            "allSamPoints": [
+              {
+                "x": 1333.4564472658433,
+                "y": 314.0918020347867,
+                "label": 1
+              },
+              {
+                "x": 1408.311428889632,
+                "y": 285.81754029766074,
+                "label": 1
+              }
+            ],
+            "activePointsPerHistoryIndex": [
+              [
+                0,
+                1
+              ]
+            ]
+          },
+          "latestSamMask": {
+            "width": 2040,
+            "height": 2040,
+            "encoding": "gzip-base64",
+            "maskType": "sam",
+            "rle": "H4sIAAAAAAAAE+2RwQ2DMAxF/RMkjh2BUbpGtyEbdYWMwgjcCODiyjhQrj1Vqqyn/J9IjvOtCInjfMGT0IOZcINgY8I9CBP6j8ZzrQQcyhSsvoegTIQOOVqXNO09X1qRtDoIcvXh8JkQYfs0670MvVUW1ZEJrfbVPJbreBd5MR8WQrz4WF07tFHA1Tf1Rkztrf1U9VI5VE/mKyHqjDUxF02cgk08Fk2oJ504FwIaQvfr33Qcx3Ecx3Ecx/kvHvQGENMv2+gQAAA="
+          },
+          "compositeMask": {
+            "width": 2040,
+            "height": 2040,
+            "encoding": "gzip-base64",
+            "maskType": "composite",
+            "rle": "H4sIAAAAAAAAE+2RwQ2DMAxF/RMkjh2BUbpGtyEbdYWMwgjcCODiyjhQrj1Vqqyn/J9IjvOtCInjfMGT0IOZcINgY8I9CBP6j8ZzrQQcyhSsvoegTIQOOVqXNO09X1qRtDoIcvXh8JkQYfs0670MvVUW1ZEJrfbVPJbreBd5MR8WQrz4WF07tFHA1Tf1Rkztrf1U9VI5VE/mKyHqjDUxF02cgk08Fk2oJ504FwIaQvfr33Qcx3Ecx3Ecx/kvHvQGENMv2+gQAAA="
+          }
+        }
+      ]
+    }
+  ],
+  "links": {
+    "subjects": [
+      "119116354"
+    ],
+    "workflow": "31349",
+    "project": "30908"
+  }
+}

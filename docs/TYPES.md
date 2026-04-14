@@ -305,6 +305,7 @@ interface ClassificationMetadata {
   user_agent: string;        // Browser info
   user_language: string;     // User's language
   workflow_version: string;  // Workflow version used
+  classifier_version: string;  // Classifier version (IFE-x.x.x format)
 }
 ```
 

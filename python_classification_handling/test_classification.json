@@ -1,110 +1,99 @@
 {
-    "metadata": {
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
-        "started_at": "2026-04-10T22:44:02.319Z",
-        "finished_at": "2026-04-10T22:46:08.764Z",
-        "user_language": "en-GB",
-        "workflow_version": "1.0"
-    },
-    "annotations": [
+  "metadata": {
+    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+    "started_at": "2026-04-13T18:28:18.207Z",
+    "finished_at": "2026-04-13T18:29:40.295Z",
+    "user_language": "en-GB",
+    "workflow_version": "1.0",
+    "classifier_version": "IFE-0.1.0"
+  },
+  "annotations": [
+    {
+      "task": "rect-annotations",
+      "value": [
         {
-            "task": "rect-annotations",
-            "value": [
-                {
-                    "annotationId": "1000",
-                    "samPoints": [
-                        {
-                            "x": 1125.6390309260205,
-                            "y": 323.63328392328293,
-                            "label": 1,
-                            "pointId": 0
-                        },
-                        {
-                            "x": 1074.5345781583273,
-                            "y": 395.675101501911,
-                            "label": 1,
-                            "pointId": 1
-                        }
-                    ],
-                    "latestSamMask": {
-                        "width": 2040,
-                        "height": 2040,
-                        "encoding": "gzip-base64",
-                        "maskType": "sam",
-                        "rle": "H4sIAAAAAAAAE+2SMQ6CQBBF57saOzkCR+FS9tB7KY6yR8COxGHHLDsmSCzQQgt/XjKvAfbvH0yMkK9wEQQYOhVUMEQV1DCMKmhhUJWdId0EcIeVj+5q5XqDdeXR33948O9HP68vqaacdXjnlgdBnQSnT1u6zq1oaaHzVL2njJ5+6cbTt68dnmdczP4x52fzWQ0MyfeS9wOM21Lvc1taUmtpsCtNatl6mgSGYRKE3/6FhBBCCCGEkH/nLHfrhhSxChEAAA=="
-                    },
-                    "compositeMask": {
-                        "width": 2040,
-                        "height": 2040,
-                        "encoding": "gzip-base64",
-                        "maskType": "composite",
-                        "rle": "H4sIAAAAAAAAE+1TO27DMAzliwMYyFAfwUfxpbrbey+lo+gIQodaQRmz4Cdp6nbI1A4VHsBnEZT4ebSQNDT8Cl4IHQQLEwYIMhNGCCoTZgiY6SDY3gkI7nbcBw87Hh9g3nGN+1cu8X6OfMmrumit5Xsvq/ZSL4QebDHbnfVbn52mHWvnPQTlQpjC6lsj6okwvmoUnwhP/nXL0tv7XVi5WUQu5QSNK9BTWSk8AyqsYvNkaC42D6/ap8bP5unNM1m8YDPPZh62uVzPel/ntWjXqyupc00Y7TwcNc9k3/1RUPS1NbSE4KyKr641Y1YlqupfMKkK1Xci+5tV81uug5xtzvAJbuw7xdG9TnFGtokmoTeriz3LEgqnUDzHJtzzFJsw/8zdV5vvbLpai9VcU9Q3huJAfew/OZoWXjX7xBbfyuhW9fft6f76n25oaGhoaGhoaGho+N94pg+48yl7VhIAAA=="
-                    }
-                },
-                {
-                    "annotationId": "1023",
-                    "samPoints": [
-                        {
-                            "x": 1783.004962480154,
-                            "y": 656.7870212606401,
-                            "label": 1,
-                            "pointId": 0
-                        },
-                        {
-                            "x": 1732.7598934040032,
-                            "y": 670.5162514320542,
-                            "label": 1,
-                            "pointId": 1
-                        }
-                    ],
-                    "latestSamMask": {
-                        "width": 2040,
-                        "height": 2040,
-                        "encoding": "gzip-base64",
-                        "maskType": "sam",
-                        "rle": "H4sIAAAAAAAAE+2RwQ3DIAxF/yeHHDNCjx0jo5XRskiljsAtriC4dbDUqgv0Yr3DjwnGT6DQIAiCwLmDM5XSwJtlBZmUrYKT5+y5JGV/gkrwYt8yej/V8q7yWTUBL+c/6xKx0zvHWWUHJyobx4xtH3slIakMj5JAUvZhU9zi4RaWNmWr4JqUuWJSN+9f5uds31s8f3obuJqLZ/F72Dzzud4PM2yHeed/v1gQBEEQBEEQGFe8ANOnY3bgEAAA"
-                    },
-                    "compositeMask": {
-                        "width": 2040,
-                        "height": 2040,
-                        "encoding": "gzip-base64",
-                        "maskType": "composite",
-                        "rle": "H4sIAAAAAAAAE+1TS07DMBCdFxfcXY6QBQcpx2KBiHcsuVJ2LDkBkg9QhAFBXRpieDPmIy6AhKwn2fOmHs+857RIaWhoaGiouBV4FORZMHI/CNAVzAeBq7uve98VLHtBgWBgnK32m/UfLCibs2DQ31iVM29fYHelncChYIb1mHZ2NnfSlWxzpE4A5J1Nk+oUsU7BnV2mg2DTFYSDuFInX9acMD7U+b1VhFQn8VaRk92QvGB0BeHeePSyKoiVTcecoiCZNxCc3Wm9pwLqoY4FwMI8rJ+nElXkUGqefXpVxYpL+rQ1pZPn2ejIrn/kg+Ynx/We57a8ieo2CM68vtHsgPlD87iy17hC3LJLWAsuVp/94otgWZkah/jMaD4SZUlZPhKckz0JTlVZVvX5kb30rZC+MvU1ET8znb41/UOu3gf0qi492OtN5Hu7bUDEgLCnmkRnKhsx0T9sXkW/Jbpssc3O7w+YO6mxU69HzBon9Z2x17hH1jiq78niN67TrxUIf/1PbGhoaGhoaGho+J84kXdnVy5PiBIAAA=="
-                    }
-                },
-                {
-                    "annotationId": "-1",
-                    "samPoints": [
-                        {
-                            "x": 132.94521619342603,
-                            "y": 1250.6051230196608,
-                            "label": 1,
-                            "pointId": 0
-                        }
-                    ],
-                    "latestSamMask": {
-                        "width": 2040,
-                        "height": 2040,
-                        "encoding": "gzip-base64",
-                        "maskType": "sam",
-                        "rle": "H4sIAAAAAAAAE+3PMQqAMBBE0fmxSBlv5P1v4QmsA1lcEbG1VWF4xWfKSaWZmZmZ/cIsGj0EJBFiOTvEVJJ9iFqufbc9tA9BSdYQlf3tb2Zm9kWbDjVu//c2EAAA"
-                    },
-                    "compositeMask": {
-                        "width": 2040,
-                        "height": 2040,
-                        "encoding": "gzip-base64",
-                        "maskType": "composite",
-                        "rle": "H4sIAAAAAAAAE+1VS3LbMAzF48eeuAv1BjqKjibdrDyKdp3YTuvEXdCxInTwsauk2bcLDWZM4oECgQeAZuJVVllllVVWWWWVVYjpC6EHY7gSEBinK2EbGNOV0ES+EtrIKK+ELjLGV0qM04WAxJguhJgY84WwzSy/YExoAmOohAaMEygwSiZ0qM+EFowC0Rhj0jsdHWBrTRbBeNJTwb0mQitxnSTeORAiGHPSuBSbIgVOhF7i/UniKXpuUaKuPwiQiKLdXoJHv8Dl/jFoNhie7I4xeiaB0GRGcbxEi6wGQpsZpyfTBRf7FOz2UfmYnszLEO22OSgvQOSbJQlCiEFy7oTDo0aUzU/RX8lc/JWjZDELr8nuilK9O9omzT8w6lHZyYQmWTaS/XQUhgTdJotZYpgVrdmYGTyT+eAMZa17psAHs5w2hD6YH/E67J2zjWUgX2jFHS8bq6L0Q+O4cDZsbJ19HW944/eY/tXj2OvXybS605gV034QPzvN2TDJIvIHRLv6QdnaS4yCSeeMD6opJqxKn1fF+I4JY5NWX3q1WViazNZzyeN/FIt0SJetw2XGbp1jVu2TbFOhNXTWi1o5UGRcgk6STeZ7Owb1OftMVRjDs/fZ7dSovkefMT0dGUN4f6rKDcHuGWySFicam27vefFXvKMY46P1ZWuTFBjnZLmYTU5/8+noNksLkrAl9XDfZtlL3lLPJkruOlE3i/Vc0rpqTkubZC91QTROe+XCbI33ZG8ztrAoO97FMmMt2GwH8m8an+nGLeVgp8UW/X3Y6nsFt7Y+Icbi1t+4m1X7fGffLvH4Ga5zWRzVTnG0xbDzM47KywsYLx91jeFCf7RXsjdasvqw73XfYv5rX+/7Tvcdpvu+v+91Nn2/9X2Laqyc5ZaaDVEWXyzKyTCpxou/VNmn9dmqNLs+PPs8fKLL2zO/WL1v+rTQe/e/1AfXa6bIZ5vUUd46TL+EK7lXsOr/lKOvxdbJ33Vf65uy+SaMlDdC96//51dZZZVVVvkf5Dv9BnWard6QFgAA"
-                    }
-                }
-            ]
+          "annotationId": "1000",
+          "samPoints": [
+            {
+              "x": 1441.553569460933,
+              "y": 919.7981649390874,
+              "label": 1,
+              "pointId": 0
+            }
+          ],
+          "latestSamMask": {
+            "width": 2040,
+            "height": 2040,
+            "encoding": "gzip-base64",
+            "maskType": "sam",
+            "rle": "H4sIAAAAAAAAE+2VW27jMAxFeSUn+vQSvBTvYLYU72p+tRQvwcA0idJRrYIPPxJPvwrMYACB6CUP6lCURdGFSrVq1apVq/YX7SchzIQWwwdr/CB0O+0PejHl5wuGTMCL9+bD5iV3uRKawJk5ateoC5x75gjDmXNrHCXOV6lrF49nXjlJnHZxPmkNk9B80kqYAsqBwkYYGqlP2Bt3KBiNY8MVKvMKY8PVFIw3Xn3yBLiFkif4lbJRvMm+PCGsVDyhNeLsg1MevuDoCJ2xVKd8V5ocoV8prcT7yk7rne+ScUdczQByBdkoyl6YZBei6a47nOSJlPj5xPkxJcLl9Oz7U8GYCJ359sWHU0FMBP/iwf5Bqrg0BcOD0JvvmvJOaEWDKHzBvPjfpIqLLy/aPyuG92/5P63RHP64LqvcN7oj9qP5/JD3oIph91b2/vXt8dtt5Ry4H1LSfhjlxLNRlBOfjQY+sSS9ADvt+57i3XoBdt7GGXriyTg56xGnvWX947TvOldu1iHOVrnanXDqV/b8m7iRZNrzes/4Ob/dw4WXe7qwt/svq3i9n3nhhg4038jx/e/XqEORu8oTg7NzrWWdH1Eoy5yZJE4yi9Ia6+wqmM6ca4t14mkcUN5sdpzFLxRkiv7a6PJEvZDUIfNyT62QzK9ACG/bxG2XiStzXHWWCZ4PmuS/00HHnW7fg+U7wRr+9berWrVq1apVq/Z/2A/6BPRGpSPsFAAA"
+          },
+          "compositeMask": {
+            "width": 2040,
+            "height": 2040,
+            "encoding": "gzip-base64",
+            "maskType": "composite",
+            "rle": "H4sIAAAAAAAAE+2VW27jMAxFeSUn+vQSvBTvYLYU72p+tRQvwcA0idJRrYIPPxJPvwrMYACB6CUP6lCURdGFSrVq1apVq/YX7SchzIQWwwdr/CB0O+0PejHl5wuGTMCL9+bD5iV3uRKawJk5ateoC5x75gjDmXNrHCXOV6lrF49nXjlJnHZxPmkNk9B80kqYAsqBwkYYGqlP2Bt3KBiNY8MVKvMKY8PVFIw3Xn3yBLiFkif4lbJRvMm+PCGsVDyhNeLsg1MevuDoCJ2xVKd8V5ocoV8prcT7yk7rne+ScUdczQByBdkoyl6YZBei6a47nOSJlPj5xPkxJcLl9Oz7U8GYCJ359sWHU0FMBP/iwf5Bqrg0BcOD0JvvmvJOaEWDKHzBvPjfpIqLLy/aPyuG92/5P63RHP64LqvcN7oj9qP5/JD3oIph91b2/vXt8dtt5Ry4H1LSfhjlxLNRlBOfjQY+sSS9ADvt+57i3XoBdt7GGXriyTg56xGnvWX947TvOldu1iHOVrnanXDqV/b8m7iRZNrzes/4Ob/dw4WXe7qwt/svq3i9n3nhhg4038jx/e/XqEORu8oTg7NzrWWdH1Eoy5yZJE4yi9Ia6+wqmM6ca4t14mkcUN5sdpzFLxRkiv7a6PJEvZDUIfNyT62QzK9ACG/bxG2XiStzXHWWCZ4PmuS/00HHnW7fg+U7wRr+9berWrVq1apVq/Z/2A/6BPRGpSPsFAAA"
+          }
+        },
+        {
+          "annotationId": "3000",
+          "samPoints": [
+            {
+              "x": 315.959929447364,
+              "y": 546.5814872218502,
+              "label": 1,
+              "pointId": 0
+            }
+          ],
+          "latestSamMask": {
+            "width": 2040,
+            "height": 2040,
+            "encoding": "gzip-base64",
+            "maskType": "sam",
+            "rle": "H4sIAAAAAAAAE+2SQQrCMBBF59uF7noBoUuPMUfr1byFW4/QZcCaiCPWZEwUV4J+HrxHWxrKTJMkQshPshNso0CjYMT+fPXRPFWthYPd90721HkWoNEua6h0/aZ9pVPW4UXDB9VGRyTMj66cTwJkje566dObobSdn1fd9/WN+dznWMx92c1t32q733z7bySEEEIIIeR/OMgF4jel4GwRAAA="
+          },
+          "compositeMask": {
+            "width": 2040,
+            "height": 2040,
+            "encoding": "gzip-base64",
+            "maskType": "composite",
+            "rle": "H4sIAAAAAAAAE+2TTQrCMBCF59lFV+IFhC49Ro5Wj+YpXPcIXQZaE3EsNR3Tli5ElMcH7yMJ+WGYRImEkL/kJDgGgQuCGpfbIxvNNptukl7nbUZdNdkLMOMisc+4XPEh4zZxtWC/wW7GNSL6l3cmOwESBzMe/bbTT1PP90sro+0Lq6QiuYqtVbgc9n/ahTGG+9XaR7bXnp24x/nb/4gQQgghhJDf5Sp3jiz5fPYRAAA="
+          }
+        },
+        {
+          "annotationId": "-2",
+          "samPoints": [
+            {
+              "x": 1748.2703396433974,
+              "y": 923.633825643894,
+              "label": 1,
+              "pointId": 0
+            }
+          ],
+          "latestSamMask": {
+            "width": 2040,
+            "height": 2040,
+            "encoding": "gzip-base64",
+            "maskType": "sam",
+            "rle": "H4sIAAAAAAAAE+3OsQ0AIAzEwP9J0rAnqzEHU7AACh1lKGmsk1w7lQAA4GHK4bHl7nWbZeP3MwAAQK3pAKxsMXsUEAAA"
+          },
+          "compositeMask": {
+            "width": 2040,
+            "height": 2040,
+            "encoding": "gzip-base64",
+            "maskType": "composite",
+            "rle": "H4sIAAAAAAAAE+2SsQ6CQBBEd46CksLGjg+x8NPk0+j8DTpbSgOLa+5uEYPGmFgYzeQlM8kdzN5NzsQIIYSQn+MoAAxnFdQwqAoOMFxGAUL2orBRUCatktYPmtdL/2P2IhjUk1QlpDnB0PmU1r1ZPJim71VQxnPM5xlySoPtkHf6z+69ifdtp5je39Reav1++klQTUuzeyw9zL3c91StPXf6ZFdX3ntK597GdO8tTm++/b4IIYQQ8n/s5Aq8lMJEAhEAAA=="
+          }
         }
-    ],
-    "links": {
-        "subjects": [
-            "119116329"
-        ],
-        "workflow": "31349",
-        "project": "30908"
+      ]
     }
+  ],
+  "links": {
+    "subjects": [
+      "119116352"
+    ],
+    "workflow": "31349",
+    "project": "30908"
+  }
 }

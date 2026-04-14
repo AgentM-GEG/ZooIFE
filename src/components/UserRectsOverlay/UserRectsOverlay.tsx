@@ -3,9 +3,9 @@ import { useState, useRef, useEffect } from 'react';
 import { useClassificationStore } from '@/stores/classificationStore';
 import { getAnnotationCursor, ANNOTATION_DEFAULT_CURSOR } from '@/components/CaesarAnnotationOverlay/constants';
 import { useCaesarAnnotationTooltip } from '@/components/CaesarAnnotationOverlay/useCaesarAnnotationTooltip';
-import type { AnnotationRect } from '@/components/CaesarAnnotationOverlay/types';
 import type { TooltipState } from '@/components/CaesarAnnotationOverlay/types';
 import type { Dispatch, SetStateAction } from 'react';
+import type { UserRectState } from '@/stores/classificationStore';
 
 function UserRect({
   rectId,
@@ -23,7 +23,7 @@ function UserRect({
   setToolTip,
 }: {
   rectId: string;
-  rect: AnnotationRect;
+  rect: UserRectState;
   isSelected: boolean;
   isHovered: boolean;
   opacity: number;
@@ -38,8 +38,9 @@ function UserRect({
   setToolTip: Dispatch<SetStateAction<TooltipState>>;
 }) {
   const rectRef = useRef<any>(null);
-  const prevBoundsRef = useRef<AnnotationRect>(rect);
-  const [displayedBounds, setDisplayedBounds] = useState<AnnotationRect>(rect);
+  const prevBoundsRef = useRef<UserRectState>(rect);
+  const prevOpacityRef = useRef<number | null>(null);
+  const [displayedBounds, setDisplayedBounds] = useState<UserRectState>(rect);
 
   // Animate when rect bounds change (e.g., after Save operation)
   useEffect(() => {
@@ -69,6 +70,26 @@ function UserRect({
     }
   }, [rect]);
 
+  // Animate opacity changes with Caesar-style animation timing
+  // 200ms fade-in (slower) when becoming visible, 100ms fade-out (faster) when dimming
+  useEffect(() => {
+    if (rectRef.current) {
+      const prevOpacity = prevOpacityRef.current;
+      const rect = (rectRef.current as any);
+      
+      // On first mount, set opacity directly without animation
+      if (prevOpacity === null) {
+        rect.opacity(opacity);
+      } else if (opacity !== prevOpacity) {
+        // For subsequent updates, animate the change
+        const isFadingIn = opacity > prevOpacity;
+        const duration = isFadingIn ? 0.2 : 0.1; // 200ms fade-in, 100ms fade-out
+        rect.to({ opacity, duration });
+      }
+    }
+    prevOpacityRef.current = opacity;
+  }, [opacity]);
+
   const strokeWidth = isSelected ? baseStrokeWidth * 2 : baseStrokeWidth;
 
   // Tooltip handler hook - reuses Caesar annotation tooltip logic
@@ -87,10 +108,9 @@ function UserRect({
       y={displayedBounds.y}
       width={displayedBounds.width}
       height={displayedBounds.height}
-      stroke="#FF0000" // Red color for user rects
+      stroke={rect.markColour}
       strokeWidth={strokeWidth}
-      opacity={opacity}
-      dash={[5, 5]} // Dotted line pattern: 5px line, 5px gap
+      dash={rect.markStroke === 'dashed' ? [5, 5] : undefined}
       fillEnabled={false}
       listening={true}
       hitStrokeWidth={baseStrokeWidth * 4} // Make hit area larger for easier clicking
@@ -164,7 +184,7 @@ export function UserRectsOverlay({
   setToolTip,
   contentScale = 1,
 }: {
-  onRectClick?: (rect: AnnotationRect, rectId: string) => void;
+  onRectClick?: (rect: UserRectState, rectId: string) => void;
   selectedRectId?: string;
   toolCursor?: string;
   onMouseEnter?: () => void;

@@ -83,7 +83,7 @@ High-level system architecture with diagrams and component relationships. Start 
 
 ### Debugging & Troubleshooting
 
-#### [HOOKS_DEBUGGING.md](HOOKS_DEBUGGING.md) ⭐ 
+#### [debugging/HOOKS_DEBUGGING.md](debugging/HOOKS_DEBUGGING.md) ⭐ 
 **Comprehensive guide to React hooks violations and solutions** — Real case study from this project.
 
 **Key sections**:
@@ -100,7 +100,21 @@ High-level system architecture with diagrams and component relationships. Start 
 - You're writing new components with hooks
 - You need to debug state/rendering issues
 
-#### [REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md)
+#### [debugging/README.md](debugging/README.md)
+Index for practical debugging guides and troubleshooting workflows.
+
+### Development History (Archive)
+
+#### [dev-history/README.md](dev-history/README.md)
+Historical implementation notes and bug-fix writeups that are useful for context but are not canonical references for current behavior.
+
+#### [dev-history/MASK_BUG_FIX.md](dev-history/MASK_BUG_FIX.md)
+Historical analysis of mask type/composite accumulation issues and the first round of fixes.
+
+#### [dev-history/MASK_MIXING_BUG_FIX.md](dev-history/MASK_MIXING_BUG_FIX.md)
+Historical analysis of SAM/non-SAM mask mixing, compositing inconsistencies, and async race fixes.
+
+#### [dev-history/REFACTORING_SUMMARY.md](dev-history/REFACTORING_SUMMARY.md)
 **Summary of refactoring work completed** — What changed, why, and what was fixed.
 
 **Two phases**:
@@ -117,7 +131,7 @@ High-level system architecture with diagrams and component relationships. Start 
 
 ### I'm a **Frontend Developer** working on Components
 1. Start with [COMPONENTS.md](COMPONENTS.md)
-2. Understand hooks patterns from [HOOKS_DEBUGGING.md](HOOKS_DEBUGGING.md)
+2. Understand hooks patterns from [debugging/HOOKS_DEBUGGING.md](debugging/HOOKS_DEBUGGING.md)
 3. Use [SERVICES.md](SERVICES.md) to understand data dependencies
 4. Use [AUTH.md](AUTH.md) for authentication
 
@@ -139,7 +153,7 @@ High-level system architecture with diagrams and component relationships. Start 
 4. Review the complete classification example and FAQ
 
 ### I'm **Debugging an Error**
-1. If it's a React hooks error → [HOOKS_DEBUGGING.md](HOOKS_DEBUGGING.md)
+1. If it's a React hooks error → [debugging/HOOKS_DEBUGGING.md](debugging/HOOKS_DEBUGGING.md)
 2. If it's an API error → [SERVICES.md](SERVICES.md)
 3. If it's an auth error → [AUTH.md](AUTH.md)
 4. For overall system behavior → [COMPONENTS.md](COMPONENTS.md) or [SOLUTION_ARCHITECTURE.md](SOLUTION_ARCHITECTURE.md)
@@ -150,7 +164,7 @@ High-level system architecture with diagrams and component relationships. Start 
 3. [AUTH.md](AUTH.md) — Authentication system
 4. [SERVICES.md](SERVICES.md) — API layer
 5. [COMPONENTS.md](COMPONENTS.md) — UI layer
-6. [HOOKS_DEBUGGING.md](HOOKS_DEBUGGING.md) — Best practices
+6. [debugging/HOOKS_DEBUGGING.md](debugging/HOOKS_DEBUGGING.md) — Best practices
 
 ## Documentation Files
 
@@ -160,9 +174,11 @@ High-level system architecture with diagrams and component relationships. Start 
 | [SERVICES.md](SERVICES.md) | Services architecture reference | 450+ lines | Developers working with APIs |
 | [COMPONENTS.md](COMPONENTS.md) | Component and hooks reference | 400+ lines | Frontend developers |
 | [CLASSIFICATION_EXPORT.md](CLASSIFICATION_EXPORT.md) | Classification export format reference | 500+ lines | Backend developers, data analysts |
-| [HOOKS_DEBUGGING.md](HOOKS_DEBUGGING.md) | React hooks guide | 500+ lines | All developers using hooks |
-| [REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md) | What changed and why | 300+ lines | Code reviewers, maintainers |
+| [debugging/HOOKS_DEBUGGING.md](debugging/HOOKS_DEBUGGING.md) | React hooks guide | 500+ lines | All developers using hooks |
+| [debugging/README.md](debugging/README.md) | Practical debugging docs index | Short | All developers |
+| [dev-history/REFACTORING_SUMMARY.md](dev-history/REFACTORING_SUMMARY.md) | What changed and why (historical summary) | 300+ lines | Code reviewers, maintainers |
 | [SOLUTION_ARCHITECTURE.md](SOLUTION_ARCHITECTURE.md) | System architecture | Varies | System designers, architects |
+| [dev-history/README.md](dev-history/README.md) | Archive index for historical docs | Short | Maintainers, debuggers |
 
 ## Key Concepts
 
@@ -183,7 +199,7 @@ The **component layer** uses specialized hooks for managing:
 - **ML integration** — `useCaesarReductions` for Caesar API
 - **GraphQL client** — `useCaesarClient` for Apollo/graphql-request
 
-All hooks follow React's rules of hooks. See [COMPONENTS.md](COMPONENTS.md) and [HOOKS_DEBUGGING.md](HOOKS_DEBUGGING.md).
+All hooks follow React's rules of hooks. See [COMPONENTS.md](COMPONENTS.md) and [debugging/HOOKS_DEBUGGING.md](debugging/HOOKS_DEBUGGING.md).
 
 ### React Hooks Rules
 
@@ -194,7 +210,7 @@ This project follows strict React hooks patterns:
 3. **No hooks in loops** — Extract to child components if needed
 4. **No hooks in conditions** — Move conditions after hooks
 
-See [HOOKS_DEBUGGING.md](HOOKS_DEBUGGING.md) for detailed explanations and common mistakes.
+See [debugging/HOOKS_DEBUGGING.md](debugging/HOOKS_DEBUGGING.md) for detailed explanations and common mistakes.
 
 ## Recent Changes
 
@@ -210,7 +226,7 @@ See [HOOKS_DEBUGGING.md](HOOKS_DEBUGGING.md) for detailed explanations and commo
 - ✅ Fixed `useSubjectLoader` (state-driven hook counts)
 - ✅ Multi-subject workflow now works without errors
 
-See [REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md) for full details.
+See [dev-history/REFACTORING_SUMMARY.md](dev-history/REFACTORING_SUMMARY.md) for full details.
 
 ## FAQ
 
@@ -218,7 +234,7 @@ See [REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md) for full details.
 A: Add it to the appropriate service file in `src/services/`. Use the patterns shown in [SERVICES.md](SERVICES.md). Likely use `apiClient.apiCall()` for REST or GraphQLClient for GraphQL.
 
 **Q: I'm getting a "rendered fewer hooks" error**
-A: Most common causes are listed in [HOOKS_DEBUGGING.md](HOOKS_DEBUGGING.md) with solutions.
+A: Most common causes are listed in [debugging/HOOKS_DEBUGGING.md](debugging/HOOKS_DEBUGGING.md) with solutions.
 
 **Q: How do I load the next subject?**
 A: Use the `useSubjectLoader` hook. Example in [COMPONENTS.md](COMPONENTS.md).
@@ -262,7 +278,7 @@ When making changes:
 ## Questions or Issues?
 
 Refer to the appropriate documentation file above. Most answers are in:
-- Hooks issues → [HOOKS_DEBUGGING.md](HOOKS_DEBUGGING.md)
+- Hooks issues → [debugging/HOOKS_DEBUGGING.md](debugging/HOOKS_DEBUGGING.md)
 - API issues → [SERVICES.md](SERVICES.md)
 - Component issues → [COMPONENTS.md](COMPONENTS.md)
 - Architecture questions → [SOLUTION_ARCHITECTURE.md](SOLUTION_ARCHITECTURE.md)

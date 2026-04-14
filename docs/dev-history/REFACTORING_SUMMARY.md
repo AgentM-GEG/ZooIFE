@@ -1,5 +1,7 @@
 # Refactoring Summary: Services Layer & React Hooks
 
+> Archived development note: this summary reflects a historical refactoring phase and may not match current implementation details. For canonical current behavior, prefer `docs/INDEX.md`, `docs/STORES.md`, and `docs/SOLUTION_ARCHITECTURE.md`.
+
 This document summarizes the refactoring and debugging work completed in April 2026.
 
 ## Overview
@@ -345,7 +347,7 @@ const loadNextSubject = useCallback(async () => {
   - Integration points between services and components
   - Performance considerations and optimization opportunities
 
-- **docs/HOOKS_DEBUGGING.md** (500+ lines)
+- **docs/debugging/HOOKS_DEBUGGING.md** (500+ lines)
   - Root causes of React hooks violations
   - Real-world case study from this refactoring
   - Solutions with before/after code examples

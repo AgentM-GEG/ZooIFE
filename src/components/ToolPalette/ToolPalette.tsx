@@ -45,11 +45,11 @@ export function ToolPalette({
   onDebugCoordsChange,
 }: ToolPaletteProps) {
 
-  const { annotations, activeAnnotationId, clearAnnotations } =
+  const { annotations, activeAnnotationId, clearSamPoints } =
     useClassificationStore(s => ({
       annotations: s.annotations,
       activeAnnotationId: s.activeAnnotationId,
-      clearAnnotations: s.clearAnnotations,
+      clearSamPoints: s.clearSamPoints,
     }));
 
   const hasAnnotations = annotations.length > 0;
@@ -89,7 +89,7 @@ export function ToolPalette({
       </HiddenBrushSizeContainer>
 
       {hasAnnotations && (
-        <ClearButton onClick={() => clearAnnotations(activeAnnotationId ?? undefined, 'point')}>
+        <ClearButton onClick={() => clearSamPoints(activeAnnotationId ?? '-1')}>
           Clear SAM points
         </ClearButton>
       )}

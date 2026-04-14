@@ -246,25 +246,39 @@ taskAnswers: Record<string, string | string[]>;
 
 Answers to sidebar classification questions (e.g., "What is this organism?").
 
-#### Global Segmentation Mask
+#### Global / Debug Mask State
 
 ```typescript
-currentMaskUrl: string | null;   // Current SAM2 mask URL
-maskHistory: ImageData[];        // Mask undo/redo history
-maskHistoryIndex: number;        // Current position in history
-debugImageUrl: string | null;    // Debug visualization
+globalCompositeMask: string | null;            // Composite of all visible annotation masks
+compositeExcludingActiveMask: string | null;   // Composite excluding active annotation (reference layer)
+debugImageUrl: string | null;                  // Debug visualization image
+debugMasks: Array<{ idx: number; iou: number; url: string; is_selected: boolean }> | null;
+maskSelectionInfo: {
+  selected_idx: number;
+  selected_iou: number;
+  all_iou_scores: number[];
+  has_background_prompts: boolean;
+} | null;
 ```
-
-For the entire image (not per-annotation).
 
 #### Per-Annotation Masks
 
 ```typescript
 perAnnotationMasks: Record<string, PerAnnotationMaskState>;
 activeAnnotationId: string | null;
+
+interface PerAnnotationMaskState {
+  maskUrl: string | null;
+  history: HistoryEntry[];
+  historyIndex: number;
+  samPointHistory?: {
+    allSamPoints: Array<{ x: number; y: number; label: 0 | 1 }>;
+    activePointsPerHistoryIndex: number[][];
+  };
+}
 ```
 
-Independent segmentation for individual annotations (e.g., refining masks for specific points).
+Independent segmentation for individual annotations. `samPointHistory` keeps prompt overlays synchronized with mask history during undo/redo.
 
 ### Actions
 
@@ -346,46 +360,13 @@ setTaskAnswer('patterns', ['orange', 'black', 'white']);
 
 #### Global Mask Actions
 
-**`setMask(url: string | null)`**
+**`setGlobalCompositeMask(url: string | null)`**
 
-Set the current global segmentation mask.
+Set the displayed composite of all visible annotation masks.
 
-```typescript
-const { setMask } = useClassificationStore();
-setMask('data:image/png;base64,...');
-setMask(null); // Clear
-```
+**`setCompositeExcludingActiveMask(url: string | null)`**
 
-**`pushMaskHistory(imgData: ImageData)`**
-
-Add mask to undo/redo history.
-
-```typescript
-const { pushMaskHistory } = useClassificationStore();
-const canvas = canvasRef.current;
-const imgData = canvas.getImageData(0, 0, canvas.width, canvas.height);
-pushMaskHistory(imgData);
-```
-
-**`undoMask(): ImageData | null`**
-
-Undo mask, return previous state.
-
-```typescript
-const { undoMask } = useClassificationStore();
-const previous = undoMask();
-if (previous) updateCanvas(previous);
-```
-
-**`redoMask(): ImageData | null`**
-
-Redo mask, return next state.
-
-```typescript
-const { redoMask } = useClassificationStore();
-const next = redoMask();
-if (next) updateCanvas(next);
-```
+Set the reference composite that excludes the active annotation.
 
 **`setDebugImage(url: string | null)`**
 
@@ -418,13 +399,18 @@ const { setPerAnnotationMask } = useClassificationStore();
 setPerAnnotationMask('annotation-uuid', 'data:image/png;...');
 ```
 
-**`pushPerAnnotationMaskHistory(annotationId, imgData)`**
+**`pushPerAnnotationMaskHistory(annotationId, entry, samPoints?)`**
 
-Add per-annotation mask to history.
+Add a per-annotation history entry (`'sam'` or `'modifier_brush'`).
+When provided, `samPoints` updates `samPointHistory` so point overlays can be reconstructed at each history index.
 
 ```typescript
 const { pushPerAnnotationMaskHistory } = useClassificationStore();
-pushPerAnnotationMaskHistory('annotation-uuid', imgData);
+pushPerAnnotationMaskHistory(
+  'annotation-uuid',
+  { type: 'sam', imageData },
+  points
+);
 ```
 
 **`undoPerAnnotationMask(annotationId): ImageData | null`**
@@ -444,6 +430,14 @@ Redo per-annotation mask.
 const { redoPerAnnotationMask } = useClassificationStore();
 redoPerAnnotationMask('annotation-uuid');
 ```
+
+**`syncAnnotationsToHistoryIndex(annotationId)`**
+
+Rebuild point annotations to match the active SAM points at the current history index.
+
+**`clearSamPoints(annotationId)`**
+
+Clear currently rendered SAM point annotations for an annotation without deleting underlying mask history.
 
 **`saveMask(annotationId)`**
 
@@ -1016,14 +1010,15 @@ describe('useClassificationStore', () => {
   });
 
   describe('mask history', () => {
-    it('should undo mask', () => {
-      const { pushMaskHistory, undoMask } = useClassificationStore.getState();
+    it('should undo per-annotation mask', () => {
+      const { pushPerAnnotationMaskHistory, undoPerAnnotationMask } = useClassificationStore.getState();
       const imageData = new ImageData(10, 10);
+      const entry = { type: 'modifier_brush' as const, imageData };
       
-      pushMaskHistory(imageData);
-      pushMaskHistory(imageData);
+      pushPerAnnotationMaskHistory('-1', entry);
+      pushPerAnnotationMaskHistory('-1', entry);
       
-      const previous = undoMask();
+      const previous = undoPerAnnotationMask('-1');
       expect(previous).toBeDefined();
     });
   });
@@ -1069,7 +1064,8 @@ useClassificationStore.getState()
 
 // Extract specific values
 useClassificationStore.getState().annotations
-useClassificationStore.getState().currentMaskUrl
+useClassificationStore.getState().globalCompositeMask
+useClassificationStore.getState().perAnnotationMasks
 
 // Call an action
 useClassificationStore.getState().addAnnotation({

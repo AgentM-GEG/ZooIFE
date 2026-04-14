@@ -1,5 +1,7 @@
 # Mask Type and Composite Accumulation Bug Fix
 
+> Archived development note: this document captures a historical bug-fix snapshot and may not reflect the latest implementation. For current behavior, see `docs/MASK_HISTORY_SYSTEM.md` and `docs/STORES.md`.
+
 **Date**: April 10, 2026  
 **Status**: FIXED  
 **Impact**: Critical - Affects mask export quality and type tracking
@@ -220,3 +222,107 @@ Export compositeMask:  800px OR 750px ≈ 850px ✓ (union of both SAM predictio
 - **Frontend**: User sees composited masks on canvas (unchanged visually)
 - **Export**: Composites are clean, per-rect, and don't accumulate across rects
 - **Undo/Redo**: Works correctly with atomic entries in history
+
+---
+
+# Undo/Redo Composite Mask Bug Fix
+
+**Date**: April 13, 2026  
+**Status**: FIXED  
+**Impact**: Critical - Multiple SAM predictions were being lost on undo
+
+## The Problem
+
+When a user placed multiple SAM points on the same annotation in sequence, undoing would lose earlier SAM predictions.
+
+### Reproduction Steps
+1. Select a rect
+2. Place SAM point 1 → displays SAM1 mask ✓
+3. Place SAM point 2 → displays SAM1 + SAM2 composite... but actually only SAM2 was visible ❌
+4. Place SAM point 3 → displays only SAM3 ❌
+5. Click undo → displays only SAM2 ❌ (SAM1 completely lost!)
+
+### Root Cause
+
+The `compositeHistoryUpToIndex()` function was designed to find **only the latest SAM** and ignore all earlier ones:
+
+```typescript
+// OLD (BUGGY)
+export function compositeHistoryUpToIndex(history, upToIndex) {
+  // Find the most recent SAM prediction at or before maxIndex
+  let latestSamIndex = -1;
+  for (let i = maxIndex; i >= 0; i--) {
+    if (history[i].type === 'sam') {
+      latestSamIndex = i;
+      break;  // ❌ Stop at first (latest) SAM found
+    }
+  }
+  // Return composite of only latestSam + brush strokes...
+}
+```
+
+When given `history=[SAM1, SAM2, SAM3]` and `upToIndex=1`:
+- Found `latestSamIndex=1` (SAM2)
+- Returned composite of **SAM2 only** ❌
+- SAM1 was completely discarded!
+
+## The Solution
+
+Changed `compositeHistoryUpToIndex()` to composite **ALL entries** (both SAM and brush) in order, not just the latest SAM:
+
+```typescript
+// NEW (FIXED)
+export function compositeHistoryUpToIndex(history, upToIndex) {
+  // Clamp to valid range
+  const maxIndex = Math.min(upToIndex, history.length - 1);
+  
+  // Collect ALL entries (both SAM and modifier_brush) up to maxIndex
+  const entriesToComposite = history.slice(0, maxIndex + 1);
+  
+  // Extract all ImageData from entries in order
+  const allMasks = entriesToComposite
+    .filter(e => e.imageData)
+    .map(e => e.imageData);
+  
+  // Composite ALL masks together in order
+  return compositeImageDataMasks(allMasks);
+}
+```
+
+Also updated `undoPerAnnotationMask()` and `redoPerAnnotationMask()` in the store to use this corrected function when calculating `maskUrl`.
+
+## Files Modified
+
+1. **src/utils/image/maskCompositing.ts**
+   - Simplified `compositeHistoryUpToIndex()` to composite all entries in order
+   - Removed the latestSamIndex search logic
+   - Updated logging
+
+2. **src/stores/classificationStore.ts**
+   - Imported `compositeHistoryUpToIndex`
+   - Updated `undoPerAnnotationMask()` to composite all entries up to new index
+   - Updated `redoPerAnnotationMask()` to composite all entries up to new index
+
+3. **src/components/ImageCanvas/ImageCanvas.tsx**
+   - Imported `compositeHistoryUpToIndex`
+   - Updated `displayCompositeExcludingActive()` to composite per-annotation history correctly
+   - Updated `displayCompositeOfVisibleMasks()` to composite per-annotation history correctly
+
+4. **docs/MASK_HISTORY_SYSTEM.md**
+   - Updated "Compositing Rule" section
+   - Added Example 3: Multiple SAM Predictions demonstrating the fix
+
+## Verification
+
+- [x] TypeScript compilation: All changes compile without errors
+- [x] Undo/redo with multiple SAM points: All masks retained correctly
+- [x] Undo/redo with brush strokes: Brush refinements retained correctly
+- [x] Mixed SAM + brush scenarios: All entries composited in order
+- [x] Display and store consistency: maskUrl reflects composite up to historyIndex
+
+## Impact
+
+- **User Experience**: Multiple SAM predictions are now preserved across undo/redo operations
+- **Undo/Redo Accuracy**: Moving backward/forward in history shows correct composite of all entries
+- **Display Consistency**: Canvas display matches what would be exported
+- **Data Integrity**: Earlier SAM predictions are never lost
