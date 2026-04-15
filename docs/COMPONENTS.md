@@ -458,6 +458,41 @@ The canvas maintains multiple cursor states based on context:
 
 The `toolCursor` prop is set to `'auto'` when hovering over rectangles (instead of `'not-allowed'`), allowing the `CaesarAnnotationOverlay` and its tooltip hook to take full control of the cursor.
 
+#### Show/Hide Instructions Toggle — Cursor Suppression
+
+The Show/Hide instructions toggle buttons in the top-right corner of the canvas overlay the Konva stage. When the pointer enters these buttons, `isHoveringToolHelpToggle` state is set to `true`, which:
+
+- Forces `toolCursor` to `'default'` (overrides crosshair, grab, etc.)
+- Suppresses the `BrushCursor` overlay circle (sets `isBrushCursorVisible` to `false`)
+
+This prevents the custom tool cursor from bleeding through the toggle buttons and gives them normal browser pointer behavior.
+
+### Tool Instructions Panel
+
+The instructions panel (`ToolHelpOverlay`) displays contextual guidance for the currently active tool (SAM point and modifier brush tools).
+
+#### Single Persistent Instance
+
+Rather than conditionally mounting/unmounting separate panels per tool, a single `ToolHelpOverlay` is always present when `shouldShowToolHelp` is true:
+
+```typescript
+const shouldShowToolHelp = tool === 'point' || tool === 'modifier_brush';
+```
+
+This eliminates the flickering that occurred when switching between tools (React was unmounting + remounting the component).
+
+#### Fade Animation on Tool Switch
+
+The inner `ToolHelpContent` wrapper is keyed by the current tool name. When the tool changes, React replaces the keyed element and triggers the CSS `fadeIn` animation:
+
+```typescript
+<ToolHelpContent key={tool}>
+  {/* tool-specific instruction content */}
+</ToolHelpContent>
+```
+
+The animation is `0.12s ease-in-out` and is defined as a `@keyframes` in `ImageCanvas/styled.ts`.
+
 ## Caesar Annotation Overlay: Cursor Utilities
 
 Located in `src/components/CaesarAnnotationOverlay/constants.ts`
@@ -618,3 +653,75 @@ const selectedAnnotationLabel: string | undefined = selectedCaesarAnnotation && 
 - [ ] Implement subject preloading (load next subject while current is displayed)
 - [ ] Add Caesar annotation caching with TTL
 - [ ] Virtual scrolling for large annotation lists
+
+---
+
+## ToolPalette Component
+
+Located in `src/components/ToolPalette/ToolPalette.tsx`.
+
+Renders the tool selection panel: point/brush/modifier tool buttons, brush size slider, model selector, and the Clear SAM Points button.
+
+### Modifier Controls — Disabled State
+
+The modifier mode toggle (`ModifierToggle`) and the modifier size slider (`RangeSlider`) are disabled when the modifier brush tool is not the active tool:
+
+```typescript
+const isModifierToolActive = tool === 'modifier_brush';
+// ...
+<ModifierToggle disabled={!isModifierToolActive} $inactive={!isModifierToolActive} />
+<RangeSlider disabled={!isModifierToolActive} />
+```
+
+This prevents users from accidentally changing modifier settings while on another tool. Visual feedback:
+- Both controls get `opacity: 0.7` when disabled
+- `ModifierToggle` background turns `neutral.dark` (grey) and its `Add`/`Subtract` text switches to `text.secondary` color
+- `cursor: not-allowed` is applied to `ModifierToggle` when `$inactive`
+
+### Label Alignment
+
+The "Modifier mode:" and "Modifier size:" row labels share a common `minWidth: 110px` inline style so their left edges align consistently regardless of text length.
+
+### Clear SAM Points Button
+
+The Clear SAM Points button is only shown when the active rect actually has SAM point annotations:
+
+```typescript
+const hasSamPointsForActiveRect = annotations.some(
+  (a) => a.type === 'point' && a.annotationId === activeRectId
+);
+// ...
+{hasSamPointsForActiveRect && (
+  <ClearButton onClick={() => clearSamPoints(activeRectId)}>
+    Clear SAM points
+  </ClearButton>
+)}
+```
+
+`clearSamPoints` is rect-scoped — it only removes `type: 'point'` annotations whose `annotationId` matches the given rect. This ensures clicking the button never affects SAM points belonging to other rects.
+
+---
+
+## UserRectsOverlay Component
+
+Located in `src/components/UserRectsOverlay/UserRectsOverlay.tsx`.
+
+Renders user-drawn bounding rectangles as a react-konva layer on top of the image canvas.
+
+### Dashed Stroke — Unsaved Changes Indicator
+
+The stroke style of each rect reflects whether that rect has unsaved mask changes:
+
+```typescript
+const maskState = perAnnotationMasks[rectId];
+const hasUnsavedChanges = !!maskState && maskState.historyIndex !== maskState.lastSavedHistoryIndex;
+// ...
+<Rect dash={hasUnsavedChanges ? [5, 5] : undefined} />
+```
+
+- **Dashed** (`[5, 5]`) — `historyIndex` differs from `lastSavedHistoryIndex`: changes exist since last save
+- **Solid** (no `dash` prop) — indices match: mask is clean / has been saved
+
+This is purely a rendering concern; the `markStroke: 'dashed'` field stored on the `UserRectState` in the classification store is used only for Caesar export compatibility and does not drive the visual state.
+
+`lastSavedHistoryIndex` is updated via `markPerAnnotationMaskSaved(rectId)` in the store whenever a mask is exported or submitted.

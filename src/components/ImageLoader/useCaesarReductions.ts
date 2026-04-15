@@ -2,21 +2,32 @@ import { useCallback, useRef, useEffect } from 'react';
 import { fetchCaesarReductions, CAESAR_REDUCTION_OPTS, SubjectReduction } from '@/services/caesarService';
 import { getWorkflow } from '@/services/panoptesService';
 import type { CaesarAnnotation } from '@/types/annotations';
-import { useCaesarAnnotationStore } from '@/stores/caesarReductionStore';
+import { useCaesarAnnotationStore, type CaesarRetryConfig } from '@/stores/caesarReductionStore';
 import { loggers } from '@/utils/logger';
+
+/**
+ * Default retry configuration for Caesar service
+ */
+const DEFAULT_CAESAR_RETRY_CONFIG: CaesarRetryConfig = {
+  maxRetries: 3,
+  retryDelayMs: 1000,
+};
 
 /**
  * Custom hook for fetching and processing Caesar ML reductions.
  * Converts raw Caesar reduction data into standardized CaesarAnnotation format.
+ * Includes automatic retry logic with exponential backoff.
  * @param caesarClient - Initialized Caesar API client
  * @param workflowId - Workflow ID for fetching metadata
  * @param accessToken - OAuth access token for API calls
+ * @param retryConfig - Optional retry configuration (max attempts, delay between retries)
  * @returns Function to process Caesar reductions for a subject
  */
 export function useCaesarReductions(
   caesarClient: any,
   workflowId: string,
-  accessToken: string | undefined
+  accessToken: string | undefined,
+  retryConfig: CaesarRetryConfig = DEFAULT_CAESAR_RETRY_CONFIG
 ) {
   // Store latest client and token in refs to avoid cascading dependency changes
   const caesarClientRef = useRef(caesarClient);
@@ -69,7 +80,8 @@ export function useCaesarReductions(
   );
 
   /**
-   * Fetch and process Caesar reductions for a subject.
+   * Fetch and process Caesar reductions for a subject with retry logic.
+   * Automatically retries on failure with exponential backoff.
    * Uses refs to avoid cascading dependency changes.
    * @param subjectId - Subject ID to fetch reductions for
    */
@@ -77,31 +89,64 @@ export function useCaesarReductions(
     async (subjectId: string) => {
       // Access from refs instead of dependencies
       if (!caesarClientRef.current || !accessTokenRef.current) {
-        console.debug('Cannot process Caesar reductions: missing caesarClient or accessToken');
+        const msg = 'Cannot process Caesar reductions: missing caesarClient or accessToken';
+        console.debug(msg);
+        useCaesarAnnotationStore.getState().setError(msg);
         return;
       }
 
-      try {
-        const reductions: SubjectReduction[] = await fetchCaesarReductions(
-          caesarClientRef.current,
-          'machineLearnt',
-          subjectId,
-          workflowId
-        );
+      // Set loading state at start
+      useCaesarAnnotationStore.getState().setLoading(true);
 
-        const workflow = await getWorkflow(
-          workflowId,
-          accessTokenRef.current,
-          CAESAR_REDUCTION_OPTS.staging
-        );
-        const parsed: CaesarAnnotation[] = parseReductions(reductions, workflow);
+      /**
+       * Recursive helper for retry logic with exponential backoff
+       */
+      const fetchWithRetry = async (attempt: number = 0): Promise<void> => {
+        try {
+          loggers.app(
+            `[Caesar] Fetching reductions for subject ${subjectId} (attempt ${attempt + 1}/${retryConfig.maxRetries})`
+          );
 
-        useCaesarAnnotationStore.getState().setAnnotations(parsed);
-      } catch (err) {
-        loggers.app('Failed to process Caesar reductions:', err);
-      }
+          const reductions: SubjectReduction[] = await fetchCaesarReductions(
+            caesarClientRef.current,
+            'machineLearnt',
+            subjectId,
+            workflowId
+          );
+
+          const workflow = await getWorkflow(
+            workflowId,
+            accessTokenRef.current,
+            CAESAR_REDUCTION_OPTS.staging
+          );
+          const parsed: CaesarAnnotation[] = parseReductions(reductions, workflow);
+
+          useCaesarAnnotationStore.getState().setAnnotations(parsed);
+          useCaesarAnnotationStore.getState().setLoading(false);
+          loggers.app(`[Caesar] Successfully fetched ${parsed.length} annotations for subject ${subjectId}`);
+        } catch (err) {
+          if (attempt < retryConfig.maxRetries - 1) {
+            // Retry with exponential backoff
+            const delay = retryConfig.retryDelayMs * Math.pow(2, attempt);
+            loggers.app(
+              `[Caesar] Fetch failed (attempt ${attempt + 1}), retrying in ${delay}ms...`,
+              err
+            );
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            return fetchWithRetry(attempt + 1);
+          } else {
+            // All retries exhausted
+            const errorMsg = `Caesar annotation fetch failed after ${retryConfig.maxRetries} attempts`;
+            loggers.app(`[Caesar] ${errorMsg}:`, err);
+            useCaesarAnnotationStore.getState().setError(errorMsg);
+            useCaesarAnnotationStore.getState().setLoading(false);
+          }
+        }
+      };
+
+      return fetchWithRetry();
     },
-    [workflowId, parseReductions]  // Only stable dependencies
+    [workflowId, parseReductions, retryConfig]  // Include retryConfig in dependencies
   );
 
   return processCaesarReductions;

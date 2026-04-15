@@ -246,6 +246,21 @@ taskAnswers: Record<string, string | string[]>;
 
 Answers to sidebar classification questions (e.g., "What is this organism?").
 
+#### User Rects
+
+```typescript
+userRects: Record<string, UserRectState>;
+nextUserRectId: number; // Negative counter (starts at -2), decrements per rect
+
+export interface UserRectState extends AnnotationRect {
+  markLabel: string;  // Label shown in tooltip
+  markColour: string; // Stroke color (for Caesar export compatibility)
+  markStroke: string; // Stroke style ('solid' | 'dashed') — stored for export; rendering uses hasUnsavedChanges instead
+}
+```
+
+User-drawn bounding rectangles that supplement the Caesar ML predictions. IDs are negative integers (e.g., `'-2'`, `'-3'`) to avoid collisions with Caesar rect IDs. `markStroke` is set to `'dashed'` on creation for export compatibility, but the actual rendered stroke style in `UserRectsOverlay` is determined by comparing `historyIndex` vs `lastSavedHistoryIndex` in `perAnnotationMasks`.
+
 #### Global / Debug Mask State
 
 ```typescript
@@ -267,10 +282,16 @@ maskSelectionInfo: {
 perAnnotationMasks: Record<string, PerAnnotationMaskState>;
 activeAnnotationId: string | null;
 
+// HistoryEntry is a discriminated union — modelId is required for SAM entries, absent for brush entries
+type HistoryEntry =
+  | { type: 'sam'; imageData: ImageData; modelId: string }
+  | { type: 'modifier_brush'; imageData: ImageData };
+
 interface PerAnnotationMaskState {
   maskUrl: string | null;
   history: HistoryEntry[];
   historyIndex: number;
+  lastSavedHistoryIndex: number; // Save checkpoint — compared to historyIndex to detect unsaved changes
   samPointHistory?: {
     allSamPoints: Array<{ x: number; y: number; label: 0 | 1 }>;
     activePointsPerHistoryIndex: number[][];
@@ -278,7 +299,7 @@ interface PerAnnotationMaskState {
 }
 ```
 
-Independent segmentation for individual annotations. `samPointHistory` keeps prompt overlays synchronized with mask history during undo/redo.
+Independent segmentation for individual annotations. `samPointHistory` keeps prompt overlays synchronized with mask history during undo/redo. `lastSavedHistoryIndex` is updated whenever `markPerAnnotationMaskSaved` is called; comparing it to `historyIndex` tells you whether there are unsaved changes (used by `UserRectsOverlay` to render a dashed vs. solid rect stroke).
 
 ### Actions
 
@@ -408,7 +429,7 @@ When provided, `samPoints` updates `samPointHistory` so point overlays can be re
 const { pushPerAnnotationMaskHistory } = useClassificationStore();
 pushPerAnnotationMaskHistory(
   'annotation-uuid',
-  { type: 'sam', imageData },
+  { type: 'sam', imageData, modelId: 'sam2-hiera-large' },
   points
 );
 ```
@@ -437,7 +458,17 @@ Rebuild point annotations to match the active SAM points at the current history 
 
 **`clearSamPoints(annotationId)`**
 
-Clear currently rendered SAM point annotations for an annotation without deleting underlying mask history.
+Clear currently rendered SAM point annotations for a specific annotation (rect-scoped — only removes `type: 'point'` annotations whose `annotationId` matches) without deleting underlying mask history.
+
+**`markPerAnnotationMaskSaved(annotationId)`**
+
+Record a save checkpoint for an annotation by setting `lastSavedHistoryIndex = historyIndex`. Used after exporting or submitting, so `UserRectsOverlay` can switch the rect stroke from dashed (unsaved) back to solid (saved).
+
+```typescript
+const { markPerAnnotationMaskSaved } = useClassificationStore();
+markPerAnnotationMaskSaved('annotation-uuid');
+// lastSavedHistoryIndex is now equal to historyIndex → no unsaved changes
+```
 
 **`saveMask(annotationId)`**
 
@@ -448,6 +479,30 @@ const { saveMask } = useClassificationStore();
 saveMask('annotation-uuid');
 // activeAnnotationId set to null
 ```
+
+#### User Rect Actions
+
+**`addUserRect(rect: AnnotationRect): string`**
+
+Add a user-drawn bounding rectangle. Assigns a negative integer ID and sets `markStroke: 'dashed'` for export. Returns the new rect's ID.
+
+```typescript
+const { addUserRect } = useClassificationStore();
+const rectId = addUserRect({ x: 50, y: 100, width: 200, height: 150 });
+// rectId: '-2', '-3', etc. (negative IDs avoid collisions with Caesar rects)
+```
+
+**`updateUserRect(rectId: string, rect: AnnotationRect)`**
+
+Update geometry of an existing user rect (called when user resizes or moves it).
+
+**`removeUserRect(rectId: string)`**
+
+Remove a single user rect and its associated `perAnnotationMasks` entry.
+
+**`clearUserRects()`**
+
+Remove all user rects and reset the ID counter.
 
 #### Building Submissions
 
@@ -472,12 +527,14 @@ const annotations = await buildPanoptesAnnotations();
 //         samPoints: [...],
 //         latestSamMask: {...},
 //         compositeMask: {...},
+//         samModelId: 'sam2-hiera-large',
 //       },
 //       {
 //         annotationId: '-1',  // unmarked objects
 //         samPoints: [...],
-//         latestSamMask: {...},
-//         compositeMask: {...},
+//         latestSamMask: null,
+//         compositeMask: null,
+//         samModelId: null,
 //       }
 //     ]
 //   },
@@ -515,6 +572,7 @@ interface RectAnnotation {
   }>;
   latestSamMask: CompressedMask | null;   // Most recent SAM prediction
   compositeMask: CompressedMask | null;   // Current composite at historyIndex
+  samModelId: string | null;              // Model ID used for the most recent SAM prediction (e.g. 'sam2-hiera-large'); null if no SAM masks exist
 }
 
 interface CompressedMask {
@@ -621,7 +679,8 @@ Represents the final user-approved segmentation state.
         "height": 600,
         "encoding": "gzip-base64",
         "rle": "H4sIAB5K4WYC..."
-      }
+      },
+      "samModelId": "sam2-hiera-large"
     },
     {
       "annotationId": "-1",
@@ -629,7 +688,8 @@ Represents the final user-approved segmentation state.
         { "x": 400, "y": 200, "label": 1 }
       ],
       "latestSamMask": null,
-      "compositeMask": null
+      "compositeMask": null,
+      "samModelId": null
     }
   ]
 }

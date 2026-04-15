@@ -10,6 +10,7 @@ import { useCaesarAnnotationStore } from '@/stores/caesarReductionStore';
 import { useAuth } from '@/auth/AuthContext';
 import { compositeImageDataMasks, compositeHistoryUpToIndex } from '@/utils/image/maskCompositing';
 import { computeMaskBounds, hasMaskPixels } from '@/utils/image/maskBounds';
+import { getActiveSamPoints } from '@/stores/classificationStore';
 
 // Extracted components and hooks
 import AnnotationRenderer from './AnnotationRenderer';
@@ -23,15 +24,17 @@ import {
   CanvasWrapper,
   WarningBanner,
   MarkingBanner,
+  ToolHelpOverlay,
+  ToolHelpHeader,
+  ToolHelpContent,
+  ToolHelpToggleButton,
   DebugBanner,
-  DebugImage,
   DismissButton,
   Placeholder,
 } from './styled';
 import { useCanvasState } from './useCanvasState';
 import { useCanvasHandlers } from './useCanvasHandlers';
 import { useAnnotationEffects } from './useAnnotationEffects';
-import { theme } from '@/theme/zooniverseTheme';
 
 /**
  * ImageCanvas Component
@@ -97,14 +100,25 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const setActiveAnnotation = useClassificationStore(s => s.setActiveAnnotation);
   const addAnnotation = useClassificationStore(s => s.addAnnotation);
   const perAnnotationMasks = useClassificationStore(s => s.perAnnotationMasks);
-  const globalCompositeMask = useClassificationStore(s => s.globalCompositeMask);
   const compositeExcludingActiveMask = useClassificationStore(s => s.compositeExcludingActiveMask);
   const userRects = useClassificationStore(s => s.userRects);
   const setDebugImage = useClassificationStore(s => s.setDebugImage);
 
+  const activeUserRectMaskState = useClassificationStore((s) => {
+    if (!activeAnnotationId || !activeAnnotationId.startsWith('-') || activeAnnotationId === '-1') {
+      return undefined;
+    }
+    return s.perAnnotationMasks[activeAnnotationId];
+  });
+
   const caesarReducedAnnotations = useCaesarAnnotationStore(s => s.annotations);
   const selectedCaesarAnnotation = useCaesarAnnotationStore(s => s.selectedAnnotationId);
   const setSelectedCaesarAnnotation = useCaesarAnnotationStore(s => s.setSelectedAnnotationId);
+  const caesarLoading = useCaesarAnnotationStore(s => s.isLoading);
+
+  const hasUnsavedUserRectMaskChanges =
+    !!activeUserRectMaskState &&
+    activeUserRectMaskState.historyIndex !== activeUserRectMaskState.lastSavedHistoryIndex;
 
   // ============ LOCAL STATE ============
   const [noRectangleWarning, setNoRectangleWarning] = useState(false);
@@ -119,10 +133,12 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const [isCursorOverCanvas, setIsCursorOverCanvas] = useState(false);
   const [hasWholeImageMaskPixels, setHasWholeImageMaskPixels] = useState(false);
   const [isHoveringOverRect, setIsHoveringOverRect] = useState(false);
-  const [compositeImageElement, setCompositeImageElement] = useState<HTMLImageElement | null>(null);
   const [compositeExcludingActiveImageElement, setCompositeExcludingActiveImageElement] = useState<HTMLImageElement | null>(null);
   const [selectedUserRectId, setSelectedUserRectId] = useState<string | undefined>();
   const [isHoveringOverUserRect, setIsHoveringOverUserRect] = useState(false);
+  const [isToolHelpCollapsed, setIsToolHelpCollapsed] = useState(false);
+  const [isHoveringToolHelpToggle, setIsHoveringToolHelpToggle] = useState(false);
+  const shouldShowToolHelp = tool === 'point' || tool === 'modifier_brush';
 
   // Get current annotation ID for editing
   const currentAnnotationId = activeAnnotationId || '-1';
@@ -136,22 +152,6 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
       setWarningFadingOut(false);
     }
   }, [noRectangleWarning, suppressWarningForSession]);
-
-  // Convert global composite mask data URI to HTMLImageElement for Konva rendering
-  useEffect(() => {
-    if (!globalCompositeMask) {
-      setCompositeImageElement(null);
-      return;
-    }
-
-    const imageElement = document.createElement('img');
-    imageElement.onload = () => setCompositeImageElement(imageElement);
-    imageElement.onerror = () => {
-      loggers.canvas('[useEffect] Failed to load composite mask image');
-      setCompositeImageElement(null);
-    };
-    imageElement.src = globalCompositeMask;
-  }, [globalCompositeMask]);
 
   // Convert composite excluding active mask data URI to HTMLImageElement for Konva rendering
   useEffect(() => {
@@ -258,7 +258,9 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
    * When hovering over a rectangle boundary (Caesar or user), use default cursor
    * to let the rectangle overlay handle cursor feedback (magnifying glass, resize, etc).
    */
-  const toolCursor: string = (isHoveringOverRect || isHoveringOverUserRect) && !isPanMode
+  const toolCursor: string = isHoveringToolHelpToggle
+    ? 'default'
+    : (isHoveringOverRect || isHoveringOverUserRect) && !isPanMode
     ? 'auto'
     : isPanMode
       ? 'grab'
@@ -271,7 +273,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
    * Only show for brush tools when not in pan mode, debug mode, cursor is over canvas,
    * and not hovering over a rectangle boundary (Caesar or user).
    */
-  const isBrushCursorVisible = !isPanMode && !debugImageUrl && isCursorOverCanvas && !isHoveringOverRect && !isHoveringOverUserRect && (tool === 'brush' || tool === 'modifier_brush');
+  const isBrushCursorVisible = !isPanMode && !debugImageUrl && isCursorOverCanvas && !isHoveringOverRect && !isHoveringOverUserRect && !isHoveringToolHelpToggle && (tool === 'brush' || tool === 'modifier_brush');
 
 
   /**
@@ -479,6 +481,10 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
       setSelectedUserRectId(rectId);
       loggers.canvas(`[handleSaveUserRect] Kept rect ${rectId} selected after saving`);
 
+      // Mark current history index as saved without clearing history
+      state.markPerAnnotationMaskSaved(rectId);
+      loggers.canvas(`[handleSaveUserRect] Marked history checkpoint as saved for ${rectId}`);
+
       // Clear the mask to return to default state for next editing
       state.clearAnnotations(rectId, 'sam2_mask');
       loggers.canvas('[handleSaveUserRect] Cleared mask for ' + rectId);
@@ -529,6 +535,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     debugImageUrl,
     selectedCaesarAnnotation,
     onUndo: handleUndoMask,
+    onRedo: handleRedoMask,
     stageRef,
     setIsPanMode,
     setNoRectangleWarning,
@@ -690,10 +697,15 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
       // Initialize the rect's mask with the current mask entry
       state.setPerAnnotationMask(rectId, maskUrl);
       
-      // Copy the history entries
-      for (const entry of historyToCopy) {
-        state.pushPerAnnotationMaskHistory(rectId, entry);
+      // Copy the history entries and preserve per-step SAM point snapshots
+      for (let i = 0; i < historyToCopy.length; i += 1) {
+        const entry = historyToCopy[i];
+        const stepSamPoints = maskState.samPointHistory
+          ? getActiveSamPoints(maskState.samPointHistory, i)
+          : undefined;
+        state.pushPerAnnotationMaskHistory(rectId, entry, stepSamPoints);
       }
+      state.markPerAnnotationMaskSaved(rectId);
       
       loggers.canvas(`[handleIdentifyNewObject] Initialized mask history for ${rectId} with ${historyToCopy.length} entries`);
 
@@ -864,6 +876,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
         disableRedo={disableRedo}
         hasWholeImageMask={hasWholeImageMaskPixels}
         isUserRectSelected={activeAnnotationId ? activeAnnotationId.startsWith('-') && activeAnnotationId !== '-1' : false}
+        hasUnsavedUserRectMaskChanges={hasUnsavedUserRectMaskChanges}
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
         onZoomFit={zoomFit}
@@ -1005,7 +1018,9 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
               </Stage>
             {(activeAnnotationId || !disableUndo || !disableRedo) && (
               <MarkingBanner $isEditingMinusOne={currentAnnotationId === '-1'}>
-                {selectedAnnotationLabel ? `Marking a ${selectedAnnotationLabel}` : 'Marking a new object'}
+                {caesarLoading
+                  ? 'Loading automatically detected objects...'
+                  : (selectedAnnotationLabel ? `Marking a ${selectedAnnotationLabel}` : 'Marking a new object')}
               </MarkingBanner>
             )}
             {(noRectangleWarning || warningFadingOut) && showWarningBanner && !suppressWarningForSession && (
@@ -1026,6 +1041,104 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
                   Do not remind me again
                 </DismissButton>
               </WarningBanner>
+            )}
+            {shouldShowToolHelp && (
+              <ToolHelpOverlay $expanded={!isToolHelpCollapsed}>
+                <ToolHelpHeader>
+                  <strong>
+                    {isToolHelpCollapsed
+                      ? 'Instructions'
+                      : tool === 'point'
+                        ? 'Instructions for the SAM Point Tool'
+                        : 'Instructions for the Mask Modifier Tool'}
+                  </strong>
+                  <ToolHelpToggleButton
+                    type="button"
+                    onClick={() => setIsToolHelpCollapsed(prev => !prev)}
+                    onMouseEnter={() => setIsHoveringToolHelpToggle(true)}
+                    onMouseLeave={() => setIsHoveringToolHelpToggle(false)}
+                    aria-label={isToolHelpCollapsed ? 'Show instructions' : 'Hide instructions'}
+                    title={isToolHelpCollapsed ? 'Show instructions' : 'Hide instructions'}
+                  >
+                    {isToolHelpCollapsed ? 'Show' : 'Hide'}
+                  </ToolHelpToggleButton>
+                </ToolHelpHeader>
+                {!isToolHelpCollapsed && (
+                  <ToolHelpContent key={tool}>
+                    {tool === 'point' ? (
+                      <>
+                        <p>
+                          Add SAM prompts by clicking in the image area for the currently selected bounding box.
+                        </p>
+
+                        <p>Point types:</p>
+                        <ul>
+                          <li>Left-click adds a positive point (green) to include that region.</li>
+                          <li>Right-click adds a negative point (red) to exclude that region.</li>
+                        </ul>
+
+                        <p>
+                          Each new point updates the mask prediction for the selected bounding box.
+                        </p>
+
+                        <p>
+                          Use the "Clear SAM points" button in the Tools panel to reset the point prompts for the currently selected bounding box.
+                        </p>
+
+                        <p>
+                          If no bounding box is selected, we assume you are marking an object that was missed by our automatic detectors.
+                        </p>
+
+                        <p>
+                          Once you have finished marking a new object, click the "Identify new object" button in the subject viewer toolbar.
+                        </p>
+
+                        <p>
+                          You can undo or redo your edits using the buttons in the subject viewer toolbar or using the following keyboard shortcuts while the mouse pointer is over the subject viewer.
+                        </p>
+                        <ul>
+                          <li>Undo: Ctrl+Z / ⌘Z</li>
+                          <li>Redo: Ctrl+Y / ⌘⇧Z</li>
+                        </ul>
+                      </>
+                    ) : (
+                      <>
+                        <p>Click and drag to add or remove mask pixels.</p>
+
+                        <p>
+                          You can change the mode using the <em>Modifier Mode</em> toggle in the Tools panel:
+                        </p>
+                        <ul>
+                          <li>To add pixels, set the toggle to "Add".</li>
+                          <li>To remove pixels, set the toggle to "Subtract".</li>
+                        </ul>
+
+                        <p>
+                          You can change the size of the tool using the <em>Modifier size</em> slider in the Tools panel.
+                        </p>
+
+                        <p>Edits apply to the mask for the bounding box is currently selected.</p>
+
+                        <p>
+                          If no bounding box is selected your, we assume you are marking an object that was missed by our automatic detectors.
+                        </p>
+
+                        <p>
+                          Once you have finished marking a new object, click the "Identify new object" button in the subject viewer toolbar.
+                        </p>
+
+                        <p>
+                          You can undo or redo your edits using the buttons in the subject viewer toolbar or using the following keyboard shortcuts while the mouse pointer is over the subject viewer.
+                        </p>
+                        <ul>
+                          <li>Undo: Ctrl+Z / ⌘Z</li>
+                          <li>Redo: Ctrl+Y / ⌘⇧Z</li>
+                        </ul>
+                      </>
+                    )}
+                  </ToolHelpContent>
+                )}
+              </ToolHelpOverlay>
             )}
           </CanvasWrapper>
         </div>

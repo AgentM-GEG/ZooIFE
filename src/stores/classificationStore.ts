@@ -10,24 +10,25 @@ import { APP_VERSION } from '@/utils/version';
 
 /**
  * Single entry in mask history - tracks origin (SAM or brush stroke)
- * 
- * Types:
- * - 'sam': SAM model prediction. Contains raw model output (no pre-compositing).
- * - 'modifier_brush': User brush stroke (either regular brush or refinement).
- * 
- * IMPORTANT: Storage vs Display
- * - Storage: imageData contains ONLY the raw atomic mask (SAM or brush)
- * - Display: User sees composite of all masks up to historyIndex (calculated at display time)
- * - Export: Composite calculated fresh from all entries (bitwise OR)
- * 
- * This separation ensures:
- * 1. Clean undo/redo (each entry is atomic)\n * 2. Correct export composites (per-rect not accumulating across rects)
- * 3. Accurate mask type tracking (SAM vs brush vs composite)
+ *
+ * Two distinct storage strategies are used depending on entry type:
+ *
+ * - `sam`: `imageData` contains ONLY the raw model prediction (no pre-compositing).
+ *   Multiple SAM entries are OR-composited with all preceding entries at display/export
+ *   time so all predictions remain visible simultaneously.
+ *
+ * - `modifier_brush`: `imageData` is a FULL CANVAS SNAPSHOT of the cumulative mask
+ *   state at the moment the stroke was completed (pointer released). It encodes the
+ *   combined effect of all preceding SAM predictions and add/subtract strokes, including
+ *   any erased regions. The snapshot must be used as-is — OR-compositing with earlier
+ *   entries would incorrectly resurrect pixels removed by subtract strokes.
+ *
+ * `getSimpleComposite` in maskCompositing.ts handles both strategies automatically and
+ * is the canonical function for display and export.
  */
-export interface HistoryEntry {
-  type: 'sam' | 'modifier_brush';
-  imageData: ImageData; // Raw atomic mask (SAM prediction or brush stroke)
-}
+export type HistoryEntry =
+  | { type: 'sam'; imageData: ImageData; modelId: string }
+  | { type: 'modifier_brush'; imageData: ImageData };
 
 /**
  * A single SAM point with coordinates and label
@@ -53,6 +54,7 @@ interface PerAnnotationMaskState {
   maskUrl: string | null;
   history: HistoryEntry[];
   historyIndex: number;
+  lastSavedHistoryIndex: number; // Save checkpoint used to determine unsaved changes
   samPointHistory?: SamPointHistory; // Track SAM points and which are active at each history step
 }
 
@@ -60,8 +62,25 @@ interface PerAnnotationMaskState {
  * Get the active SAM points at a given history index
  */
 export function getActiveSamPoints(samPointHistory: SamPointHistory, historyIndex: number): SamPoint[] {
-  const activeIndices = samPointHistory.activePointsPerHistoryIndex[historyIndex];
-  return activeIndices.map(idx => samPointHistory.allSamPoints[idx]);
+  const activeHistory = samPointHistory.activePointsPerHistoryIndex;
+  const exactIndices = activeHistory[historyIndex];
+
+  // If this history slot has no explicit SAM point snapshot (e.g. brush-only entry),
+  // reuse the most recent previous snapshot. This preserves SAM points across non-SAM edits.
+  let activeIndices = exactIndices;
+  if (!activeIndices) {
+    for (let i = Math.min(historyIndex - 1, activeHistory.length - 1); i >= 0; i -= 1) {
+      if (activeHistory[i]) {
+        activeIndices = activeHistory[i];
+        break;
+      }
+    }
+  }
+
+  if (!activeIndices) return [];
+  return activeIndices
+    .map(idx => samPointHistory.allSamPoints[idx])
+    .filter((p): p is SamPoint => !!p);
 }
 
 /**
@@ -288,6 +307,13 @@ interface ClassificationState {
   saveMask: (annotationId: string) => void;
 
   /**
+   * Mark current history position as saved for a specific annotation.
+   * Used to keep history while clearing the dirty/save-required state.
+   * @param annotationId Annotation's markId
+   */
+  markPerAnnotationMaskSaved: (annotationId: string) => void;
+
+  /**
    * Clear the entire mask history for a specific annotation
    * @param annotationId Annotation's markId
    */
@@ -343,7 +369,7 @@ interface ClassificationState {
 /**
  * Create initial state with dynamically generated timestamp
  */
-const createInitialState = (): Pick<ClassificationState, Exclude<keyof ClassificationState, 'setSubject' | 'addAnnotation' | 'removeAnnotation' | 'undoLastAnnotation' | 'clearAnnotations' | 'clearSamPoints' | 'syncAnnotationsToHistoryIndex' | 'setTaskAnswer' | 'setDebugImage' | 'setDebugMasks' | 'setActiveAnnotation' | 'setPerAnnotationMask' | 'setGlobalCompositeMask' | 'setCompositeExcludingActiveMask' | 'pushPerAnnotationMaskHistory' | 'undoPerAnnotationMask' | 'redoPerAnnotationMask' | 'saveMask' | 'clearPerAnnotationMaskHistory' | 'addUserRect' | 'updateUserRect' | 'removeUserRect' | 'clearUserRects' | 'buildPanoptesAnnotations' | 'buildPanoptesClassification' | 'reset'>> => ({
+const createInitialState = (): Pick<ClassificationState, Exclude<keyof ClassificationState, 'setSubject' | 'addAnnotation' | 'removeAnnotation' | 'undoLastAnnotation' | 'clearAnnotations' | 'clearSamPoints' | 'syncAnnotationsToHistoryIndex' | 'setTaskAnswer' | 'setDebugImage' | 'setDebugMasks' | 'setActiveAnnotation' | 'setPerAnnotationMask' | 'setGlobalCompositeMask' | 'setCompositeExcludingActiveMask' | 'pushPerAnnotationMaskHistory' | 'undoPerAnnotationMask' | 'redoPerAnnotationMask' | 'saveMask' | 'markPerAnnotationMaskSaved' | 'clearPerAnnotationMaskHistory' | 'addUserRect' | 'updateUserRect' | 'removeUserRect' | 'clearUserRects' | 'buildPanoptesAnnotations' | 'buildPanoptesClassification' | 'reset'>> => ({
   subjectId: null,
   imageUrl: null,
   imageDimensions: null,
@@ -531,7 +557,7 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
       perAnnotationMasks: {
         ...state.perAnnotationMasks,
         [annotationId]: {
-          ...(state.perAnnotationMasks[annotationId] || { history: [], historyIndex: -1 }),
+          ...(state.perAnnotationMasks[annotationId] || { history: [], historyIndex: -1, lastSavedHistoryIndex: -1 }),
           maskUrl: url,
         },
       },
@@ -561,20 +587,35 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
         maskUrl: null,
         history: [],
         historyIndex: -1,
+        lastSavedHistoryIndex: -1,
       };
       const truncated = annotationState.history.slice(0, annotationState.historyIndex + 1);
       const newHistoryLength = truncated.length + 1;
       const newHistoryIndex = truncated.length;
       loggers.store(`[pushPerAnnotationMaskHistory] annotationId=${annotationId}, type=${entry.type}, newHistoryLength=${newHistoryLength}, historyIndex=${newHistoryIndex}`);
 
-      // Update samPointHistory if SAM points were provided
+      // If a SAM entry was pushed without explicit samPoints, infer them from
+      // current point annotations for this annotation to keep point history in sync.
+      const effectiveSamPoints = samPoints ?? (
+        entry.type === 'sam'
+          ? state.annotations
+              .filter(
+                (a): a is Extract<typeof a, { type: 'point'; x: number; y: number; label: 0 | 1; annotationId?: string }> =>
+                  a.type === 'point' && String((a as any).annotationId ?? '-1') === String(annotationId)
+              )
+              .map((p) => ({ x: p.x, y: p.y, label: p.label }))
+          : undefined
+      );
+
+      // Update samPointHistory if SAM points were provided or inferred
       let samPointHistory = annotationState.samPointHistory;
-      if (samPoints) {
+      if (effectiveSamPoints) {
         // Start with existing pool, grow it as needed (accumulative, never replace)
-        let allSamPoints = annotationState.samPointHistory?.allSamPoints ?? [];
+        // Clone to avoid mutating arrays that may still be referenced elsewhere.
+        let allSamPoints = [...(annotationState.samPointHistory?.allSamPoints ?? [])];
         
         // For each new point, find it in pool or add it
-        const newActiveIndices = samPoints.map(newPoint => {
+        const newActiveIndices = effectiveSamPoints.map(newPoint => {
           const existingIdx = findPointInPool(newPoint, allSamPoints);
           if (existingIdx !== -1) {
             return existingIdx;  // Reuse existing index
@@ -584,13 +625,38 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
           }
         });
         
-        // Truncate activePointsPerHistoryIndex in sync with mask history, then append new entry
-        const truncatedEntries = annotationState.samPointHistory?.activePointsPerHistoryIndex?.slice(0, annotationState.historyIndex + 1) ?? [];
+        // Keep activePointsPerHistoryIndex aligned with mask history indices.
+        // Fill any gaps with the previous active snapshot before appending the new SAM snapshot.
+        const existingEntries = annotationState.samPointHistory?.activePointsPerHistoryIndex?.slice(0, annotationState.historyIndex + 1) ?? [];
+        const alignedEntries = [...existingEntries];
+        const previousActive = alignedEntries.length > 0
+          ? alignedEntries[alignedEntries.length - 1]
+          : [];
+        while (alignedEntries.length < newHistoryIndex) {
+          alignedEntries.push([...previousActive]);
+        }
+
         samPointHistory = {
           allSamPoints,
-          activePointsPerHistoryIndex: [...truncatedEntries, newActiveIndices],
+          activePointsPerHistoryIndex: [...alignedEntries, newActiveIndices],
         };
-        loggers.history(`[pushPerAnnotationMaskHistory] samPointHistory updated, historyIndex=${newHistoryIndex}, pointCount=${samPoints.length}, poolSize=${allSamPoints.length}`);
+        loggers.history(`[pushPerAnnotationMaskHistory] samPointHistory updated, historyIndex=${newHistoryIndex}, pointCount=${effectiveSamPoints.length}, poolSize=${allSamPoints.length}`);
+      } else if (annotationState.samPointHistory) {
+        // Keep SAM history aligned with mask history when adding a non-SAM entry
+        // (e.g. brush edit), by carrying forward the previous active indices.
+        const existingEntries = annotationState.samPointHistory.activePointsPerHistoryIndex.slice(0, annotationState.historyIndex + 1);
+        const alignedEntries = [...existingEntries];
+        const previousActive = alignedEntries.length > 0
+          ? alignedEntries[alignedEntries.length - 1]
+          : [];
+        while (alignedEntries.length < newHistoryIndex) {
+          alignedEntries.push([...previousActive]);
+        }
+
+        samPointHistory = {
+          allSamPoints: annotationState.samPointHistory.allSamPoints,
+          activePointsPerHistoryIndex: [...alignedEntries, [...previousActive]],
+        };
       }
 
       return {
@@ -649,8 +715,9 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
       },
     }));
     loggers.history(`[undoPerAnnotationMask] annotationId=${annotationId}, historyIndex=${annotationState.historyIndex} -> ${newIndex}`);
-    // Only sync annotations if this annotation has SAM point history and we're at a valid history index
-    if (annotationState.samPointHistory && newIndex >= 0) {
+    // Sync SAM points for all history positions, including -1,
+    // so undo-to-empty clears any previously shown SAM points.
+    if (annotationState.samPointHistory) {
       get().syncAnnotationsToHistoryIndex(annotationId);
     }
     return newIndex >= 0 ? annotationState.history[newIndex] : null;
@@ -755,6 +822,26 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
     set({ activeAnnotationId: null }),
 
   /**
+   * Mark the current history index as the saved checkpoint for an annotation.
+   * Keeps the full history intact so undo/redo remains available after save.
+   */
+  markPerAnnotationMaskSaved: (annotationId) =>
+    set((state) => {
+      const annotationState = state.perAnnotationMasks[annotationId];
+      if (!annotationState) return state;
+
+      return {
+        perAnnotationMasks: {
+          ...state.perAnnotationMasks,
+          [annotationId]: {
+            ...annotationState,
+            lastSavedHistoryIndex: annotationState.historyIndex,
+          },
+        },
+      };
+    }),
+
+  /**
    * Clear the entire mask history for an annotation and reset its mask URL.
    * Used when clearing temporary masks (e.g., -1 mask after transferring to user rect).
    * @param annotationId - The annotation's markId
@@ -769,6 +856,7 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
             maskUrl: null,
             history: [],
             historyIndex: -1,
+            lastSavedHistoryIndex: -1,
           },
         },
       };
@@ -857,6 +945,7 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
       };
       latestSamMask: any; // CompressedMask or null
       compositeMask: any;  // CompressedMask or null
+      samModelId: string | null; // Model used for the most recent SAM prediction in history
     }> = [];
 
     // Get all unique annotationIds from point annotations (to include rects with only points, no masks yet)
@@ -914,19 +1003,24 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
       // Searches backwards through history to find the most recent 'sam' type entry
       // This extracts the raw SAM prediction (not composited with modifiers)
       let latestSamMask: any = null;
+      let samModelId: string | null = null;
       if (maskState && maskState.history.length > 0) {
         const historyUpToNow = maskState.history.slice(0, maskState.historyIndex + 1);
         for (let i = historyUpToNow.length - 1; i >= 0; i--) {
-          if (historyUpToNow[i].type === 'sam') {
-            latestSamMask = await compressSegmentationMask(historyUpToNow[i].imageData, 'gzip-base64', 'sam');
+          const entry = historyUpToNow[i];
+          if (entry.type === 'sam') {
+            latestSamMask = await compressSegmentationMask(entry.imageData, 'gzip-base64', 'sam');
+            samModelId = entry.modelId;
             break;
           }
         }
       }
 
       // 3. Get composite mask at historyIndex (if mask history exists)
-      // Composite = bitwise OR of all masks (both SAM and brush strokes) up to historyIndex
-      // Uses getSimpleComposite (same function as display) to ensure consistency
+      // For modifier_brush entries: the snapshot at historyIndex is returned directly (it already
+      // encodes the cumulative state including any subtract strokes).
+      // For sam entries: OR-composited with all preceding entries so all predictions stay visible.
+      // Uses getSimpleComposite (same function as display) to ensure export == display.
       let compositeMask: any = null;
       if (maskState && maskState.history.length > 0) {
         const historyUpToNow = maskState.history.slice(0, maskState.historyIndex + 1);
@@ -940,6 +1034,7 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
         samPointHistory,
         latestSamMask,
         compositeMask,
+        samModelId,
       });
     }
 

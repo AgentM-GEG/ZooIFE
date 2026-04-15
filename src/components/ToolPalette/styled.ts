@@ -118,10 +118,13 @@ export const PredModContainer = styled.div`
  * Range slider for modifier mode toggle (add/subtract).
  * Gradient swapover point dynamically moves based on mode to be hidden under thumb.
  */
-export const ModifierToggle = styled.input<{ $mode: "add" | "subtract" }>`
+export const ModifierToggle = styled.input<{ $mode: "add" | "subtract"; $inactive?: boolean }>`
   width: 40px;
-  cursor: pointer;
+  cursor: ${(props) => (props.$inactive ? 'not-allowed' : 'pointer')};
   background: ${(props) => {
+    if (props.$inactive) {
+      return `${theme.colors.neutral.dark}`;
+    }
     const swapover = props.$mode === "subtract" ? "5%" : "95%";
     return `linear-gradient(
       to right,
@@ -137,6 +140,10 @@ export const ModifierToggle = styled.input<{ $mode: "add" | "subtract" }>`
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
+
+  &:disabled {
+    opacity: 0.7;
+  }
 `;
 
 /**

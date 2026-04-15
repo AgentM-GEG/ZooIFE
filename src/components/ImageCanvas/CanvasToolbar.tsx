@@ -21,6 +21,7 @@ import {
  * @param disableRedo - Whether redo button should be disabled
  * @param hasWholeImageMask - Whether the whole-image (-1) mask has content (enable identify button)
  * @param isUserRectSelected - Whether a user-created rect is currently selected (enable save button)
+ * @param hasUnsavedUserRectMaskChanges - Whether selected user rect mask differs from last saved checkpoint
  * @param onZoomIn - Callback for zoom in button
  * @param onZoomOut - Callback for zoom out button
  * @param onZoomFit - Callback for fit-to-view button
@@ -41,6 +42,7 @@ const CanvasToolbar = memo(({
   disableRedo,
   hasWholeImageMask = false,
   isUserRectSelected = false,
+  hasUnsavedUserRectMaskChanges = false,
   onZoomIn,
   onZoomOut,
   onZoomFit,
@@ -59,6 +61,7 @@ const CanvasToolbar = memo(({
   disableRedo: boolean;
   hasWholeImageMask?: boolean;
   isUserRectSelected?: boolean;
+  hasUnsavedUserRectMaskChanges?: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomFit: () => void;
@@ -97,7 +100,7 @@ const CanvasToolbar = memo(({
               Identify new object
             </IdentifyButton>
           )}
-          {onSaveUserRect && isUserRectSelected && (
+          {onSaveUserRect && isUserRectSelected && hasUnsavedUserRectMaskChanges && (
             <SaveButton
               type="button"
               onClick={onSaveUserRect}

@@ -2,6 +2,16 @@ import { create } from 'zustand';
 import type { CaesarAnnotation } from '@/types/annotations';
 
 /**
+ * Configuration for Caesar service retries
+ */
+export interface CaesarRetryConfig {
+  /** Maximum number of retry attempts (default: 3) */
+  maxRetries: number;
+  /** Delay between retries in milliseconds (default: 1000) */
+  retryDelayMs: number;
+}
+
+/**
  * State interface for Caesar ML annotations store
  */
 interface CaesarAnnotationState {
@@ -9,6 +19,10 @@ interface CaesarAnnotationState {
   annotations: CaesarAnnotation[];
   /** Currently selected annotation ID for display/interaction */
   selectedAnnotationId: string | null;
+  /** Loading state: true while fetching Caesar annotations */
+  isLoading: boolean;
+  /** Error message if Caesar fetch fails after all retries */
+  error: string | null;
 
   // Actions
   /**
@@ -32,6 +46,18 @@ interface CaesarAnnotationState {
    * @param id ID of the annotation to select, or null to deselect
    */
   setSelectedAnnotationId: (id: string | null) => void;
+
+  /**
+   * Set loading state when fetching Caesar annotations
+   * @param isLoading True when fetching, false when complete
+   */
+  setLoading: (isLoading: boolean) => void;
+
+  /**
+   * Set error message if Caesar fetch fails
+   * @param error Error message or null if no error
+   */
+  setError: (error: string | null) => void;
 }
 
 /**
@@ -58,8 +84,12 @@ interface CaesarAnnotationState {
 export const useCaesarAnnotationStore = create<CaesarAnnotationState>((set) => ({
   annotations: [],
   selectedAnnotationId: null,
+  isLoading: false,
+  error: null,
 
-  setAnnotations: (annotations) => set({ annotations }),
-  clearAnnotations: () => set({ annotations: [] }),
+  setAnnotations: (annotations) => set({ annotations, error: null }),
+  clearAnnotations: () => set({ annotations: [], error: null }),
   setSelectedAnnotationId: (selectedAnnotationId) => set({ selectedAnnotationId }),
+  setLoading: (isLoading) => set({ isLoading }),
+  setError: (error) => set({ error }),
 }));

@@ -16,7 +16,6 @@ import {
   RangeSlider,
   PredModContainer,
   ModifierToggle,
-  HelpText,
   ButtonGroup,
 } from './styled';
 import { TOOLS } from './constants';
@@ -52,7 +51,18 @@ export function ToolPalette({
       clearSamPoints: s.clearSamPoints,
     }));
 
-  const hasAnnotations = annotations.length > 0;
+  const activeRectId = activeAnnotationId ?? '-1';
+  const hasSamPointsForActiveRect = annotations.some(
+    annotation =>
+      annotation.type === 'point' &&
+      (((annotation as any).annotationId ?? '-1') === activeRectId)
+  );
+  const isPointToolActive = tool === 'point';
+  const isModifierToolActive = tool === 'modifier_brush';
+  const modifierControlLabelStyle = {
+    margin: 0,
+    minWidth: '110px',
+  } as const;
 
   return (
     <Container>
@@ -60,10 +70,12 @@ export function ToolPalette({
       <ButtonGroup>
         {TOOLS.map((t) => {
           const ToolButtonComponent = (t.id === 'freehand' || t.id === 'brush') ? HiddenToolButton : Button;
+          const isActive = t.id === 'point' ? isPointToolActive : tool === t.id;
           return (
             <ToolButtonComponent
               key={t.id}
-              $active={tool === t.id}
+              $active={isActive}
+              aria-pressed={isActive}
               onClick={() => onToolChange(t.id)}
             >
               {t.label}
@@ -71,6 +83,70 @@ export function ToolPalette({
           );
         })}
       </ButtonGroup>
+
+      <PredModContainer>
+        <ButtonGroup>
+          <Button
+            $active={isModifierToolActive}
+            aria-pressed={isModifierToolActive}
+            onClick={() => onToolChange("modifier_brush")}
+          >
+            Mask Modifier Tool
+          </Button>
+          <UndoButton
+            disabled={true}
+            onClick={() => brushProps.predModBrushRef?.current?.undo()}
+          >
+            Undo
+          </UndoButton>
+          <RedoButton
+            disabled={true}
+            onClick={() => brushProps.predModBrushRef?.current?.redo()}
+          >
+            Redo
+          </RedoButton>
+        </ButtonGroup>
+
+        <FlexContainer>
+          <Label style={modifierControlLabelStyle}>Modifier mode:</Label>
+          <ModifierToggle
+            type="range"
+            min="0"
+            max="1"
+            step="1"
+            $mode={brushProps.predModBrushMode as "add" | "subtract"}
+            $inactive={!isModifierToolActive}
+            value={brushProps.predModBrushMode === "subtract" ? 0 : 1}
+            disabled={!isModifierToolActive}
+            onChange={(e) =>
+              onPredModBrushModeChange(e.target.value === "0" ? "subtract" : "add")
+            }
+          />
+          <Label
+            style={{
+              margin: 0,
+              color: isModifierToolActive ? theme.colors.text.primary : theme.colors.text.secondary,
+            }}
+          >
+            {brushProps.predModBrushMode === "add" ? "Add" : "Subtract"}
+          </Label>
+        </FlexContainer>
+
+        <FlexContainer>
+          <Label style={modifierControlLabelStyle}>Modifier size:</Label>
+          <RangeSlider
+            type="range"
+            min="1"
+            max="10"
+            defaultValue="5"
+            id="predmod_brush_size_slider"
+            disabled={!isModifierToolActive}
+            onChange={(event) =>
+              onPredModBrushSizeChange(parseFloat(event.target.value))
+            }
+          />
+        </FlexContainer>
+      </PredModContainer>
 
       <HiddenBrushSizeContainer>
         <FlexContainer>
@@ -88,8 +164,8 @@ export function ToolPalette({
         </FlexContainer>
       </HiddenBrushSizeContainer>
 
-      {hasAnnotations && (
-        <ClearButton onClick={() => clearSamPoints(activeAnnotationId ?? '-1')}>
+      {hasSamPointsForActiveRect && (
+        <ClearButton onClick={() => clearSamPoints(activeRectId)}>
           Clear SAM points
         </ClearButton>
       )}
@@ -142,66 +218,6 @@ export function ToolPalette({
         </>
       )}
 
-      <PredModContainer>
-        <ButtonGroup>
-          <Button
-            $active={tool === "modifier_brush"}
-            onClick={() => onToolChange(tool === "modifier_brush" ? "point" : "modifier_brush")}
-          >
-            Modify prediction
-          </Button>
-          <UndoButton
-            disabled={true}
-            onClick={() => brushProps.predModBrushRef?.current?.undo()}
-          >
-            Undo
-          </UndoButton>
-          <RedoButton
-            disabled={true}
-            onClick={() => brushProps.predModBrushRef?.current?.redo()}
-          >
-            Redo
-          </RedoButton>
-        </ButtonGroup>
-
-        <FlexContainer>
-          <Label style={{ margin: 0 }}>Modifier mode:</Label>
-          <ModifierToggle
-            type="range"
-            min="0"
-            max="1"
-            step="1"
-            $mode={brushProps.predModBrushMode as "add" | "subtract"}
-            value={brushProps.predModBrushMode === "subtract" ? 0 : 1}
-            onChange={(e) =>
-              onPredModBrushModeChange(e.target.value === "0" ? "subtract" : "add")
-            }
-          />
-          <Label style={{ margin: 0 }}>
-            {brushProps.predModBrushMode === "add" ? "Add" : "Subtract"}
-          </Label>
-        </FlexContainer>
-
-        <FlexContainer>
-          <Label style={{ margin: 0 }}>Modifier brush size</Label>
-          <RangeSlider
-            type="range"
-            min="1"
-            max="10"
-            defaultValue="5"
-            id="predmod_brush_size_slider"
-            onChange={(event) =>
-              onPredModBrushSizeChange(parseFloat(event.target.value))
-            }
-          />
-        </FlexContainer>
-      </PredModContainer>
-
-      <HelpText>
-        Left-click: positive point (green){'\n'}
-        Right-click: negative point (red){'\n'}
-        Undo: Ctrl+Z / ⌘Z
-      </HelpText>
     </Container>
   );
 }

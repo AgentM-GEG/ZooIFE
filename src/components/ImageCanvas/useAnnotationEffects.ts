@@ -12,6 +12,7 @@ interface UseAnnotationEffectsProps {
   debugImageUrl: string | null;
   selectedCaesarAnnotation: string | null;
   onUndo?: () => void;
+  onRedo?: () => void;
   stageRef: React.RefObject<Konva.Stage>;
   setIsPanMode: (value: boolean) => void;
   setNoRectangleWarning: (value: boolean) => void;
@@ -38,10 +39,27 @@ export function useAnnotationEffects(props: UseAnnotationEffectsProps) {
     debugImageUrl,
     selectedCaesarAnnotation,
     onUndo,
+    onRedo,
     stageRef,
     setIsPanMode,
     setNoRectangleWarning,
   } = props;
+
+  const isEditableTarget = (target: EventTarget | null): boolean => {
+    if (!(target instanceof HTMLElement)) return false;
+
+    if (target.isContentEditable) return true;
+
+    const tagName = target.tagName.toLowerCase();
+    if (tagName === 'textarea') return true;
+    if (tagName === 'select') return true;
+    if (tagName === 'input') {
+      const input = target as HTMLInputElement;
+      return input.type !== 'button' && input.type !== 'checkbox' && input.type !== 'radio' && input.type !== 'range';
+    }
+
+    return false;
+  };
 
   /**
    * Update stage cursor based on tool and pan mode.
@@ -62,18 +80,44 @@ export function useAnnotationEffects(props: UseAnnotationEffectsProps) {
   }, [tool, setIsPanMode]);
 
   /**
-   * Setup keyboard undo shortcut (Ctrl+Z / ⌘Z).
+   * Setup scoped keyboard shortcuts for mask history:
+   * - Undo: Ctrl+Z / ⌘Z
+  * - Redo: ⌘⇧Z / Ctrl+Y
+   *
+   * Shortcuts are ignored when:
+   * - Focus is in an editable element (input/textarea/select/contenteditable), or
+   * - The canvas is not hovered.
    */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+      if (isEditableTarget(e.target)) return;
+
+      const stage = stageRef.current;
+      if (!stage) return;
+      const isCanvasHovered = stage.container().matches(':hover');
+      if (!isCanvasHovered) return;
+
+      const key = e.key.toLowerCase();
+      const hasMod = e.metaKey || e.ctrlKey;
+      if (!hasMod) return;
+
+      const isUndo = key === 'z' && !e.shiftKey;
+      const isRedo = (key === 'z' && e.shiftKey && e.metaKey) || (key === 'y' && e.ctrlKey && !e.metaKey);
+
+      if (isUndo) {
         e.preventDefault();
         onUndo?.();
+        return;
+      }
+
+      if (isRedo) {
+        e.preventDefault();
+        onRedo?.();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onUndo]);
+  }, [onUndo, onRedo, stageRef]);
 
   /**
    * Clear warning banner silently when a Caesar annotation is selected.

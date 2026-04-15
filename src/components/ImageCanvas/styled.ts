@@ -196,7 +196,7 @@ export const WarningBanner = styled.div<{ $isLeaving?: boolean }>`
   bottom: ${theme.spacing.lg};
   right: ${theme.spacing.lg};
   max-width: 600px;
-  z-index: 10;
+  z-index: 20;
   animation: ${(props) => props.$isLeaving ? fadeOut : fadeIn} 0.1s ease-in-out;
 `;
 
@@ -232,6 +232,72 @@ export const MarkingBanner = styled.div<{ $isEditingMinusOne?: boolean }>`
   z-index: 10;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   animation: ${fadeIn} 0.1s ease-in-out;
+`;
+
+export const ToolHelpOverlay = styled.div<{ $expanded?: boolean }>`
+  background: ${(props) => (props.$expanded ? 'rgba(0, 0, 0, 0.9)' : 'rgba(0, 0, 0, 0.66)')};
+  color: ${theme.colors.text.inverse};
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 10px 12px;
+  border-radius: ${theme.borders.radius.base};
+  font-size: ${theme.typography.size.sm};
+  line-height: 1.4;
+  position: absolute;
+  bottom: ${theme.spacing.lg};
+  left: ${theme.spacing.lg};
+  max-width: 60%;
+  z-index: 9;
+  pointer-events: auto;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  max-height: 75%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  animation: ${fadeIn} 0.1s ease-in-out;
+
+  p {
+    margin: ${theme.spacing.sm} 0;
+  }
+
+  ul {
+    margin: ${theme.spacing.xs} 0 ${theme.spacing.sm} 1.1rem;
+    padding: 0;
+  }
+
+  li {
+    margin: 0 0 ${theme.spacing.xs} 0;
+  }
+`;
+
+export const ToolHelpHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${theme.spacing.sm};
+`;
+
+export const ToolHelpContent = styled.div`
+  animation: ${fadeIn} 0.12s ease-in-out;
+`;
+
+export const ToolHelpToggleButton = styled.button`
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  color: ${theme.colors.text.inverse};
+  border-radius: ${theme.borders.radius.base};
+  min-width: 48px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: ${theme.typography.size.xs};
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 ${theme.spacing.xs};
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
 `;
 
 export const SaveButton = styled.button`

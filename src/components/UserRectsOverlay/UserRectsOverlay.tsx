@@ -20,6 +20,7 @@ function UserRect({
   onTap,
   toolCursor,
   markLabel,
+  hasUnsavedChanges,
   setToolTip,
 }: {
   rectId: string;
@@ -35,6 +36,7 @@ function UserRect({
   onTap: (e: any) => void;
   toolCursor: string;
   markLabel: string;
+  hasUnsavedChanges: boolean;
   setToolTip: Dispatch<SetStateAction<TooltipState>>;
 }) {
   const rectRef = useRef<any>(null);
@@ -110,7 +112,7 @@ function UserRect({
       height={displayedBounds.height}
       stroke={rect.markColour}
       strokeWidth={strokeWidth}
-      dash={rect.markStroke === 'dashed' ? [5, 5] : undefined}
+      dash={hasUnsavedChanges ? [5, 5] : undefined}
       fillEnabled={false}
       listening={true}
       hitStrokeWidth={baseStrokeWidth * 4} // Make hit area larger for easier clicking
@@ -194,6 +196,7 @@ export function UserRectsOverlay({
   contentScale?: number;
 }) {
   const userRects = useClassificationStore((s) => s.userRects);
+  const perAnnotationMasks = useClassificationStore((s) => s.perAnnotationMasks);
   const [hoveredRectId, setHoveredRectId] = useState<string | undefined>();
 
   if (Object.keys(userRects).length === 0) {
@@ -229,6 +232,9 @@ export function UserRectsOverlay({
           opacity = 0.5;
         }
 
+        const maskState = perAnnotationMasks[rectId];
+        const hasUnsavedChanges = !!maskState && maskState.historyIndex !== maskState.lastSavedHistoryIndex;
+
         return (
           <UserRect
             key={rectId}
@@ -240,6 +246,7 @@ export function UserRectsOverlay({
             baseStrokeWidth={baseStrokeWidth}
             toolCursor={toolCursor}
             markLabel={rect.markLabel}
+            hasUnsavedChanges={hasUnsavedChanges}
             setToolTip={setToolTip}
             onMouseEnter={() => {
               setHoveredRectId(rectId);

@@ -1,8 +1,8 @@
 {
   "metadata": {
     "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
-    "started_at": "2026-04-13T18:28:18.207Z",
-    "finished_at": "2026-04-13T18:29:40.295Z",
+    "started_at": "2026-04-14T19:09:36.571Z",
+    "finished_at": "2026-04-14T19:12:27.639Z",
     "user_language": "en-GB",
     "workflow_version": "1.0",
     "classifier_version": "IFE-0.1.0"
@@ -12,86 +12,186 @@
       "task": "rect-annotations",
       "value": [
         {
-          "annotationId": "1000",
+          "annotationId": "1014",
           "samPoints": [
             {
-              "x": 1441.553569460933,
-              "y": 919.7981649390874,
+              "x": 1458.4055296911213,
+              "y": 115.2441418163909,
               "label": 1,
               "pointId": 0
             }
           ],
+          "samPointHistory": {
+            "allSamPoints": [
+              {
+                "x": 1498.508329432436,
+                "y": 213.38908782363896,
+                "label": 1
+              },
+              {
+                "x": 1458.3382083589108,
+                "y": 115.2441418163909,
+                "label": 1
+              },
+              {
+                "x": 1458.4055296911213,
+                "y": 115.2441418163909,
+                "label": 1
+              }
+            ],
+            "activePointsPerHistoryIndex": [
+              [],
+              [],
+              [
+                0
+              ],
+              [
+                2
+              ]
+            ]
+          },
           "latestSamMask": {
             "width": 2040,
             "height": 2040,
             "encoding": "gzip-base64",
             "maskType": "sam",
-            "rle": "H4sIAAAAAAAAE+2VW27jMAxFeSUn+vQSvBTvYLYU72p+tRQvwcA0idJRrYIPPxJPvwrMYACB6CUP6lCURdGFSrVq1apVq/YX7SchzIQWwwdr/CB0O+0PejHl5wuGTMCL9+bD5iV3uRKawJk5ateoC5x75gjDmXNrHCXOV6lrF49nXjlJnHZxPmkNk9B80kqYAsqBwkYYGqlP2Bt3KBiNY8MVKvMKY8PVFIw3Xn3yBLiFkif4lbJRvMm+PCGsVDyhNeLsg1MevuDoCJ2xVKd8V5ocoV8prcT7yk7rne+ScUdczQByBdkoyl6YZBei6a47nOSJlPj5xPkxJcLl9Oz7U8GYCJ359sWHU0FMBP/iwf5Bqrg0BcOD0JvvmvJOaEWDKHzBvPjfpIqLLy/aPyuG92/5P63RHP64LqvcN7oj9qP5/JD3oIph91b2/vXt8dtt5Ry4H1LSfhjlxLNRlBOfjQY+sSS9ADvt+57i3XoBdt7GGXriyTg56xGnvWX947TvOldu1iHOVrnanXDqV/b8m7iRZNrzes/4Ob/dw4WXe7qwt/svq3i9n3nhhg4038jx/e/XqEORu8oTg7NzrWWdH1Eoy5yZJE4yi9Ia6+wqmM6ca4t14mkcUN5sdpzFLxRkiv7a6PJEvZDUIfNyT62QzK9ACG/bxG2XiStzXHWWCZ4PmuS/00HHnW7fg+U7wRr+9berWrVq1apVq/Z/2A/6BPRGpSPsFAAA"
+            "rle": "H4sIAAAAAAAAE+3PsQ2AMBBDUTsUKTMC67AVLEXPXgkczRUsgJDQ1yssWW4cil/b5eoYskt463LNbCV8dHnObI8+d0OeSpzy6uvrHwAAAAAAvG3RDaaGnK8mEAAA"
           },
           "compositeMask": {
             "width": 2040,
             "height": 2040,
             "encoding": "gzip-base64",
             "maskType": "composite",
-            "rle": "H4sIAAAAAAAAE+2VW27jMAxFeSUn+vQSvBTvYLYU72p+tRQvwcA0idJRrYIPPxJPvwrMYACB6CUP6lCURdGFSrVq1apVq/YX7SchzIQWwwdr/CB0O+0PejHl5wuGTMCL9+bD5iV3uRKawJk5ateoC5x75gjDmXNrHCXOV6lrF49nXjlJnHZxPmkNk9B80kqYAsqBwkYYGqlP2Bt3KBiNY8MVKvMKY8PVFIw3Xn3yBLiFkif4lbJRvMm+PCGsVDyhNeLsg1MevuDoCJ2xVKd8V5ocoV8prcT7yk7rne+ScUdczQByBdkoyl6YZBei6a47nOSJlPj5xPkxJcLl9Oz7U8GYCJ359sWHU0FMBP/iwf5Bqrg0BcOD0JvvmvJOaEWDKHzBvPjfpIqLLy/aPyuG92/5P63RHP64LqvcN7oj9qP5/JD3oIph91b2/vXt8dtt5Ry4H1LSfhjlxLNRlBOfjQY+sSS9ADvt+57i3XoBdt7GGXriyTg56xGnvWX947TvOldu1iHOVrnanXDqV/b8m7iRZNrzes/4Ob/dw4WXe7qwt/svq3i9n3nhhg4038jx/e/XqEORu8oTg7NzrWWdH1Eoy5yZJE4yi9Ia6+wqmM6ca4t14mkcUN5sdpzFLxRkiv7a6PJEvZDUIfNyT62QzK9ACG/bxG2XiStzXHWWCZ4PmuS/00HHnW7fg+U7wRr+9berWrVq1apVq/Z/2A/6BPRGpSPsFAAA"
-          }
+            "rle": "H4sIAAAAAAAAE+2SMQrDMAxF9e0h3XyEHCVDD5ZcqnuP0iN0TIhitZYVcCmFbilFPPjf38SyZCIkf82F0EGYgCCYVkJnnoLguhJ689Ts23dMiEE2woh8TPeRwFuZIG+EhNLL0Oi4KyaufjW/NT60vhAiZmg1TQnZ0n0h9M9aVUsqJyZN80vir1KpmT+kzlK9L1qqvSBIXQfSVQSHfdZ2+n5XnT69u75cq+UVoyrAmXA6+u90HMdxHMdxHMdxfp0zPQCIWt+5OhEAAA=="
+          },
+          "samModelId": "sam1-vit_b"
         },
         {
-          "annotationId": "3000",
+          "annotationId": "1021",
           "samPoints": [
             {
-              "x": 315.959929447364,
-              "y": 546.5814872218502,
+              "x": 1625.3629641761916,
+              "y": 916.2661807748316,
               "label": 1,
               "pointId": 0
             }
           ],
+          "samPointHistory": {
+            "allSamPoints": [
+              {
+                "x": 1591.5279683584624,
+                "y": 890.274554018906,
+                "label": 1
+              },
+              {
+                "x": 1625.3016004839997,
+                "y": 915.359496120555,
+                "label": 1
+              },
+              {
+                "x": 1625.3629641761916,
+                "y": 916.2661807748316,
+                "label": 1
+              }
+            ],
+            "activePointsPerHistoryIndex": [
+              [
+                0
+              ],
+              [
+                2
+              ],
+              [
+                2
+              ],
+              [
+                2
+              ]
+            ]
+          },
           "latestSamMask": {
             "width": 2040,
             "height": 2040,
             "encoding": "gzip-base64",
             "maskType": "sam",
-            "rle": "H4sIAAAAAAAAE+2SQQrCMBBF59uF7noBoUuPMUfr1byFW4/QZcCaiCPWZEwUV4J+HrxHWxrKTJMkQshPshNso0CjYMT+fPXRPFWthYPd90721HkWoNEua6h0/aZ9pVPW4UXDB9VGRyTMj66cTwJkje566dObobSdn1fd9/WN+dznWMx92c1t32q733z7bySEEEIIIeR/OMgF4jel4GwRAAA="
+            "rle": "H4sIAAAAAAAAE+3OsQ2AMBBDUTsUlIzAEAwY5mMlkrtINJHoqGi+nvTdOpUAAODlkndHk7eSPm95ndvk5alLdrk6umzH358BAAC+OjQA7YQS0hYQAAA="
           },
           "compositeMask": {
             "width": 2040,
             "height": 2040,
             "encoding": "gzip-base64",
             "maskType": "composite",
-            "rle": "H4sIAAAAAAAAE+2TTQrCMBCF59lFV+IFhC49Ro5Wj+YpXPcIXQZaE3EsNR3Tli5ElMcH7yMJ+WGYRImEkL/kJDgGgQuCGpfbIxvNNptukl7nbUZdNdkLMOMisc+4XPEh4zZxtWC/wW7GNSL6l3cmOwESBzMe/bbTT1PP90sro+0Lq6QiuYqtVbgc9n/ahTGG+9XaR7bXnp24x/nb/4gQQgghhJDf5Sp3jiz5fPYRAAA="
-          }
+            "rle": "H4sIAAAAAAAAE+2RMQ7CMAxF/RMhxh4hh+CA5GgVJ+kROjBU1KmRmxSWIpUJhq83vCXf31ZMjBBCCPk7boKIsQjO0ZAf1f2OYzPcsyAFQza5C4Cp+BTDqIIYDNNcc0PLbR43z4Iu1PcdDMOa74/sexIkZPXWmk8wTCqtFcGgH9xeqeCKV/eRzugti9ads9/2dr1Y14bik5fiuy2//ldCCCGEkG+5yBOM6QsxuhAAAA=="
+          },
+          "samModelId": "sam1-vit_b"
         },
         {
           "annotationId": "-2",
           "samPoints": [
             {
-              "x": 1748.2703396433974,
-              "y": 923.633825643894,
+              "x": 421.02956792132443,
+              "y": 947.8386288998591,
               "label": 1,
               "pointId": 0
             }
           ],
+          "samPointHistory": {
+            "allSamPoints": [
+              {
+                "x": 434.1138716427882,
+                "y": 892.0851978338528,
+                "label": 1
+              },
+              {
+                "x": 421.02956792132443,
+                "y": 947.8386288998591,
+                "label": 1
+              },
+              {
+                "x": 425.29203446799744,
+                "y": 916.5711679148185,
+                "label": 1
+              },
+              {
+                "x": 412.1657495269799,
+                "y": 909.1005558443075,
+                "label": 1
+              }
+            ],
+            "activePointsPerHistoryIndex": [
+              [
+                0
+              ],
+              [
+                1
+              ],
+              [
+                1
+              ]
+            ]
+          },
           "latestSamMask": {
             "width": 2040,
             "height": 2040,
             "encoding": "gzip-base64",
             "maskType": "sam",
-            "rle": "H4sIAAAAAAAAE+3OsQ0AIAzEwP9J0rAnqzEHU7AACh1lKGmsk1w7lQAA4GHK4bHl7nWbZeP3MwAAQK3pAKxsMXsUEAAA"
+            "rle": "H4sIAAAAAAAAE+3PwQmAUAwE0YyNWIQFWp9d/DIEoxHUg+BV8ODwYBdCLltRkiTpVUMAuQY9RctgpMhnd8V25hJw7+M6X5/t6z2SJOlfptgBWs2s6CwQAAA="
           },
           "compositeMask": {
             "width": 2040,
             "height": 2040,
             "encoding": "gzip-base64",
             "maskType": "composite",
-            "rle": "H4sIAAAAAAAAE+2SsQ6CQBBEd46CksLGjg+x8NPk0+j8DTpbSgOLa+5uEYPGmFgYzeQlM8kdzN5NzsQIIYSQn+MoAAxnFdQwqAoOMFxGAUL2orBRUCatktYPmtdL/2P2IhjUk1QlpDnB0PmU1r1ZPJim71VQxnPM5xlySoPtkHf6z+69ifdtp5je39Reav1++klQTUuzeyw9zL3c91StPXf6ZFdX3ntK597GdO8tTm++/b4IIYQQ8n/s5Aq8lMJEAhEAAA=="
-          }
+            "rle": "H4sIAAAAAAAAE+2RMQ7CMAxF/VOkjhwhV2Bh7tGao3XlFjlCx0CdGLlYqEUMbEhgPSlPchzbSYTEcRzHcX6cM6FDuxEGCBgRgnQljAfB9MbDxmnjqGatVbbVF8KpEbhREKSF0AXBtBD6IMjm2VxsX40gYCZEO9fv47arMzcmHM29udO7VLJ1RKmaO1dCRK6anz55G+23VtBXyayVHn1fHNauutqET6/RYpn523/tOI7jOM5/caE7AKuADtgQAAA="
+          },
+          "samModelId": "sam1-vit_b"
         }
       ]
     }
   ],
   "links": {
     "subjects": [
-      "119116352"
+      "119116354"
     ],
     "workflow": "31349",
     "project": "30908"

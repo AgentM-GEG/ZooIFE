@@ -64,6 +64,7 @@ function createSamHistoryEntry(imageData: ImageData): HistoryEntry {
   return {
     type: 'sam',
     imageData,
+    modelId: 'test-model',
   };
 }
 

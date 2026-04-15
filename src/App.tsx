@@ -84,11 +84,12 @@ function imageDataToDataUri(imageData: ImageData): string {
  * @param rawSamImageData - Raw ImageData from SAM segmentation (model output only)
  * @returns HistoryEntry with type 'sam' containing only raw prediction
  */
-function createSamHistoryEntry(rawSamImageData: ImageData): HistoryEntry {
+function createSamHistoryEntry(rawSamImageData: ImageData, modelId: string): HistoryEntry {
   // Store ONLY raw SAM prediction - no pre-compositing with modifier strokes
   return {
     type: 'sam',
     imageData: rawSamImageData,
+    modelId,
   };
 }
 
@@ -170,7 +171,7 @@ function App() {
           const maskUrl = result.image.url;
           dataUriToImageData(maskUrl).then((imageData) => {
             // Create SAM history entry with raw prediction
-            const samEntry = createSamHistoryEntry(imageData);
+            const samEntry = createSamHistoryEntry(imageData, modelId);
             
             // Calculate display composite BEFORE pushing to avoid async state race condition
             const currentMaskState = useClassificationStore.getState().perAnnotationMasks[currentAnnotationId];
@@ -191,7 +192,7 @@ function App() {
             const compositedMaskUrl = imageDataToDataUri(displayComposite);
             
             // Now push to history and update UI
-            pushPerAnnotationMaskHistory(currentAnnotationId, samEntry);
+            pushPerAnnotationMaskHistory(currentAnnotationId, samEntry, points);
             setPerAnnotationMask(currentAnnotationId, compositedMaskUrl);
           }).catch((err) => {
             loggers.app('Failed to convert SAM mask to ImageData:', err);
@@ -261,7 +262,7 @@ function App() {
               const maskUrl = result.image.url;
               dataUriToImageData(maskUrl).then((imageData) => {
                 // Create SAM history entry with raw prediction
-                const samEntry = createSamHistoryEntry(imageData);
+                const samEntry = createSamHistoryEntry(imageData, modelId);
                 
                 // Calculate display composite BEFORE pushing to avoid async state race condition
                 const currentMaskState = useClassificationStore.getState().perAnnotationMasks[currentAnnotationId];
@@ -298,7 +299,7 @@ function App() {
             const maskUrl = result.image.url;
             dataUriToImageData(maskUrl).then((imageData) => {
               // Create SAM history entry with raw prediction
-              const samEntry = createSamHistoryEntry(imageData);
+              const samEntry = createSamHistoryEntry(imageData, modelId);
               
               // Calculate display composite BEFORE pushing to avoid async state race condition
               const currentMaskState = useClassificationStore.getState().perAnnotationMasks[currentAnnotationId];

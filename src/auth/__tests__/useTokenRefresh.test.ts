@@ -1,3 +1,24 @@
+/**
+ * Unit tests for useTokenRefresh hook
+ * 
+ * These tests use MOCKED fetch and OAuth server to test the refresh logic
+ * in isolation, ensuring all code paths work correctly.
+ * 
+ * For validation against real Zooniverse tokens, see:
+ * useTokenRefresh.integration.test.ts (optional integration tests)
+ * 
+ * Unit tests are preferred because they:
+ * - Don't depend on external services
+ * - Run fast and deterministically
+ * - Can test all error conditions (401, timeouts, retries, etc.)
+ * - Work offline and in CI/CD without credentials
+ * 
+ * To run ONLY unit tests:
+ *   npm run test -- useTokenRefresh.test.ts
+ * 
+ * To run unit + integration tests:
+ *   VITE_ZOONIVERSE_TEST_REFRESH_TOKEN="..." npm run test
+ */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useTokenRefresh } from '../useTokenRefresh';

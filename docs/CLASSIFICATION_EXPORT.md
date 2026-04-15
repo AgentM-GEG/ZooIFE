@@ -36,6 +36,7 @@ interface RectAnnotationsValue {
   };
   latestSamMask: CompressedMask | null;   // Most recent SAM prediction
   compositeMask: CompressedMask | null;   // Current composite (SAM + edits)
+  samModelId: string | null;              // Model used for the most recent SAM prediction (e.g. 'sam2-hiera-large'); null if no SAM masks exist
 }[]
 ```
 
@@ -79,9 +80,20 @@ interface RectAnnotationsValue {
 #### compositeMask
 - **Type:** `CompressedMask | null`
 - **Purpose:** Combined mask after all edits (SAM + modifier brush strokes)
-- **Contents:** Bitwise OR of all mask history entries up to `historyIndex`
+- **Contents:** Computed by `getSimpleComposite` using two strategies depending on the entry at `historyIndex`:
+  - `modifier_brush` at `historyIndex` — the cumulative canvas snapshot is returned directly. It already encodes the effect of all preceding add and subtract strokes, including erased regions.
+  - `sam` at `historyIndex` — OR-composited with all preceding entries so all SAM predictions remain represented.
+  This ensures that subtract (erase) brush strokes are correctly reflected in the exported mask.
 - **Null cases:** User reached a point with no segmentation data
 - **Use case:** Final approved segmentation state
+- **Required:** No
+
+#### samModelId
+- **Type:** `string | null`
+- **Purpose:** Identifies which SAM model generated the most recent prediction in history for this rect
+- **Values:** Model ID string (e.g. `'sam2-hiera-large'`, `'sam2-hiera-tiny'`, `'sam1-vit_h'`) matching the IDs in `SEGMENT_MODELS` from `sam2Service.ts`
+- **Null cases:** No SAM masks exist for this rect (only points placed, or no annotations at all)
+- **Use case:** Audit which model produced each segmentation; compare quality across models
 - **Required:** No
 
 ### CompressedMask Format
@@ -157,7 +169,8 @@ Indicates the origin and nature of the mask:
         "encoding": "gzip-base64",
         "maskType": "composite",
         "rle": "H4sIA..."
-      }
+      },
+      "samModelId": "sam2-hiera-large"
     },
     {
       "annotationId": "-1",
@@ -171,7 +184,8 @@ Indicates the origin and nature of the mask:
         "activePointsPerHistoryIndex": [[0]]
       },
       "latestSamMask": null,
-      "compositeMask": null
+      "compositeMask": null,
+      "samModelId": null
     },
     {
       "annotationId": "-2",
@@ -185,7 +199,8 @@ Indicates the origin and nature of the mask:
         "activePointsPerHistoryIndex": [[0]]
       },
       "latestSamMask": null,
-      "compositeMask": null
+      "compositeMask": null,
+      "samModelId": null
     }
   ]
 }
@@ -218,7 +233,16 @@ Raw user-drawn marks that may or may not have generated SAM predictions.
 }
 ```
 
-#### Brush Annotation
+#### Brush Annotation (Deprecated)
+⚠️ **Currently not exported by the app.** Modifier brush strokes (add/subtract refinements) are stored in the per-annotation mask history and baked directly into `compositeMask` in the rect-annotations output instead. This approach is more efficient and correctly handles subtract operations.
+
+**To re-enable brush annotations in the export:**
+1. Un-hide the brush tool selector in the UI (currently hidden behind modifier_brush)
+2. Refactor the brush system to capture individual strokes as separate annotation events (instead of full canvas snapshots)
+3. Modify `buildPanoptesAnnotations` to export each captured stroke as a drawing annotation
+4. Update backend to re-synthesize the composite mask from `latestSamMask` + all brush strokes in order
+
+**Legacy format (if re-enabled):**
 ```json
 {
   "task": "drawing-1",
@@ -230,7 +254,8 @@ Raw user-drawn marks that may or may not have generated SAM predictions.
           { "x": 10, "y": 20 },
           { "x": 15, "y": 25 }
         ],
-        "radius": 5
+        "radius": 5,
+        "mode": "add" | "subtract"
       }
     ],
     "annotationId": "-1"
@@ -429,7 +454,10 @@ A: They are user-defined rectangles created in the UI. Example: `-2`, `-3`, `-4`
 A: `samPoints` is the currently visible point list, while `samPointHistory` preserves undo/redo timeline state (`allSamPoints` pool plus active indices per history step).
 
 **Q: Why are there both drawing annotations AND rect annotations?**
-A: Drawing annotations preserve raw interaction history; rect annotations provide the processed, final data structure for analysis.
+A: Drawing annotations preserve raw interaction history (points, etc.); rect annotations provide the processed, final data structure for analysis. Note: Modifier brush strokes are not exported as separate drawing annotations—they're baked into `compositeMask` instead.
+
+**Q: What happened to brush stroke annotations?**
+A: Currently deprecated. Modifier brush refinements (add/subtract) are automatically incorporated into the `compositeMask` in rect-annotations, which is more efficient and correctly handles subtract operations (erased pixels stay erased). Individual brush strokes can be re-enabled if the backend needs to audit or replay the precise sequence of refinements—see "Brush Annotation (Deprecated)" section for re-enablement steps.
 
 **Q: Can compositeMask be null while latestSamMask is not?**
 A: Yes — user may undo all edits back to the SAM prediction, clearing the composite.

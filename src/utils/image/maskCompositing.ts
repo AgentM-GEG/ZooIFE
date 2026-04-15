@@ -1,11 +1,19 @@
 /**
  * Mask compositing utilities for handling SAM predictions and brush strokes
- * 
- * Compositing logic:
- * 1. Find the most recent SAM prediction
- * 2. Composite all modifier brush strokes before that prediction
- * 3. Composite the SAM prediction with the composite from step 2
- * 4. Apply all modifier brush strokes made after the last SAM prediction
+ *
+ * Two distinct storage strategies exist in mask history:
+ *
+ * - `sam` entries store only the RAW MODEL PREDICTION (not a cumulative snapshot).
+ *   They must be OR-composited with all preceding entries so that multiple SAM
+ *   predictions and any pre-SAM brush work remain visible simultaneously.
+ *
+ * - `modifier_brush` entries store a FULL CANVAS SNAPSHOT encoding the cumulative
+ *   effect of all preceding operations, including subtract/erase. The snapshot must be
+ *   returned directly; OR-compositing would incorrectly resurrect pixels erased by
+ *   subtract strokes.
+ *
+ * `getSimpleComposite` is the canonical compositing function for both display and
+ * export, and handles both strategies automatically.
  */
 
 import type { HistoryEntry } from '@/stores/classificationStore';
@@ -60,13 +68,19 @@ export function compositeImageDataMasks(masks: ImageData[]): ImageData | null {
 }
 
 /**
- * Simple composite: bitwise OR all masks up to the given index.
+ * Composite history entries up to the given index for display and export.
  * IMPORTANT: This is the CANONICAL compositing logic used for both display and export.
  * It ensures display and export are consistent.
- * 
- * Do NOT use SAM-aware compositing (finding latest SAM, pre/post positioning) for display,
- * as that can cause earlier SAM predictions to be lost when multiple SAMs are placed.
- * 
+ *
+ * Two storage strategies exist in history:
+ * - `modifier_brush` entries store a FULL CANVAS SNAPSHOT: the cumulative mask state at
+ *   that stroke, including the effect of any preceding add and subtract operations.
+ *   These must be returned directly — OR-compositing with earlier entries would
+ *   incorrectly resurrect pixels that were erased by subtract strokes.
+ * - `sam` entries store only the RAW MODEL PREDICTION (not a cumulative snapshot).
+ *   Multiple SAM predictions and any brush work before them must be OR-composited
+ *   so that all earlier contributions remain visible.
+ *
  * @param history - HistoryEntry array from mask history
  * @param upToIndex - Max index to composite (inclusive)
  * @returns Composited ImageData or null if no valid history
@@ -78,19 +92,33 @@ export function getSimpleComposite(history: HistoryEntry[], upToIndex: number): 
 
   // Clamp to valid range
   const maxIndex = Math.min(upToIndex, history.length - 1);
-  
-  // Start with empty (all zeros)
+
+  const targetEntry = history[maxIndex];
+
+  // modifier_brush snapshots already encode the correct cumulative state (including
+  // subtract/erase). Return a copy directly — no compositing needed or wanted.
+  if (targetEntry.type === 'modifier_brush') {
+    loggers.masks(`[getSimpleComposite] modifier_brush at index=${maxIndex}, using snapshot directly`);
+    return new ImageData(
+      new Uint8ClampedArray(targetEntry.imageData.data),
+      targetEntry.imageData.width,
+      targetEntry.imageData.height,
+    );
+  }
+
+  // sam entry: OR all entries from 0 to maxIndex so all SAM predictions and any
+  // pre-SAM brush work remain visible.
+  loggers.masks(`[getSimpleComposite] sam at index=${maxIndex}, OR-compositing ${maxIndex + 1} entries`);
   const firstEntry = history[0];
   const compositeData = new Uint8ClampedArray(firstEntry.imageData.data.length);
-  
-  // OR all entries from 0 to maxIndex (inclusive)
+
   for (let i = 0; i <= maxIndex && i < history.length; i++) {
     const hEntry = history[i];
     for (let j = 0; j < hEntry.imageData.data.length; j++) {
       compositeData[j] = compositeData[j] | hEntry.imageData.data[j];
     }
   }
-  
+
   return new ImageData(compositeData, firstEntry.imageData.width, firstEntry.imageData.height);
 }
 
