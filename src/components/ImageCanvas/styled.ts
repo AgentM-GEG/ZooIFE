@@ -19,6 +19,24 @@ export const fadeOut = keyframes`
   }
 `;
 
+export const spin = keyframes`
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+`;
+
+export const placeholderBackdropFadeOut = keyframes`
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+`;
+
 export const Container = styled.div`
   background: ${theme.colors.secondary};
   border-radius: ${theme.borders.radius.lg};
@@ -155,10 +173,41 @@ export const Placeholder = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  overflow: hidden;
   background: ${theme.colors.background.surface};
   border-radius: ${theme.borders.radius.lg};
   color: ${theme.colors.text.secondary};
   font-size: ${theme.typography.size.base};
+`;
+
+export const PlaceholderBackdropImage = styled.img`
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: ${placeholderBackdropFadeOut} 220ms ease-out forwards;
+`;
+
+export const PlaceholderContent = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+  position: relative;
+  z-index: 1;
+  padding: 8px 12px;
+  border-radius: ${theme.borders.radius.base};
+  background: rgba(255, 255, 255, 0.82);
+`;
+
+export const LoadingSpinner = styled.span`
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid ${theme.colors.border};
+  border-top-color: ${theme.colors.primary};
+  animation: ${spin} 0.9s linear infinite;
 `;
 
 export const DebugBanner = styled.div`

@@ -1,7 +1,8 @@
 import { useClassificationStore } from '@/stores/classificationStore';
-import { PROJECT_ID, WORKFLOW_ID } from '@/services/panoptesService';
+import { createClassification, PROJECT_ID, WORKFLOW_ID } from '@/services/panoptesService';
 import { Sidebar, SubmitButton, DebugDownloadButton } from './styled';
 import { loggers } from '@/utils/logger';
+import { getToken } from '@/auth/tokenStore';
 
 /**
  * Task sidebar component for displaying and answering Zooniverse workflow tasks.
@@ -17,8 +18,15 @@ export function TaskSidebar() {
   const isDebugMode = import.meta.env.VITE_SHOW_DEBUG_UI === 'true' || import.meta.env.VITE_SHOW_DEBUG_UI === true;
 
   const handleSubmit = async () => {
-    const annotations = await buildPanoptesClassification(PROJECT_ID, WORKFLOW_ID);
-    loggers.app('Classifications (Panoptes format):', annotations);
+    const classification = await buildPanoptesClassification(PROJECT_ID, WORKFLOW_ID);
+    loggers.app('Classifications (Panoptes format):', classification);
+    const token = getToken();
+    if(token){
+      loggers.panoptes(JSON.stringify(classification), token.access_token);
+      const panoptes_response = await createClassification(classification, token.access_token);
+      loggers.panoptes("Submission response:", panoptes_response);
+      // TODO: Next subject? 
+    }
   };
 
   const handleDebugDownload = async () => {

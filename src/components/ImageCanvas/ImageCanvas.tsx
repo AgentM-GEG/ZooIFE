@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Stage, Layer, Group, Image, Line } from 'react-konva';
 import type { KonvaEventObject } from "konva/lib/Node"
 import { useClassificationStore } from '@/stores/classificationStore';
@@ -31,6 +31,9 @@ import {
   DebugBanner,
   DismissButton,
   Placeholder,
+  PlaceholderBackdropImage,
+  PlaceholderContent,
+  LoadingSpinner,
 } from './styled';
 import { useCanvasState } from './useCanvasState';
 import { useCanvasHandlers } from './useCanvasHandlers';
@@ -138,7 +141,11 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const [isHoveringOverUserRect, setIsHoveringOverUserRect] = useState(false);
   const [isToolHelpCollapsed, setIsToolHelpCollapsed] = useState(false);
   const [isHoveringToolHelpToggle, setIsHoveringToolHelpToggle] = useState(false);
+  const [lastImageUrl, setLastImageUrl] = useState<string | null>(null);
+  const [baseImageOpacity, setBaseImageOpacity] = useState(1);
   const shouldShowToolHelp = tool === 'point' || tool === 'modifier_brush';
+  const hadImagePreviouslyRef = useRef(false);
+  const fadeInFrameRef = useRef<number | null>(null);
 
   // Get current annotation ID for editing
   const currentAnnotationId = activeAnnotationId || '-1';
@@ -168,6 +175,13 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     };
     imageElement.src = compositeExcludingActiveMask;
   }, [compositeExcludingActiveMask]);
+
+  useEffect(() => {
+    if (imageUrl) {
+      hadImagePreviouslyRef.current = true;
+      setLastImageUrl(imageUrl);
+    }
+  }, [imageUrl]);
 
   // Convert composite excluding active mask data URI to HTMLImageElement for Konva rendering
   useEffect(() => {
@@ -211,6 +225,41 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
     maskImage,
     debugImage,
   } = canvasState;
+
+  useEffect(() => {
+    if (!image) {
+      return;
+    }
+
+    if (fadeInFrameRef.current !== null) {
+      cancelAnimationFrame(fadeInFrameRef.current);
+    }
+
+    const durationMs = 220;
+    const start = performance.now();
+    setBaseImageOpacity(0);
+
+    const animate = (now: number) => {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / durationMs, 1);
+      setBaseImageOpacity(progress);
+
+      if (progress < 1) {
+        fadeInFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        fadeInFrameRef.current = null;
+      }
+    };
+
+    fadeInFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (fadeInFrameRef.current !== null) {
+        cancelAnimationFrame(fadeInFrameRef.current);
+        fadeInFrameRef.current = null;
+      }
+    };
+  }, [image]);
 
   // ============ EXTRACTED HANDLERS ============
   const handlers = useCanvasHandlers({
@@ -827,10 +876,20 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
 
   // Early return if no image URL - but AFTER all hooks have been called
   if (!imageUrl) {
-    const placeholderText = token ? "Click 'Next subject' to start classifying" : "Log in to get started";
+    const showLoadingSpinner = Boolean(token) && hadImagePreviouslyRef.current;
     return (
       <Placeholder>
-        {placeholderText}
+        {showLoadingSpinner && lastImageUrl && (
+          <PlaceholderBackdropImage src={lastImageUrl} alt="" aria-hidden="true" />
+        )}
+        {showLoadingSpinner ? (
+          <PlaceholderContent>
+            <LoadingSpinner aria-hidden="true" />
+            <span>Loading...</span>
+          </PlaceholderContent>
+        ) : (
+          token ? "Click 'Next subject' to start classifying" : "Log in to get started"
+        )}
       </Placeholder>
     );
   }
@@ -934,6 +993,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
                         image={image}
                         width={image?.naturalWidth ?? 0}
                         height={image?.naturalHeight ?? 0}
+                        opacity={baseImageOpacity}
                         listening={isPanMode}
                       />
                     )}

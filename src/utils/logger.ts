@@ -79,4 +79,5 @@ export const loggers = {
   masks: createLogger('app:masks'),
   annotationRenderer: createLogger('app:annotationRenderer'),
   history: createLogger('app:history'),
+  panoptes: createLogger('app:panoptes')
 };

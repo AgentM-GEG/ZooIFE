@@ -3,6 +3,8 @@
  * Eliminates repetitive fetch/error handling boilerplate.
  */
 
+import { loggers } from "@/utils/logger";
+
 /**
  * API call options
  */
@@ -32,8 +34,13 @@ export async function apiCall<T>(
   const { token, method = 'GET', body } = options;
 
   const headers: HeadersInit = {
+    // keep server-side response negotiation/versioning
     Accept: 'application/vnd.api+json; version=1',
-    'Content-Type': 'application/vnd.api+json; version=1',
+
+    // ensure Rails parses the request body into params
+    'Content-Type': method === 'GET' || method === 'HEAD'
+      ? 'application/vnd.api+json; version=1'   // doesn’t matter much for GET, but ok
+      : 'application/json',                     // or 'application/vnd.api+json'
   };
 
   if (token) {

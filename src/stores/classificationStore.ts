@@ -6,7 +6,6 @@ import { compressSegmentationMask } from '@/utils/image/compressImageMask';
 import { getSimpleComposite } from '@/utils/image/maskCompositing';
 import { PROJECT_ID, WORKFLOW_ID } from '@/services/panoptesService';
 import { loggers } from '@/utils/logger';
-import { APP_VERSION } from '@/utils/version';
 
 /**
  * Single entry in mask history - tracks origin (SAM or brush stroke)
@@ -422,13 +421,11 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
 
   setSubject: (id, imageUrl, dimensions) =>
     set({
+      ...createInitialState(),
       subjectId: id,
       imageUrl,
       imageDimensions: dimensions ?? null,
       startedAt: new Date().toISOString(),
-      debugImageUrl: null,
-      debugMasks: null,
-      maskSelectionInfo: null,
     }),
 
   /**
@@ -1077,8 +1074,7 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
       started_at: startedAt,
       finished_at: new Date().toISOString(),
       user_language: navigator.language,
-      workflow_version: '1.0',
-      classifier_version: APP_VERSION,
+      workflow_version: '1.1',
     };
 
     const classification: Classification = {

@@ -173,7 +173,6 @@ export interface ClassificationMetadata {
   user_agent: string;
   user_language: string;
   workflow_version: string;
-  classifier_version: string;
 }
 
 /**

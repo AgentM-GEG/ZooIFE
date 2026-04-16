@@ -21,6 +21,7 @@ export function useSubjectLoader(accessToken: string | undefined, onSubjectProce
   const [queueSize, setQueueSize] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const setSubject = useClassificationStore((s) => s.setSubject);
+  const resetClassification = useClassificationStore((s) => s.reset);
   
   // Store the subjects queue in a ref (doesn't trigger re-renders when it changes)
   const subjectsQueueRef = useRef<Subject[] | null>(null);
@@ -67,6 +68,9 @@ export function useSubjectLoader(accessToken: string | undefined, onSubjectProce
 
     setIsLoading(true);
     try {
+      // Immediately clear previous subject state so stale masks/SAM points disappear.
+      resetClassification();
+
       // If no subjects loaded yet, fetch them FIRST
       if (!hasInitializedRef.current || !subjectsQueueRef.current || subjectsQueueRef.current.length === 0) {
         try {
@@ -98,7 +102,7 @@ export function useSubjectLoader(accessToken: string | undefined, onSubjectProce
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, isLoading, processSubject]);
+  }, [accessToken, isLoading, processSubject, resetClassification]);
 
   return {
     queueSize,
