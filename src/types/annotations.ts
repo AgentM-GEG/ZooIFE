@@ -20,6 +20,17 @@
 export type AnnotationTool = 'point' | 'freehand' | 'brush' | 'sam2' | 'modifier_brush';
 
 /**
+ * Tool specification for Caesar annotations (from workflow)
+ * Includes type, appearance, and metadata about how to render a tool's results.
+ */
+export interface MarkTool {
+  type: "rectangle" | "default";
+  color?: string;     // Hex color for rendering (e.g., "#FF0000")
+  label?: string;     // Display label for the tool
+  [key: string]: unknown;  // Arbitrary additional fields from workflow
+}
+
+/**
  * Single point annotation with foreground/background label for SAM2 prompts
  * 
  * @example
@@ -169,6 +180,7 @@ export type CaesarAnnotation = {
       width: number;
       height: number;
       markId: string;
+  previousAnnotationCount?: number;
       [key: string]: unknown;
     }
   | {

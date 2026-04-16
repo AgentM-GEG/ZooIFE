@@ -1,5 +1,4 @@
 import type { Subject } from '@/types/panoptes';
-import type { CaesarAnnotation } from '@/types/annotations';
 
 /**
  * Options for subject loading and Caesar reduction fetching

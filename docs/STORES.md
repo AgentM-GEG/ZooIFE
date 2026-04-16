@@ -259,7 +259,7 @@ export interface UserRectState extends AnnotationRect {
 }
 ```
 
-User-drawn bounding rectangles that supplement the Caesar ML predictions. IDs are negative integers (e.g., `'-2'`, `'-3'`) to avoid collisions with Caesar rect IDs. `markStroke` is set to `'dashed'` on creation for export compatibility, but the actual rendered stroke style in `UserRectsOverlay` is determined by comparing `historyIndex` vs `lastSavedHistoryIndex` in `perAnnotationMasks`.
+User-drawn bounding rectangles that supplement the Caesar ML predictions. IDs are negative integers (e.g., `'-2'`, `'-3'`) to avoid collisions with Caesar rect IDs. `markColour` is set to `'#44aaff'` (blue) on creation to distinguish user rects visually from Caesar ML boxes. `markStroke` is set to `'dashed'` on creation for export compatibility, but the actual rendered stroke style in `UserRectsOverlay` is determined by comparing `historyIndex` vs `lastSavedHistoryIndex` in `perAnnotationMasks`.
 
 #### Global / Debug Mask State
 
@@ -484,7 +484,7 @@ saveMask('annotation-uuid');
 
 **`addUserRect(rect: AnnotationRect): string`**
 
-Add a user-drawn bounding rectangle. Assigns a negative integer ID and sets `markStroke: 'dashed'` for export. Returns the new rect's ID.
+Add a user-drawn bounding rectangle. Assigns a negative integer ID, sets `markColour: '#44aaff'` (blue) for rendering, and sets `markStroke: 'dashed'` for export. Returns the new rect's ID.
 
 ```typescript
 const { addUserRect } = useClassificationStore();

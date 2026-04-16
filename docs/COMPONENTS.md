@@ -106,7 +106,10 @@ Custom React hook managing the subject queue and image loading pipeline.
     - Useful for triggering Caesar annotation fetch
 - **Returns**: Object with:
   - `queueSize: number` — Remaining subjects in queue
-  - `loadNextSubject: () => Promise<void>` — Load next subject handler
+  - `isLoading: boolean` — Whether a subject is currently being loaded
+  - `loadNextSubject: (overrideSubjectId?: string) => Promise<void>` — Load subject handler
+    - When called with no argument (or empty string): dequeues next subject from Panoptes queue
+    - When called with a subject ID string: fetches that specific subject directly, bypassing the queue
 
 #### Internal State Management
 
@@ -123,22 +126,22 @@ const [queueSize, setQueueSize] = useState(0);
 
 **Why refs instead of state?** State updates trigger re-renders, which can change hook counts if dependencies vary. Refs store data without side effects.
 
-#### `loadNextSubject()` Implementation
+#### `loadNextSubject(overrideSubjectId?)` Implementation
 
 ```
-1. Check token available
-2. If queue empty or uninitialized:
-   a. Fetch subjects from Panoptes queue
-   b. Store in subjectsQueueRef
-   c. Set hasInitializedRef = true
-3. Dequeue first subject
-4. Update remaining subjects count (state)
-5. Call processSubject(subject)
-   a. Load image as data URL
-   b. Normalize image
-   c. Get dimensions
-   d. Store in classification store
-   e. Call onSubjectProcessedRef.current(subjectId)
+1. Check token available and not already loading
+2. If overrideSubjectId provided (trimmed, non-empty):
+   a. Fetch specific subject via getSubject(id, token, staging)
+   b. If not found, log and return
+   c. Call processSubject(subject) and return
+3. Otherwise (queue path):
+   a. If queue empty or uninitialized:
+      i. Fetch subjects from Panoptes queue
+      ii. Store in subjectsQueueRef
+      iii. Set hasInitializedRef = true
+   b. Dequeue first subject
+   c. Update remaining subjects count (state)
+   d. Call processSubject(subject)
 ```
 
 #### Error Handling
@@ -167,33 +170,44 @@ Custom React hook for fetching and processing Caesar ML reductions.
 
 ```typescript
 async processCaesarReductions(subjectId) {
-  1. fetchCaesarReductions(caesarClient, 'machineLearnt', subjectId, workflowId)
-  2. getWorkflow(workflowId, accessToken, staging?)
-  3. parseReductions(reductions, workflow)
+  1. fetchTypedCaesarReductions<CaesarBBoxCountReductionData>(
+       caesarClient, 'bbox_per_rect_counter', subjectId, workflowId
+     )
+  2. parseBBoxReductionCounts(bbox_reductions)
+     - Returns Record<string, number> keyed by Caesar bbox ID
+     - Each value = number of volunteer annotations already recorded for that box
+  3. fetchTypedCaesarReductions<CaesarMachineLearntReductionData>(
+       caesarClient, 'machineLearnt', subjectId, workflowId
+     )
+  4. getWorkflow(workflowId, accessToken, staging?)
+  5. parseMLReductions(ml_reductions, workflow, bboxReductionCounts)
      - Maps rectangle data to CaesarAnnotation objects
      - Extracts tool color/label from workflow definition
-  4. Store annotations in caesarReductionStore
+     - Attaches previousAnnotationCount from bboxReductionCounts per markId
+  6. Store annotations in caesarReductionStore
 }
 ```
 
-#### Parsing Logic
+#### BBox Reduction Parsing
 
-Caesar API returns nested arrays. `parseReductions` flattens and standardizes:
+`parseBBoxReductionCounts` converts the raw `bbox_per_rect_counter` reduction payload into a `Record<string, number>` dictionary keyed by Caesar bbox ID:
 
 ```typescript
-// Input (nested):
-reductions = [
-  { data: [{ data: [rect1, rect2] }] },
-  { data: [{ data: [rect3] }] },
-]
+// Input payload structure:
+{
+  "subject_reductions": [{
+    "data": {
+      "bbox_keys": ["1000", "1001", "1002"],
+      "bbox_num_masks": [2, 0, 5]
+    }
+  }]
+}
 
-// Output (flattened):
-annotations = [
-  { toolType: 'rectangle', x_center: ..., width: ..., markColour: 'red', markLabel: 'species' },
-  { toolType: 'rectangle', ... },
-  ...
-]
+// Output:
+{ "1000": 2, "1001": 0, "1002": 5 }
 ```
+
+This dictionary is passed to `parseMLReductions`, which attaches the count as `previousAnnotationCount` on each `CaesarAnnotation` rectangle.
 
 #### Ref-Based Dependencies
 
@@ -273,11 +287,17 @@ annotations.map((annotation) => (
 - **Behavior**:
   - Calculates rectangle geometry (x, y, width, height from center-based Caesar format)
   - Determines selection state: `isSelected = selectedId === annotation.markId`
-  - Creates tooltip handlers via `useCaesarAnnotationTooltip(setToolTip, toolCursor, markLabel, isSelected)`
+  - Determines `hasPreviousAnnotations = previousAnnotationCount > 0`
+  - Creates tooltip handlers via `useCaesarAnnotationTooltip(setToolTip, toolCursor, tooltipLabel, isSelected)`
+    - `tooltipLabel` includes ` (N previous annotations)` suffix only when `previousAnnotationCount > 0`
   - Renders Konva Rect with:
-    - Stroke color from Caesar data
+    - **Stroke color**: `#ff4444` (red) when `hasPreviousAnnotations`, otherwise `annotation.markColour`
+    - **Stroke pattern**: `dash={[6, 3]}` when `hasPreviousAnnotations`, solid otherwise
     - Thicker border when selected (`SELECTED_STROKE_MULTIPLIER`)
     - Mouse/click handlers that update tooltip and selection state
+  - **Visual differentiation**:
+    - Boxes with prior volunteer annotations: red dashed stroke, tooltip shows count
+    - Boxes with no prior annotations: original stroke colour, tooltip shows plain label
   - **Cursor behavior**:
     - Unselected rect: Shows magnifying glass with **+** (zoom in)
     - Selected rect: Shows magnifying glass with **−** (zoom out)
@@ -684,21 +704,30 @@ The "Modifier mode:" and "Modifier size:" row labels share a common `minWidth: 1
 
 ### Clear SAM Points Button
 
-The Clear SAM Points button is only shown when the active rect actually has SAM point annotations:
+The Clear SAM Points button is **always rendered** in the palette. It is enabled only when the active rect has SAM point annotations, and disabled (greyed out) otherwise:
 
 ```typescript
 const hasSamPointsForActiveRect = annotations.some(
   (a) => a.type === 'point' && a.annotationId === activeRectId
 );
 // ...
-{hasSamPointsForActiveRect && (
-  <ClearButton onClick={() => clearSamPoints(activeRectId)}>
-    Clear SAM points
-  </ClearButton>
-)}
+<ClearButton
+  onClick={() => clearSamPoints(activeRectId)}
+  disabled={!hasSamPointsForActiveRect}
+>
+  Clear SAM points
+</ClearButton>
 ```
 
+Rendering the button unconditionally (rather than with `{hasSamPointsForActiveRect && ...}`) prevents layout jitter when SAM points are added or removed — the button always occupies its space.
+
+The `:hover` style on `ClearButton` is guarded with `:not(:disabled)` so the red fill does not appear on hover while the button is disabled.
+
 `clearSamPoints` is rect-scoped — it only removes `type: 'point'` annotations whose `annotationId` matches the given rect. This ensures clicking the button never affects SAM points belonging to other rects.
+
+**When the button becomes active:**
+- You have placed at least one SAM point while annotating a new object (no bounding box selected)
+- You have selected a bounding box that already has SAM points associated with it
 
 ---
 
@@ -707,6 +736,14 @@ const hasSamPointsForActiveRect = annotations.some(
 Located in `src/components/UserRectsOverlay/UserRectsOverlay.tsx`.
 
 Renders user-drawn bounding rectangles as a react-konva layer on top of the image canvas.
+
+### Stroke Colour
+
+User-defined rectangles render with a **blue** stroke (`#44aaff`) to distinguish them visually from:
+- Caesar ML annotation boxes (which use their workflow-defined `markColour`, typically orange/yellow)
+- Caesar boxes with previous volunteer annotations (which render in red `#ff4444` with a dashed line)
+
+The colour is set in `classificationStore.addUserRect()` on creation.
 
 ### Dashed Stroke — Unsaved Changes Indicator
 

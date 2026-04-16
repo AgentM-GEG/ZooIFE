@@ -15,6 +15,7 @@ This document explains each type, usage patterns, and the rationale for where ty
 
 1. [Centralized Types](#centralized-types)
    - [annotations.ts](#annotationsts)
+   - [caesar.ts](#caesarts)
    - [panoptes.ts](#panoptests)
    - [tools.ts](#toolsts)
 2. [Component-Local Types](#component-local-types)
@@ -155,6 +156,7 @@ export type CaesarAnnotation = {
   width: number;
   height: number;
   markId: string;
+  previousAnnotationCount?: number; // Volunteer annotations already recorded for this box
   [key: string]: unknown;
 } | {
   toolType: "custom";
@@ -171,6 +173,7 @@ export type CaesarAnnotation = {
 - `x_center`, `y_center` — Center coordinates in image space
 - `width`, `height` — Bounding box dimensions
 - `markId` — Unique identifier from Caesar
+- `previousAnnotationCount` — Number of volunteer annotations already recorded for this box (from `bbox_per_rect_counter` reduction); used to visually distinguish boxes that have prior volunteer attention
 - Additional fields via `[key: string]` for extensibility
 
 **Example**:
@@ -199,17 +202,75 @@ return (
 
 ---
 
-**`CaesarAnnotations`** — API response wrapper
+### caesar.ts
+
+Located in `src/types/caesar.ts`. Dedicated module for **Caesar API wire-format transport types** — the raw shapes returned by the Caesar GraphQL API before they are parsed into app-level `CaesarAnnotation` objects. These are separated from `annotations.ts` so the service layer can be typed without pulling in app-domain imports.
+
+#### BBox Count Reduction Types
+
+Used for the `bbox_per_rect_counter` reducer, which records how many volunteer annotations have already been placed on each bounding box.
 
 ```typescript
-export type CaesarAnnotations = {
-  data: CaesarAnnotation[];
-};
+/** Payload inside a single bbox count reduction envelope */
+export interface CaesarBBoxCountPayload {
+  bbox_keys?: string[];                       // Caesar bounding box IDs
+  bbox_num_masks?: Array<number | string>;    // Count of volunteer masks per box
+  aggregation_version?: string;
+  [key: string]: unknown;
+}
+
+/** Container wrapping a CaesarBBoxCountPayload */
+export interface CaesarBBoxCountEnvelope {
+  data?: CaesarBBoxCountPayload;
+  [key: string]: unknown;
+}
+
+/** Union of all shapes the bbox count reducer may return */
+export type CaesarBBoxCountReductionData = CaesarBBoxCountPayload | CaesarBBoxCountEnvelope[];
 ```
 
-**Used in**: caesarService.ts (1 file)
+#### Machine Learnt Reduction Types
 
-**Purpose**: Matches Caesar API response structure.
+Used for the `machineLearnt` reducer, which returns ML-generated bounding box marks.
+
+```typescript
+/** A single ML-generated mark inside an envelope */
+export interface CaesarMachineLearntMark {
+  taskIndex?: number;
+  toolIndex?: number;
+  x_center?: number;
+  y_center?: number;
+  width?: number;
+  height?: number;
+  markId?: string | number;
+  [key: string]: unknown;
+}
+
+/** Container wrapping an array of ML marks */
+export interface CaesarMachineLearntEnvelope {
+  data?: CaesarMachineLearntMark[];
+  [key: string]: unknown;
+}
+
+/** Union of all shapes the machineLearnt reducer may return */
+export type CaesarMachineLearntReductionData = CaesarMachineLearntEnvelope | CaesarMachineLearntEnvelope[];
+```
+
+#### Generic Reduction Wrapper
+
+```typescript
+/** Generic subject reduction — data shape is parameterised */
+export interface SubjectReduction<TData = unknown> {
+  data: TData;
+}
+
+/** Convenience alias for untyped / unknown reductions */
+export type GenericSubjectReduction = SubjectReduction<unknown>;
+```
+
+**Used in**: `caesarService.ts`, `useCaesarReductions.ts`
+
+**Purpose**: Provides strict typing for the raw Caesar GraphQL response without leaking API wire-format details into app-domain code.
 
 ---
 
@@ -476,7 +537,8 @@ Use this decision tree to determine where to define a new type:
 Is this type used by multiple files/components?
 ├─ YES → Centralized (src/types/)
 │    └─ Is it domain-specific (annotations, API, tools)?
-│         ├─ Annotations → src/types/annotations.ts
+│         ├─ Annotations (app domain) → src/types/annotations.ts
+│         ├─ Caesar wire-format / transport → src/types/caesar.ts
 │         ├─ Panoptes API → src/types/panoptes.ts
 │         └─ Tools/UI → src/types/tools.ts
 │
@@ -488,7 +550,10 @@ Is this type used by multiple files/components?
 
 | Location | Count | Examples | Strategy |
 |----------|-------|----------|----------|
-| `src/types/` | 12 types | AnnotationTool, DrawingAnnotation, CaesarAnnotation, Subject, Classification, BrushMode, BrushEditableImageHandle | **Keep** — shared across multiple components, cross-cutting concerns |
+| `src/types/annotations.ts` | 8 types | AnnotationTool, DrawingAnnotation, CaesarAnnotation, UserAnnotation, MarkTool | **Keep** — app-domain annotation types used across components and stores |
+| `src/types/caesar.ts` | 7 types | SubjectReduction, GenericSubjectReduction, CaesarBBoxCountPayload, CaesarMachineLearntMark | **Keep** — Caesar API transport types; isolated from app-domain code |
+| `src/types/panoptes.ts` | 5 types | Subject, Workflow, Classification, WorkflowTask | **Keep** — Panoptes REST API types |
+| `src/types/tools.ts` | 2 types | BrushMode, BrushEditableImageHandle | **Keep** — cross-cutting UI infrastructure |
 | Component local | 8 files | ToolPaletteProps, ImageCanvasProps, LoginProps, BrushEditableImageProps | **Keep** — component-specific props and configs |
 
 ### Future Refactoring Opportunities

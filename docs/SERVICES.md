@@ -61,6 +61,15 @@ Environment variables control API endpoints:
 
 ### Key Functions
 
+#### `getSubject(subjectId, token?, staging?)`
+- **Purpose**: Fetch a specific subject by ID (used by the debug subject override UI)
+- **Parameters**:
+  - `subjectId`: Zooniverse subject ID
+  - `token`: Optional OAuth bearer token
+  - `staging`: Use staging API (default: `false`)
+- **Returns**: `Subject | undefined` (undefined if not found)
+- **Use case**: Powers the debug override in `ZooniverseImageLoader` when `VITE_SHOW_DEBUG_UI` is enabled
+
 #### `getQueuedSubjects(workflowId, token?, options?)`
 - **Purpose**: Fetch next available subjects from the queue
 - **Parameters**:
@@ -137,32 +146,48 @@ Note: Caesar uses staging/production parallel to Panoptes, controlled by `VITE_Z
 - **Note**: Should be memoized in React using `useCaesarClient` hook
 
 #### `fetchCaesarReductions(caesarClient, reducerKey, subjectId, workflowId)`
-- **Purpose**: Fetch ML annotations for a subject
+- **Purpose**: Convenience wrapper — fetch reductions with unknown payload shape
 - **Parameters**:
-  - `reducerKey`: Reduction type (typically `"machineLearnt"`)
+  - `reducerKey`: Reduction type (e.g., `"machineLearnt"`, `"bbox_per_rect_counter"`)
   - `subjectId`: Zooniverse subject ID
   - `workflowId`: Zooniverse workflow ID
-- **Returns**: Array of SubjectReduction objects
+- **Returns**: `Promise<GenericSubjectReduction[]>` (untyped `data: unknown`)
 - **Error Handling**: Returns empty array on failure; logs errors for debugging
+- **When to use**: Call sites that do not need to inspect `data` shape
+
+#### `fetchTypedCaesarReductions<TData>(caesarClient, reducerKey, subjectId, workflowId)`
+- **Purpose**: Typed variant of `fetchCaesarReductions`
+- **Type parameter**: `TData` — the expected payload shape (e.g., `CaesarBBoxCountReductionData`)
+- **Returns**: `Promise<SubjectReduction<TData>[]>`
+- **When to use**: Call sites that need to narrow and inspect `data` fields; avoids `as unknown` casts
+
+```typescript
+// Untyped convenience wrapper
+const raw = await fetchCaesarReductions(client, 'machineLearnt', subjectId, workflowId);
+
+// Typed — used in useCaesarReductions.ts
+const bboxReductions = await fetchTypedCaesarReductions<CaesarBBoxCountReductionData>(
+  client, 'bbox_per_rect_counter', subjectId, workflowId
+);
+const mlReductions = await fetchTypedCaesarReductions<CaesarMachineLearntReductionData>(
+  client, 'machineLearnt', subjectId, workflowId
+);
+```
 
 ### Types
+
+All Caesar transport types live in `src/types/caesar.ts` (see [TYPES.md](./TYPES.md#caesarts)).
+The service imports only `GenericSubjectReduction` and `SubjectReduction<TData>` from that file.
+
+The `CaesarWorkflowResponse<TData>` internal interface remains in `caesarService.ts` (unexported — it is a GraphQL implementation detail).
 
 #### `CaesarReductionOptions`
 ```typescript
 type CaesarReductionOptions = {
   staging: boolean;
-  defaultToolType: "rectangle" | "default";
+  defaultToolSpec: MarkTool;  // Fallback tool spec when workflow tasks are missing
 };
 ```
-
-#### `SubjectReduction`
-```typescript
-interface SubjectReduction {
-  data: CaesarAnnotations[];
-}
-```
-
-Nested array structure (may contain arrays within arrays) is flattened by `useCaesarReductions` hook.
 
 ## imageService.ts
 

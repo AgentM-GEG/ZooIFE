@@ -164,11 +164,12 @@ export function ToolPalette({
         </FlexContainer>
       </HiddenBrushSizeContainer>
 
-      {hasSamPointsForActiveRect && (
-        <ClearButton onClick={() => clearSamPoints(activeRectId)}>
-          Clear SAM points
-        </ClearButton>
-      )}
+      <ClearButton
+        onClick={() => clearSamPoints(activeRectId)}
+        disabled={!hasSamPointsForActiveRect}
+      >
+        Clear SAM points
+      </ClearButton>
 
       <Label style={{ marginTop: theme.spacing.md }}>Model</Label>
       <Select

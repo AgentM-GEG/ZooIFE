@@ -3,8 +3,6 @@
  * Eliminates repetitive fetch/error handling boilerplate.
  */
 
-import { loggers } from "@/utils/logger";
-
 /**
  * API call options
  */

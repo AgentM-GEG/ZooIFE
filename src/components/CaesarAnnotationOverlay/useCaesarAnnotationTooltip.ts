@@ -34,10 +34,9 @@ export function useCaesarAnnotationTooltip(
 
       if (stage && container) {
         const pointer = stage.getPointerPosition();
-        const rect = container.getBoundingClientRect();
 
         if (pointer) {
-          const { x, y } = getTooltipPosition(pointer.x, pointer.y, rect);
+          const { x, y } = getTooltipPosition(pointer.x, pointer.y);
           const tooltipText = isSelected ? 'Deselect this box' : markLabel;
           setToolTip({
             visible: true,
@@ -46,9 +45,7 @@ export function useCaesarAnnotationTooltip(
             text: tooltipText,
           });
         }
-      }
 
-      if (container) {
         container.style.cursor = getAnnotationCursor(isSelected);
       }
     },
@@ -67,10 +64,9 @@ export function useCaesarAnnotationTooltip(
 
       if (stage && container) {
         const pointer = stage.getPointerPosition();
-        const rect = container.getBoundingClientRect();
 
         if (pointer) {
-          const { x, y } = getTooltipPosition(pointer.x, pointer.y, rect);
+          const { x, y } = getTooltipPosition(pointer.x, pointer.y);
           const tooltipText = isSelected ? 'Deselect this box' : markLabel;
           setToolTip((t) => ({
             ...t,

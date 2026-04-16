@@ -26,7 +26,8 @@ import { TOKEN_REFRESH } from '../constants';
 import type { TokenSet } from '../tokenStore';
 
 // Mock fetch globally
-global.fetch = vi.fn();
+const fetchMock = vi.fn();
+globalThis.fetch = fetchMock as unknown as typeof fetch;
 
 // Mock console methods to avoid noise in test output
 const originalConsoleLog = console.log;
@@ -42,7 +43,7 @@ beforeEach(() => {
 afterEach(() => {
   console.log = originalConsoleLog;
   console.error = originalConsoleError;
-  (global.fetch as any).mockClear();
+  fetchMock.mockClear();
   vi.runOnlyPendingTimers();
   vi.useRealTimers();
 });
@@ -50,14 +51,12 @@ afterEach(() => {
 const mockTokenSet: TokenSet = {
   access_token: 'mock_access_token',
   refresh_token: 'mock_refresh_token',
-  token_type: 'Bearer',
   expires_in: 3600,
 };
 
 const mockRefreshedTokenSet: TokenSet = {
   access_token: 'new_access_token',
   refresh_token: 'new_refresh_token',
-  token_type: 'Bearer',
   expires_in: 3600,
 };
 
@@ -66,7 +65,7 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
     it('should successfully refresh token', async () => {
       const onTokenRefreshed = vi.fn();
       const mockResponse = { ok: true, json: () => Promise.resolve(mockRefreshedTokenSet) };
-      (global.fetch as any).mockResolvedValueOnce(mockResponse);
+      fetchMock.mockResolvedValueOnce(mockResponse);
 
       const { result } = renderHook(() =>
         useTokenRefresh(mockTokenSet, { onTokenRefreshed })
@@ -79,7 +78,7 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
 
       expect(refreshResult).toBe(true);
       expect(onTokenRefreshed).toHaveBeenCalledWith(mockRefreshedTokenSet);
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(fetchMock).toHaveBeenCalledWith(
         'http://localhost:8080/oauth/refresh',
         expect.objectContaining({
           method: 'POST',
@@ -94,7 +93,7 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
       const mockError = new Error('Network error');
 
       // First two calls fail, third succeeds
-      (global.fetch as any)
+      fetchMock
         .mockRejectedValueOnce(mockError)
         .mockRejectedValueOnce(mockError)
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockRefreshedTokenSet) });
@@ -117,7 +116,7 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
 
       expect(refreshResult).toBe(true);
       expect(onTokenRefreshed).toHaveBeenCalledWith(mockRefreshedTokenSet);
-      expect(global.fetch).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
     });
 
     it('should call onRefreshFailed after max retries exceeded', async () => {
@@ -126,7 +125,7 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
       const mockError = new Error('Network error');
 
       // All calls fail
-      (global.fetch as any).mockRejectedValue(mockError);
+      fetchMock.mockRejectedValue(mockError);
 
       const { result } = renderHook(() =>
         useTokenRefresh(mockTokenSet, { onTokenRefreshed, onRefreshFailed })
@@ -145,7 +144,7 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
       expect(refreshResult).toBe(false);
       expect(onRefreshFailed).toHaveBeenCalledTimes(1);
       expect(onTokenRefreshed).not.toHaveBeenCalled();
-      expect(global.fetch).toHaveBeenCalledTimes(TOKEN_REFRESH.MAX_RETRIES);
+      expect(fetchMock).toHaveBeenCalledTimes(TOKEN_REFRESH.MAX_RETRIES);
     });
 
     it('should not refresh if no refresh token available', async () => {
@@ -163,7 +162,7 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
 
       expect(refreshResult).toBe(false);
       expect(onRefreshFailed).toHaveBeenCalled();
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it('should prevent concurrent refresh attempts', async () => {
@@ -173,7 +172,7 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
         resolveFirstFetch = resolve;
       });
 
-      (global.fetch as any).mockReturnValueOnce(firstFetchPromise);
+      fetchMock.mockReturnValueOnce(firstFetchPromise);
 
       const { result } = renderHook(() =>
         useTokenRefresh(mockTokenSet, { onTokenRefreshed })
@@ -196,7 +195,7 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
 
       expect(firstResult).toBe(true);
       expect(secondResult).toBe(false); // Second call should be skipped
-      expect(global.fetch).toHaveBeenCalledTimes(1); // Only one fetch should occur
+      expect(fetchMock).toHaveBeenCalledTimes(1); // Only one fetch should occur
     });
 
     it('should handle refresh errors with non-ok response', async () => {
@@ -204,7 +203,7 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
       const onRefreshFailed = vi.fn();
 
       const mockResponse = { ok: false, status: 401 };
-      (global.fetch as any)
+      fetchMock
         .mockResolvedValueOnce(mockResponse)
         .mockResolvedValueOnce(mockResponse)
         .mockResolvedValueOnce(mockResponse);
@@ -233,7 +232,7 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
     it('should schedule refresh before token expiry', async () => {
       const onTokenRefreshed = vi.fn();
       const mockResponse = { ok: true, json: () => Promise.resolve(mockRefreshedTokenSet) };
-      (global.fetch as any).mockResolvedValueOnce(mockResponse);
+      fetchMock.mockResolvedValueOnce(mockResponse);
 
       const { result } = renderHook(() =>
         useTokenRefresh(mockTokenSet, { onTokenRefreshed })
@@ -256,14 +255,14 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      expect(global.fetch).toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalled();
       expect(onTokenRefreshed).toHaveBeenCalledWith(mockRefreshedTokenSet);
     });
 
     it('should refresh immediately if token expires soon', async () => {
       const onTokenRefreshed = vi.fn();
       const mockResponse = { ok: true, json: () => Promise.resolve(mockRefreshedTokenSet) };
-      (global.fetch as any).mockResolvedValueOnce(mockResponse);
+      fetchMock.mockResolvedValueOnce(mockResponse);
 
       const { result } = renderHook(() =>
         useTokenRefresh(mockTokenSet, { onTokenRefreshed })
@@ -276,20 +275,20 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      expect(global.fetch).toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalled();
       expect(onTokenRefreshed).toHaveBeenCalledWith(mockRefreshedTokenSet);
     });
 
     it('should clear previous timer when scheduling new refresh', async () => {
       const onTokenRefreshed = vi.fn();
       const mockResponse = { ok: true, json: () => Promise.resolve(mockRefreshedTokenSet) };
-      (global.fetch as any).mockResolvedValueOnce(mockResponse);
+      fetchMock.mockResolvedValueOnce(mockResponse);
 
       const { result } = renderHook(() =>
         useTokenRefresh(mockTokenSet, { onTokenRefreshed })
       );
 
-      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+      const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
 
       await act(async () => {
         result.current.scheduleRefresh(3600);
@@ -302,10 +301,10 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
 
   describe('cancelRefresh', () => {
     it('should cancel pending refresh', async () => {
-      (global.fetch as any).mockClear();
+      fetchMock.mockClear();
       const onTokenRefreshed = vi.fn();
       const mockResponse = { ok: true, json: () => Promise.resolve(mockRefreshedTokenSet) };
-      (global.fetch as any).mockResolvedValueOnce(mockResponse);
+      fetchMock.mockResolvedValueOnce(mockResponse);
 
       const { result } = renderHook(() =>
         useTokenRefresh(mockTokenSet, { onTokenRefreshed })
@@ -321,13 +320,13 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
       });
 
       // Fetch should not be called since we cancelled
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it('should cleanup on unmount', async () => {
       const onTokenRefreshed = vi.fn();
       const mockResponse = { ok: true, json: () => Promise.resolve(mockRefreshedTokenSet) };
-      (global.fetch as any).mockResolvedValueOnce(mockResponse);
+      fetchMock.mockResolvedValueOnce(mockResponse);
 
       const { result, unmount } = renderHook(() =>
         useTokenRefresh(mockTokenSet, { onTokenRefreshed })
@@ -344,31 +343,31 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
         vi.advanceTimersByTime(1000 * 3600);
       });
 
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 
   describe('edge cases', () => {
     it('should handle JSON parsing error gracefully', async () => {
-      (global.fetch as any).mockReset();
+      fetchMock.mockReset();
       const onTokenRefreshed = vi.fn();
       const onRefreshFailed = vi.fn();
 
       // Mock json parsing error - first attempt fails to parse JSON
-      (global.fetch as any).mockImplementationOnce(async () => ({
+      fetchMock.mockImplementationOnce(async () => ({
         ok: true,
         json: async () => {
           throw new Error('Invalid JSON');
         },
       }));
       // Retry attempts also fail
-      (global.fetch as any).mockImplementationOnce(async () => ({
+      fetchMock.mockImplementationOnce(async () => ({
         ok: true,
         json: async () => {
           throw new Error('Invalid JSON');
         },
       }));
-      (global.fetch as any).mockImplementationOnce(async () => ({
+      fetchMock.mockImplementationOnce(async () => ({
         ok: true,
         json: async () => {
           throw new Error('Invalid JSON');
@@ -389,23 +388,23 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
       // Should not succeed in getting token
       expect(onTokenRefreshed).not.toHaveBeenCalled();
       // Fetch should be attempted 3 times (1 initial + 2 retries)
-      expect(global.fetch).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
     });
 
     it('should handle network timeout', async () => {
-      (global.fetch as any).mockReset();
+      fetchMock.mockReset();
       const onTokenRefreshed = vi.fn();
       const onRefreshFailed = vi.fn();
 
       const timeoutError = new Error('Network timeout');
       // All attempts timeout
-      (global.fetch as any).mockImplementationOnce(async () => {
+      fetchMock.mockImplementationOnce(async () => {
         throw timeoutError;
       });
-      (global.fetch as any).mockImplementationOnce(async () => {
+      fetchMock.mockImplementationOnce(async () => {
         throw timeoutError;
       });
-      (global.fetch as any).mockImplementationOnce(async () => {
+      fetchMock.mockImplementationOnce(async () => {
         throw timeoutError;
       });
 
@@ -423,7 +422,7 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
       // Should not succeed
       expect(onTokenRefreshed).not.toHaveBeenCalled();
       // Fetch should be attempted 3 times
-      expect(global.fetch).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
     });
 
     it('should use correct exponential backoff delays', async () => {
@@ -431,7 +430,7 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
       const onRefreshFailed = vi.fn();
       const delayedError = new Error('Network error');
 
-      (global.fetch as any)
+      fetchMock
         .mockRejectedValueOnce(delayedError)
         .mockRejectedValueOnce(delayedError)
         .mockRejectedValueOnce(delayedError);
@@ -449,12 +448,12 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
         await promise;
       });
 
-      expect(global.fetch).toHaveBeenCalledTimes(TOKEN_REFRESH.MAX_RETRIES);
+      expect(fetchMock).toHaveBeenCalledTimes(TOKEN_REFRESH.MAX_RETRIES);
     });
 
     it('should use environment-configured base URL', async () => {
-      (global.fetch as any).mockReset();
-      (global.fetch as any).mockResolvedValueOnce({ 
+      fetchMock.mockReset();
+      fetchMock.mockResolvedValueOnce({ 
         ok: true, 
         json: async () => mockRefreshedTokenSet 
       });
@@ -468,8 +467,8 @@ describe('useTokenRefresh', { timeout: 30000 }, () => {
         await result.current.refreshToken();
       });
 
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-      const fetchCall = (global.fetch as any).mock.calls[0];
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const fetchCall = fetchMock.mock.calls[0];
       expect(fetchCall[0]).toMatch(/oauth\/refresh$/);
       expect(onTokenRefreshed).toHaveBeenCalled();
     });

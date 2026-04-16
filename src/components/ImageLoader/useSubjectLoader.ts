@@ -4,7 +4,7 @@ import {
   getImageDimensions,
   normalizeImageForDisplay,
 } from '@/services/imageService';
-import { getQueuedSubjects, WORKFLOW_ID, QUEUE_OPTS } from '@/services/panoptesService';
+import { getQueuedSubjects, getSubject, WORKFLOW_ID, QUEUE_OPTS } from '@/services/panoptesService';
 import { useClassificationStore } from '@/stores/classificationStore';
 import type { Subject } from '@/types/panoptes';
 import { loggers } from '@/utils/logger';
@@ -61,15 +61,34 @@ export function useSubjectLoader(accessToken: string | undefined, onSubjectProce
    * Load next subject from queue.
    * Fetches subjects on first call, then uses queued subjects from ref.
    * Automatically processes subject and updates queue ref.
+   * When a subject ID override is provided, loads that specific subject instead of dequeuing.
    * Prevents concurrent calls with loading state.
    */
-  const loadNextSubject = useCallback(async () => {
+  const loadNextSubject = useCallback(async (overrideSubjectId?: string) => {
     if (!accessToken || isLoading) return;
+
+    const trimmedOverrideSubjectId = overrideSubjectId?.trim();
 
     setIsLoading(true);
     try {
       // Immediately clear previous subject state so stale masks/SAM points disappear.
       resetClassification();
+
+      if (trimmedOverrideSubjectId) {
+        try {
+          const subject = await getSubject(trimmedOverrideSubjectId, accessToken, QUEUE_OPTS.staging);
+          if (!subject) {
+            loggers.app(`Subject ${trimmedOverrideSubjectId} was not found`);
+            return;
+          }
+
+          await processSubject(subject);
+          return;
+        } catch (error) {
+          loggers.app(`Failed to fetch subject ${trimmedOverrideSubjectId}:`, error);
+          return;
+        }
+      }
 
       // If no subjects loaded yet, fetch them FIRST
       if (!hasInitializedRef.current || !subjectsQueueRef.current || subjectsQueueRef.current.length === 0) {

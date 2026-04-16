@@ -47,6 +47,13 @@ function CaesarAnnotationRect({
   const rectRef = useRef(null);
   const prevOpacityRef = useRef<number | null>(null);
 
+  const previousAnnotationCount = annotation.previousAnnotationCount;
+  const hasPreviousAnnotations = typeof previousAnnotationCount === 'number' && previousAnnotationCount > 0;
+  const tooltipLabel =
+    hasPreviousAnnotations
+      ? `${annotation.markLabel ?? 'Box'} (${previousAnnotationCount} previous annotation${previousAnnotationCount === 1 ? '' : 's'})`
+      : (annotation.markLabel as string | undefined);
+
   const isSelected = selectedId === annotation.markId;
   const isHovered = hoveredRectId === annotation.markId;
   
@@ -95,7 +102,7 @@ function CaesarAnnotationRect({
   const tooltipHandlers = useCaesarAnnotationTooltip(
     setToolTip,
     toolCursor,
-    annotation.markLabel as string | undefined,
+    tooltipLabel,
     isSelected
   );
 
@@ -107,8 +114,10 @@ function CaesarAnnotationRect({
       y={geometry.y}
       width={geometry.width}
       height={geometry.height}
-      stroke={annotation.markColour as string}
+      stroke={hasPreviousAnnotations ? '#ff4444' : annotation.markColour as string}
       strokeWidth={isSelected ? strokeWidth * SELECTED_STROKE_MULTIPLIER : strokeWidth}
+      dash={hasPreviousAnnotations ? [6, 3] : undefined}
+      dashEnabled={hasPreviousAnnotations}
       listening={true}
       hitStrokeWidth={strokeWidth * ANNOTATION_HIT_STROKE_MULTIPLIER}
       fillEnabled={false}

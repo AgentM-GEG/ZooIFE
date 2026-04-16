@@ -875,7 +875,7 @@ export const useClassificationStore = create<ClassificationState>((set, get) => 
         [rectId]: {
           ...rect,
           markLabel: 'Volunteer-defined object',
-          markColour: '#FF0000',
+          markColour: '#008cff',
           markStroke: 'dashed',
         },
       },

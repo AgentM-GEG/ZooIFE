@@ -1143,6 +1143,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
 
                         <p>
                           Use the "Clear SAM points" button in the Tools panel to reset the point prompts for the currently selected bounding box.
+                          The button becomes active when you have added at least one SAM point — either while annotating a new object (with no bounding box selected), or after selecting a bounding box that already has SAM points associated with it.
                         </p>
 
                         <p>

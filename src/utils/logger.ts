@@ -52,13 +52,14 @@ export const createLogger = (namespace: string) => {
     }
     
     // Format the output with namespace and timestamp
-    const timestamp = new Date().toLocaleTimeString('en-US', { 
+    const now = new Date();
+    const baseTimestamp = now.toLocaleTimeString('en-US', { 
       hour12: false,
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-      fractionalSecondDigits: 3
     });
+    const timestamp = `${baseTimestamp}.${String(now.getMilliseconds()).padStart(3, '0')}`;
     
     console.log(`%c${namespace}%c [${timestamp}]`, 
       'color: #0099ff; font-weight: bold;',

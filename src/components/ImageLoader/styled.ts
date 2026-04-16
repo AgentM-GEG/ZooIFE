@@ -5,7 +5,16 @@ import { theme } from '@/theme/zooniverseTheme';
  * Inline block container for the image loader button.
  */
 export const Container = styled.div`
-  display: inline-block;
+  display: inline-flex;
+  flex-direction: column;
+  gap: ${theme.spacing.sm};
+`;
+
+export const ControlsRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+  flex-wrap: wrap;
 `;
 
 /**
@@ -40,4 +49,19 @@ export const Button = styled.button`
  */
 export const HiddenInput = styled.input`
   display: none;
+`;
+
+export const DebugInput = styled.input`
+  padding: ${theme.spacing.sm} ${theme.spacing.md};
+  background: ${theme.colors.secondary};
+  border: 1px solid ${theme.colors.primary};
+  border-radius: ${theme.borders.radius.base};
+  color: ${theme.colors.text.light};
+  font-family: ${theme.typography.fontFamily};
+  font-size: ${theme.typography.size.sm};
+  min-width: 12rem;
+
+  &::placeholder {
+    color: ${theme.colors.text.secondary};
+  }
 `;

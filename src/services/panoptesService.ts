@@ -78,6 +78,29 @@ export async function getQueuedSubjects(
 }
 
 /**
+ * Fetch a specific subject by ID from Panoptes.
+ * @param subjectId - Zooniverse subject ID
+ * @param token - Optional authentication token
+ * @param staging - Whether to use staging API instead of production
+ * @returns Promise resolving to the subject, or undefined if not found
+ */
+export async function getSubject(
+  subjectId: string,
+  token?: string,
+  staging = false
+): Promise<Subject | undefined> {
+  const base = staging ? STAGING_BASE : API_BASE;
+
+  const response = await apiCall<{ subjects: Subject[] }>(
+    base,
+    `/subjects/${subjectId}`,
+    { token }
+  );
+
+  return response.subjects?.[0];
+}
+
+/**
  * Fetch workflow details by ID from Panoptes.
  * @param workflowId - Zooniverse workflow ID
  * @param token - Optional authentication token

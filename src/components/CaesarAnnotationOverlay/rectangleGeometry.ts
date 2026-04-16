@@ -38,17 +38,17 @@ export function calculateRectangleGeometry(
  */
 export function getTooltipPosition(
   stagePointerX: number,
-  stagePointerY: number,
-  containerRect: DOMRect
+  stagePointerY: number
 ): { x: number; y: number } {
   // Magnifying glass cursor is 32x32px, hotspot at (0, 0)
   // Position tooltip at lower-right corner of cursor - small offset
+  // Coordinates are relative to the canvas Container (position: relative)
   const cursorSize = 32;
   const offsetX = -5; // pixels from cursor corner (negative to pull closer)
   const offsetY = -5; // pixels from cursor corner (negative to pull closer)
   
   return {
-    x: containerRect.left + stagePointerX + cursorSize + offsetX,
-    y: containerRect.top + stagePointerY + cursorSize + offsetY,
+    x: stagePointerX + cursorSize + offsetX,
+    y: stagePointerY + cursorSize + offsetY,
   };
 }

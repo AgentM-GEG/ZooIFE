@@ -46,7 +46,8 @@ export const Container = styled.div`
   width: 100%;
   min-width: 700px;
   min-height: 70vh;
-  overflow: visible;
+  position: relative;
+  overflow: hidden;
 `;
 
 export const CanvasWrapper = styled.div`

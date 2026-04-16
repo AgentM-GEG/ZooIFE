@@ -32,7 +32,7 @@ export const ClearButton = styled(ButtonActive)`
   background: ${theme.colors.secondary};
   margin-top: ${theme.spacing.xs};
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: ${theme.colors.error};
     color: ${theme.colors.text.inverse};
   }

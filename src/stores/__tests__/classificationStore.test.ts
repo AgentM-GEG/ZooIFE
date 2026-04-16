@@ -161,9 +161,9 @@ async function testClassificationExport() {
 
   // ============= Display Results =============
   console.log('\n========== CLASSIFICATION EXPORT TEST ==========\n');
-  console.log('Subject ID:', classification.subject_id);
-  console.log('Workflow ID:', classification.workflow_id);
-  console.log('User ID:', classification.user_id);
+  console.log('Subject ID:', classification.links.subjects[0]);
+  console.log('Workflow ID:', classification.links.workflow);
+  console.log('Project ID:', classification.links.project);
   console.log('Annotations count:', classification.annotations.length);
 
   console.log('\n--- Annotations Detail ---\n');
@@ -233,7 +233,7 @@ async function testClassificationExport() {
 
     // Check point ordering
     if (rect3?.samPoints) {
-      const pointIds = rect3.samPoints.map((p) => p.pointId);
+      const pointIds = rect3.samPoints.map((p: { pointId: number }) => p.pointId);
       console.log(`✓ rect-3 point order: [${pointIds.join(', ')}]`);
     }
   }

@@ -255,37 +255,49 @@ When user submits (or autosaves):
 
 ---
 
-## 7. File Structure (Proposed)
+## 7. File Structure
 
 ```
 ZooIFE/
 ├── public/
-│   └── sample-images/          # Local test images
+│   └── (static assets)
 ├── src/
 │   ├── components/
-│   │   ├── ImageCanvas/        # Image + annotation layers
-│   │   │   ├── ImageLayer.tsx
-│   │   │   ├── AnnotationLayer.tsx
-│   │   │   └── MaskOverlay.tsx
-│   │   ├── ToolPalette/        # Point, freehand, brush
-│   │   ├── TaskSidebar/        # Questions, free text
-│   │   │   ├── SingleChoiceTask.tsx
-│   │   │   ├── MultipleChoiceTask.tsx
-│   │   │   └── TextTask.tsx
-│   │   └── SubjectNavigator/   # Prev/Next subject
+│   │   ├── CaesarAnnotationOverlay/  # ML annotation rectangles with tooltips
+│   │   ├── ImageCanvas/              # Main canvas: image, masks, annotation layers
+│   │   ├── ImageLoader/              # Subject loading + Caesar reduction hooks
+│   │   │   ├── ZooniverseImageLoader.tsx  # "Next subject" + debug override UI
+│   │   │   ├── useSubjectLoader.ts        # Queue management, image loading
+│   │   │   ├── useCaesarReductions.ts     # Caesar fetch + parse (bbox + ML)
+│   │   │   └── styled.ts                  # ControlsRow, DebugInput, Button
+│   │   ├── ImageMask/                # Brush-editable per-annotation mask canvas
+│   │   ├── TaskSidebar/              # Classification question UI
+│   │   ├── ToolPalette/              # Tool & model selection panel
+│   │   └── UserRectsOverlay/         # User-drawn bounding boxes overlay
 │   ├── services/
-│   │   ├── imageService.ts     # Local / API image loading
-│   │   ├── sam2Service.ts      # local SAM2 server
-│   │   ├── panoptesService.ts  # Zooniverse API
-│   │   └── authService.ts
+│   │   ├── apiClient.ts        # Generic HTTP wrapper for Zooniverse endpoints
+│   │   ├── caesarService.ts    # Caesar GraphQL API (fetchCaesarReductions, fetchTypedCaesarReductions)
+│   │   ├── imageService.ts     # Image loading, normalization, dimensions
+│   │   ├── panoptesService.ts  # Zooniverse REST API (subjects, workflows, classifications)
+│   │   └── sam2Service.ts      # SAM2 local Python server integration
 │   ├── stores/
-│   │   └── classificationStore.ts
+│   │   ├── caesarReductionStore.ts   # Caesar ML annotations (read-only overlay state)
+│   │   ├── classificationStore.ts    # Subject classification workflow state
+│   │   └── userStore.ts              # Logged-in user profile
 │   ├── types/
-│   │   ├── panoptes.ts         # Subject, Classification, Workflow
-│   │   └── annotations.ts
+│   │   ├── annotations.ts      # App-domain annotation types (CaesarAnnotation, DrawingAnnotation, ...)
+│   │   ├── caesar.ts           # Caesar API wire-format transport types (SubjectReduction, ...)
+│   │   ├── panoptes.ts         # Panoptes REST API types (Subject, Workflow, Classification)
+│   │   └── tools.ts            # Cross-cutting UI tool types (BrushMode, BrushEditableImageHandle)
+│   ├── auth/                   # OAuth context and token management
+│   ├── hooks/                  # Shared React hooks (useCaesarClient, ...)
+│   ├── theme/                  # Zooniverse design tokens and styled-component base
+│   └── utils/                  # Coordinate transforms, logging, RLE encoding
 │   └── App.tsx
-├── docs/
-│   └── SOLUTION_ARCHITECTURE.md (this file)
+├── server/
+│   ├── sam2_server.py          # FastAPI SAM2 segment endpoint
+│   └── oauth_server.py         # OAuth proxy server
+├── docs/                       # Architecture and component documentation
 └── package.json
 ```
 

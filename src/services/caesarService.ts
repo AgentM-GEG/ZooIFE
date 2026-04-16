@@ -1,6 +1,7 @@
 import { GraphQLClient, gql } from 'graphql-request'
 import { headers, USE_STAGING_APIS } from '@/services/panoptesService'
-import { CaesarAnnotations } from '@/types/annotations';
+import { type MarkTool } from '@/types/annotations';
+import { type GenericSubjectReduction, type SubjectReduction } from '../types/caesar';
 import { loggers } from '@/utils/logger';
 
 /**
@@ -14,32 +15,24 @@ export const CAESAR_STAGING_BASE = import.meta.env.VITE_CAESAR_STAGING_BASE || '
  */
 export type CaesarReductionOptions = {
     staging: boolean;
-    defaultToolType: "rectangle" | "default";
+    defaultToolSpec: MarkTool;
 };
 
 /**
- * Default tool type for Caesar annotations
- */
-export const CEASAR_DEFAULT_TOOL_TYPE = import.meta.env.VITE_CEASAR_DEFAULT_TOOL_TYPE?.trim() || "default";
-
-/**
- * Default options for Caesar reductions
+ * Default tool specification for Caesar annotations
  */
 export const CAESAR_REDUCTION_OPTS: CaesarReductionOptions = {
     staging: USE_STAGING_APIS,
-    defaultToolType: CEASAR_DEFAULT_TOOL_TYPE
+    defaultToolSpec: {
+        type: "rectangle",
+        color: "#ffaa00",  // Orange fallback
+        label: "Unknown artifact"
+    }
 };
 
-/**
- * Subject reduction data structure from Caesar.
- */
-export interface SubjectReduction {
-    data: CaesarAnnotations[];
-}
-
-interface CaesarWorkflowResponse {
+interface CaesarWorkflowResponse<TData = unknown> {
     workflow?: {
-        subject_reductions?: SubjectReduction[];
+        subject_reductions?: SubjectReduction<TData>[];
     };
 }
 
@@ -87,7 +80,24 @@ export async function fetchCaesarReductions(
     reducerKey: string,
     subjectID: string,
     workflowID: string
-): Promise<SubjectReduction[]> {
+): Promise<GenericSubjectReduction[]> {
+    return fetchTypedCaesarReductions<unknown>(caesarClient, reducerKey, subjectID, workflowID);
+}
+
+/**
+ * Fetch typed Caesar reductions for a subject from Caesar.
+ * @param caesarClient - GraphQL client configured for Caesar API
+ * @param reducerKey - Type of reduction to fetch (e.g., "machineLearnt")
+ * @param subjectID - Zooniverse subject ID to fetch reductions for
+ * @param workflowID - Zooniverse workflow ID
+ * @returns Promise resolving to typed array of subject reductions, empty array on error
+ */
+export async function fetchTypedCaesarReductions<TData>(
+    caesarClient: GraphQLClient,
+    reducerKey: string,
+    subjectID: string,
+    workflowID: string
+): Promise<SubjectReduction<TData>[]> {
     if (!reducerKey) {
         loggers.app('fetchCaesarReductions: reducerKey is required');
         return [];
@@ -107,7 +117,7 @@ export async function fetchCaesarReductions(
             reducerKey,
         });
 
-        const response = await caesarClient.request<CaesarWorkflowResponse>(
+        const response = await caesarClient.request<CaesarWorkflowResponse<TData>>(
             FETCH_REDUCTIONS_QUERY,
             {
                 workflowId: workflowID,

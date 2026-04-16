@@ -144,7 +144,7 @@ function UserRect({
  * User-created rects overlay component.
  * 
  * Renders bounding boxes that were created by the user from segmentation masks.
- * Styled with red color and dotted stroke pattern to distinguish from Caesar rects.
+ * Styled with blue color and dotted stroke pattern to distinguish from Caesar rects.
  * Supports clicking to select/zoom to rect (same interaction as Caesar rects).
  * Handles cursor changes and dimming on hover, matching Caesar rect behavior.
  * Displays tooltips with "Volunteer-defined object" label when hovering.
