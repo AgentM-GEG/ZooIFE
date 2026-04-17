@@ -5,6 +5,7 @@ import {
   DEFAULT_ANNOTATION_STROKE_WIDTH,
   ANNOTATION_HIT_STROKE_MULTIPLIER,
   SELECTED_STROKE_MULTIPLIER,
+  ANNO_COUNT_RETIREMENT_THRESHOLD
 } from './constants';
 import { calculateRectangleGeometry } from './rectangleGeometry';
 import { useCaesarAnnotationTooltip } from './useCaesarAnnotationTooltip';
@@ -114,7 +115,7 @@ function CaesarAnnotationRect({
       y={geometry.y}
       width={geometry.width}
       height={geometry.height}
-      stroke={hasPreviousAnnotations ? '#ff4444' : annotation.markColour as string}
+      stroke={hasPreviousAnnotations ? previousAnnotationCount >= ANNO_COUNT_RETIREMENT_THRESHOLD ? '#ff4444' : '#ff9844' : annotation.markColour as string}
       strokeWidth={isSelected ? strokeWidth * SELECTED_STROKE_MULTIPLIER : strokeWidth}
       dash={hasPreviousAnnotations ? [6, 3] : undefined}
       dashEnabled={hasPreviousAnnotations}

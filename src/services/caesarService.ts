@@ -25,7 +25,7 @@ export const CAESAR_REDUCTION_OPTS: CaesarReductionOptions = {
     staging: USE_STAGING_APIS,
     defaultToolSpec: {
         type: "rectangle",
-        color: "#ffaa00",  // Orange fallback
+        color: "#17eb81",  // Green default
         label: "Unknown artifact"
     }
 };

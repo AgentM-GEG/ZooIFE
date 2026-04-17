@@ -39,3 +39,9 @@ export function getAnnotationCursor(isZoomingOut: boolean): string {
  * Default cursor for non-hovering state
  */
 export const ANNOTATION_DEFAULT_CURSOR = 'default';
+
+/**
+ * Default number of volunteer annotations required to retire a bounding
+ * box.
+ */
+export const ANNO_COUNT_RETIREMENT_THRESHOLD = 2;
